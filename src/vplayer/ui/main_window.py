@@ -161,6 +161,19 @@ class MainWindow(QMainWindow):
         self.frame_prev.triggered.connect(lambda: self.player.frame_step(-1))
         self.player.file_loaded.connect(lambda: self.frame_prev.setEnabled(True))
         self.playback_menu.addAction(self.frame_prev)
+        for name, label, key, direction in (
+            ("skip_n_fwd", "Skip frames forward", "Ctrl+.", 1),
+            ("skip_n_back", "Skip frames back", "Ctrl+,", -1),
+        ):
+            action = QAction(label, self)
+            action.setObjectName(name)
+            action.setShortcut(key)
+            action.setEnabled(False)
+            action.triggered.connect(
+                lambda checked=False, sign=direction: self.player.skip_frames(sign * self.settings.skip_frames),
+            )
+            self.player.file_loaded.connect(lambda enabled_action=action: enabled_action.setEnabled(True))
+            self.playback_menu.addAction(action)
         for label, key, amount in (
             ("Seek forward", "Right", self.settings.seek_short_s),
             ("Seek back", "Left", -self.settings.seek_short_s),

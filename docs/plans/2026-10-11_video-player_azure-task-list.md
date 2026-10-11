@@ -399,7 +399,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.2.2.1.1 | Task | `Player.skip_frames(n)` — pause, k = round(time-pos × fps), one exact seek to clamp(k ± n)/fps; `skip_frames` setting (10, 2–1000); `skip_n_fwd` / `skip_n_back` (Ctrl+. / Ctrl+,) | 02:00 | 00:20 | Frame-accuracy: ±10 exact; back from frame < n → 0; past end → last frame | AD-008 |
+| 3.2.2.1.1 | Task | [x] `Player.skip_frames(n)` — pause, k = round(time-pos × fps), one exact seek to clamp(k ± n)/fps; `skip_frames` setting (10, 2–1000); `skip_n_fwd` / `skip_n_back` (Ctrl+. / Ctrl+,) | 02:00 | 00:20 | Frame-accuracy: ±10 exact; back from frame < n → 0; past end → last frame | AD-008; 7/7 CFR clips and playing pause covered; VFR/unknown fps fail explicitly until queued fallback task 3.2.2.2.3; v0.20.0 |
 
 ##### User Story 3.2.2.2 (US-026): Skips to stay exact when the frame rate is unknown or variable
 - **Est. Manual**: 05:15 | **Est. AI**: 00:55

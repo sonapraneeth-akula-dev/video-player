@@ -48,6 +48,7 @@ class Settings:
         self.seek_short_s = 5
         self.seek_long_s = 60
         self.speed_step = 0.05
+        self.skip_frames = 10
         self.readahead_mb = 64
         self.backbuffer_mb = 256
 
@@ -73,6 +74,7 @@ class Settings:
             self.store.setValue("schema_version", SCHEMA_VERSION)
         self.seek_short_s = self._bounded_int("playback/seek_short_s", 5, 1, 600)
         self.seek_long_s = self._bounded_int("playback/seek_long_s", 60, 1, 3600)
+        self.skip_frames = self._bounded_int("playback/skip_frames", 10, 2, 1000)
         self.readahead_mb = self._bounded_int("network/readahead_mb", 64, 16, 64)
         self.backbuffer_mb = self._bounded_int("network/backbuffer_mb", 256, 0, 256)
         value = self.store.value("playback/speed_step", 0.05)

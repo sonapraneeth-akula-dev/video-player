@@ -42,6 +42,7 @@ class Player(QObject):
         self._closed = False
         self._uri = ""
         self._pending_frame_steps: list[int] = []
+        self._pending_skip: int | None = None
         self.variable_frame_rate = False
         self._vfr_checked = False
         self.readahead_mb = readahead_mb
@@ -102,6 +103,10 @@ class Player(QObject):
             self.duration.emit(value)
         elif name == "pause":
             self.paused.emit(value)
+            if value and self._pending_skip is not None:
+                frames = self._pending_skip
+                self._pending_skip = None
+                self._skip_frames_paused(frames)
             if value and self._pending_frame_steps:
                 steps = self._pending_frame_steps
                 self._pending_frame_steps = []
@@ -226,6 +231,7 @@ class Player(QObject):
             self._sftp_sources[self._uri] = (transport, path)
             self.variable_frame_rate = False
             self._vfr_checked = False
+            self._pending_skip = None
             self.mpv.loadfile(self._uri)
             return
         file = Path(path)
@@ -238,6 +244,7 @@ class Player(QObject):
         self._uri = str(file.resolve())
         self.variable_frame_rate = False
         self._vfr_checked = False
+        self._pending_skip = None
         self.mpv.loadfile(self._uri)
 
     def play_pause(self) -> None:
@@ -266,10 +273,38 @@ class Player(QObject):
     def frame_step(self, direction: int = 1) -> None:
         if type(direction) is not int or direction not in (-1, 1):
             raise ValueError("Frame step direction must be -1 or 1")
+        self._pending_skip = None
         if self.mpv.pause:
             self.mpv.command("frame-step" if direction == 1 else "frame-back-step")
         else:
             self._pending_frame_steps.append(direction)
+            self.mpv.pause = True
+
+    def _skip_frames_paused(self, frames: int) -> None:
+        fps = self.frame_rate()
+        duration = self.mpv.duration
+        if fps is None or duration is None:
+            self.error.emit("Cannot skip frames without a known frame rate and duration")
+            return
+        last = max(0, math.ceil(duration * fps) - 1)
+        current = round((self.mpv.time_pos or 0) * fps)
+        target = max(0, min(current + frames, last))
+        self.mpv.seek(target / fps, reference="absolute", precision="exact")
+
+    def skip_frames(self, frames: int) -> None:
+        if type(frames) is not int or frames == 0 or abs(frames) > 1000:
+            raise ValueError("Frame skip must be between -1000 and 1000, excluding zero")
+        if self.variable_frame_rate:
+            self.error.emit("Frame skip on variable-rate media requires single-step fallback")
+            return
+        if self.frame_rate() is None or self.mpv.duration is None:
+            self.error.emit("Cannot skip frames without a known frame rate and duration")
+            return
+        self._pending_frame_steps.clear()
+        if self.mpv.pause:
+            self._skip_frames_paused(frames)
+        else:
+            self._pending_skip = frames
             self.mpv.pause = True
 
     def seek(self, seconds: float, relative: bool = False) -> None:
@@ -280,6 +315,7 @@ class Player(QObject):
         if duration is None:
             self.error.emit("Cannot seek before a file is loaded")
             return
+        self._pending_skip = None
         fps = self.frame_rate()
         last_frame = max(0.0, duration - (1.0 / fps if fps else 1e-6))
         target = seconds + (self.mpv.time_pos or 0.0) if relative else seconds

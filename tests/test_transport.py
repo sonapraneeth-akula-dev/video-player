@@ -86,8 +86,10 @@ def test_volume_mute_and_fullscreen_shortcuts(qtbot, tmp_path):
         window.close()
 
 
-def test_forward_frame_action_is_available_after_load(qtbot, tmp_path):
-    window = MainWindow(Settings(tmp_path / "settings.ini"))
+def test_frame_actions_are_available_after_load(qtbot, tmp_path, monkeypatch):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("playback/skip_frames", 7)
+    window = MainWindow(settings)
     qtbot.addWidget(window)
     window.show()
     try:
@@ -97,11 +99,25 @@ def test_forward_frame_action_is_available_after_load(qtbot, tmp_path):
         assert not window.frame_prev.isEnabled()
         assert window.frame_prev.shortcut().toString() == ","
         assert window.frame_prev in window.playback_menu.actions()
+        skip_actions = {
+            action.objectName(): action for action in window.playback_menu.actions()
+            if action.objectName() in ("skip_n_fwd", "skip_n_back")
+        }
+        assert [skip_actions[key].shortcut().toString() for key in ("skip_n_fwd", "skip_n_back")] == [
+            "Ctrl+.", "Ctrl+,",
+        ]
+        assert not any(action.isEnabled() for action in skip_actions.values())
         with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
             window.open_file(MEDIA)
         assert window.frame_next.isEnabled()
         assert window.frame_prev.isEnabled()
+        assert all(action.isEnabled() for action in skip_actions.values())
         window.frame_next.trigger()
         qtbot.waitUntil(lambda: window.player.mpv.pause is True)
+        calls = []
+        monkeypatch.setattr(window.player, "skip_frames", calls.append)
+        skip_actions["skip_n_fwd"].trigger()
+        skip_actions["skip_n_back"].trigger()
+        assert calls == [7, -7]
     finally:
         window.close()

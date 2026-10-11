@@ -75,6 +75,18 @@ def test_remote_buffer_settings_are_bounded(tmp_path, caplog):
     assert "Invalid network/backbuffer_mb" in caplog.text
 
 
+def test_frame_skip_setting_is_bounded(tmp_path, caplog):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("playback/skip_frames", 1000)
+    settings.load()
+    assert settings.skip_frames == 1000
+    settings.store.setValue("playback/skip_frames", 1)
+    with caplog.at_level(logging.WARNING):
+        settings.load()
+    assert settings.skip_frames == 10
+    assert "Invalid playback/skip_frames" in caplog.text
+
+
 def test_connection_profile_create_update_read_delete_without_secrets(tmp_path):
     path = tmp_path / "settings.ini"
     settings = Settings(path)

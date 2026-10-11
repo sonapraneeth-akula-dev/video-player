@@ -120,6 +120,59 @@ def test_back_step_is_exact_across_cfr_matrix(qtbot, paused_video, name):
         qtbot.waitUntil(lambda index=index: frame_index(player) == index, timeout=10000)
 
 
+@pytest.mark.parametrize("name", [case[0] for case in CASES])
+def test_skip_frames_is_exact_and_clamps_to_file_bounds(qtbot, paused_video, name):
+    player, widget = paused_video
+    qtbot.waitUntil(lambda: widget._render is not None, timeout=10000)
+    player.mpv.pause = True
+    with qtbot.waitSignal(player.file_loaded, timeout=10000):
+        player.load(MEDIA / name)
+    qtbot.waitUntil(lambda: widget.grabFramebuffer().pixelColor(128, 72).red() > 35, timeout=10000)
+    qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
+    player.skip_frames(10)
+    qtbot.waitUntil(lambda: frame_index(player) == 10, timeout=10000)
+    player.skip_frames(-10)
+    qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
+    player.skip_frames(-10)
+    qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
+    player.skip_frames(1000)
+    last = 24 if name.startswith("matrix_") else 299
+    qtbot.waitUntil(lambda: frame_index(player) == last, timeout=10000)
+    player.skip_frames(10)
+    qtbot.waitUntil(lambda: frame_index(player) == last, timeout=10000)
+
+
+def test_skip_from_playing_pauses_before_exact_seek(qtbot, paused_video):
+    player, _widget = paused_video
+    player.mpv.pause = True
+    with qtbot.waitSignal(player.file_loaded, timeout=10000):
+        player.load(MEDIA / "h264_25.mp4")
+    player.mpv.pause = False
+    qtbot.waitUntil(lambda: frame_index(player) > 5, timeout=10000)
+    paused_frames = []
+
+    def record_pause(value):
+        if value and not paused_frames:
+            paused_frames.append(round((player.mpv.time_pos or 0) * player.frame_rate()))
+
+    player.paused.connect(record_pause)
+    try:
+        player.skip_frames(10)
+        qtbot.waitUntil(lambda: bool(paused_frames), timeout=10000)
+        qtbot.waitUntil(
+            lambda: player.mpv.pause is True and frame_index(player) == paused_frames[0] + 10, timeout=10000,
+        )
+    finally:
+        player.paused.disconnect(record_pause)
+
+
+@pytest.mark.parametrize("count", [0, 1001, -1001, True, 1.0, "10"])
+def test_skip_frames_rejects_invalid_count(paused_video, count):
+    player, _widget = paused_video
+    with pytest.raises(ValueError, match="Frame skip"):
+        player.skip_frames(count)
+
+
 def test_back_step_from_playing_pauses_then_moves_one_frame(qtbot, paused_video):
     player, _widget = paused_video
     player.mpv.pause = True
