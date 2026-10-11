@@ -1,16 +1,18 @@
 """Qt-facing facade for one libmpv playback core."""
 
 import ctypes
+import itertools
 import logging
 import math
 import posixpath
+import re
 import uuid
 from decimal import Decimal
 from pathlib import Path
 
 import mpv
 import paramiko
-from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, QStandardPaths, Qt, QTimer, Signal, Slot
 
 from vplayer.sftp import SftpStream
 
@@ -33,6 +35,7 @@ class Player(QObject):
     def __init__(
         self, parent: QObject | None = None, *, video_output: str = "libmpv",
         readahead_mb: int = 64, backbuffer_mb: int = 256,
+        snapshot_dir: Path | None = None,
     ):
         super().__init__(parent)
         if (
@@ -57,6 +60,9 @@ class Player(QObject):
         self._vfr_checked = False
         self.readahead_mb = readahead_mb
         self.backbuffer_mb = backbuffer_mb
+        self.snapshot_dir = snapshot_dir or Path(
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
+        ) / "vplayer"
         self._sftp_sources: dict[str, tuple[paramiko.Transport, str]] = {}
         self._sftp_streams: dict[int, tuple[SftpStream, paramiko.SFTPClient]] = {}
         self._sftp_callbacks = None
@@ -402,6 +408,49 @@ class Player(QObject):
         target = seconds + (self.mpv.time_pos or 0.0) if relative else seconds
         target = max(0.0, min(target, last_frame))
         self.mpv.seek(target, reference="absolute", precision="exact" if target == last_frame else "keyframes")
+
+    def snapshot(self, path: str | Path | None = None) -> Path:
+        if self.mpv.duration is None or not self._uri:
+            raise ValueError("Cannot take a snapshot before a file is loaded")
+        self._stop_skip()
+        if path is None:
+            self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+            position = max(0, round((self.mpv.time_pos or 0) * 1000))
+            seconds, millis = divmod(position, 1000)
+            hours, remainder = divmod(seconds, 3600)
+            minutes, second = divmod(remainder, 60)
+            stem = re.sub(r"[^\w.-]", "_", Path(self._uri).stem)
+            name = f"{stem}_{hours:02}-{minutes:02}-{second:02}.{millis:03}"
+            fps = self.frame_rate()
+            if fps is not None:
+                name += f"_f{round(position / 1000 * fps)}"
+            candidates = (
+                self.snapshot_dir / f"{name}{'' if index == 1 else f'_{index}'}.png"
+                for index in itertools.count(1)
+            )
+        else:
+            target = Path(path)
+            if target.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+                raise ValueError("Snapshot file must have a PNG or JPEG extension")
+            candidates = iter((target,))
+        for target in candidates:
+            try:
+                with target.open("x"):
+                    pass
+                break
+            except FileExistsError:
+                if path is not None:
+                    raise
+        try:
+            self.mpv.command("screenshot-to-file", str(target), "video")
+        except Exception:
+            try:
+                if target.exists() and target.stat().st_size == 0:
+                    target.unlink()
+            except OSError:
+                log.exception("Could not remove empty snapshot reservation %s", target)
+            raise
+        return target
 
     def state(self) -> dict[str, object]:
         return {

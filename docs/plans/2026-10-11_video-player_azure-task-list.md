@@ -444,7 +444,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 4.1.1.1.1 | Task | `Player.snapshot(None)` — reserve the target with `open(path, "x")` (`_2`, `_3`… on collision), `screenshot-to-file <path> video`, delete the empty file on failure; toast with "Open folder"; `snapshot` (S) | 02:00 | 00:20 | `tests/test_snapshot.py`: PNG size == video size, no overlay; existing file never overwritten | FR-018/019; final name format in US-055 |
+| 4.1.1.1.1 | Task | [x] `Player.snapshot(None)` — reserve the target with `open(path, "x")` (`_2`, `_3`… on collision), `screenshot-to-file <path> video`, delete the empty file on failure; toast with "Open folder"; `snapshot` (S) | 02:00 | 00:20 | `tests/test_snapshot.py`: PNG size == video size, no overlay; existing file never overwritten | FR-018/019; native 256×144 PNG and collision/failure tests; final naming in US-055; v0.23.0 |
 | 4.1.1.1.2 | Debug | Snapshot edge cases — rotation metadata and HDR→SDR tone-mapping with `screenshot-to-file … video` | 01:00 | 00:15 | Rotated and HDR clips added to the snapshot test; extra filters only if needed | Design §13 |
 
 ##### User Story 4.1.1.2 (US-029): A "Save As" snapshot

@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, QStandardPaths
 
 log = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
@@ -51,6 +51,9 @@ class Settings:
         self.skip_frames = 10
         self.readahead_mb = 64
         self.backbuffer_mb = 256
+        self.snapshot_dir = Path(
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
+        ) / "vplayer"
 
     def _bounded_int(self, key: str, default: int, minimum: int, maximum: int) -> int:
         value = self.store.value(key)
@@ -77,6 +80,13 @@ class Settings:
         self.skip_frames = self._bounded_int("playback/skip_frames", 10, 2, 1000)
         self.readahead_mb = self._bounded_int("network/readahead_mb", 64, 16, 64)
         self.backbuffer_mb = self._bounded_int("network/backbuffer_mb", 256, 0, 256)
+        snapshot_dir = self.store.value("snapshot/dir")
+        if snapshot_dir is not None:
+            if isinstance(snapshot_dir, str) and snapshot_dir.strip() and Path(snapshot_dir).is_absolute():
+                self.snapshot_dir = Path(snapshot_dir)
+            else:
+                log.warning("Invalid snapshot/dir setting %r; using %s", snapshot_dir, self.snapshot_dir)
+                self.store.setValue("snapshot/dir", str(self.snapshot_dir))
         value = self.store.value("playback/speed_step", 0.05)
         try:
             if isinstance(value, bool):

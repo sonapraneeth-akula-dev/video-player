@@ -3,13 +3,14 @@
 import math
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QFocusFrame,
     QLabel,
     QMainWindow,
+    QPushButton,
     QSlider,
     QStyle,
     QToolBar,
@@ -83,12 +84,22 @@ class MainWindow(QMainWindow):
         self.settings.load()
         self.player = Player(
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
+            snapshot_dir=self.settings.snapshot_dir,
         )
         self.speed_label = QLabel("1×", self)
         self.speed_label.setAccessibleName("Playback speed")
         self.statusBar().addPermanentWidget(self.speed_label)
         self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
         self.player.skip_status.connect(self.statusBar().showMessage)
+        self.snapshot_button = QPushButton("Open folder", self)
+        self.snapshot_button.setAccessibleName("Open snapshot folder")
+        self.snapshot_button.hide()
+        self.snapshot_button.clicked.connect(self.open_snapshot_folder)
+        self.statusBar().addPermanentWidget(self.snapshot_button)
+        self._snapshot_timer = QTimer(self)
+        self._snapshot_timer.setSingleShot(True)
+        self._snapshot_timer.timeout.connect(self.snapshot_button.hide)
+        self._snapshot_folder: Path | None = None
 
         content = QWidget(self)
         layout = QVBoxLayout(content)
@@ -125,6 +136,11 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self.choose_file)
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu.addAction(open_action)
+        snapshot_action = QAction("Snapshot", self)
+        snapshot_action.setObjectName("snapshot")
+        snapshot_action.setShortcut("S")
+        snapshot_action.triggered.connect(self.snapshot)
+        self.file_menu.addAction(snapshot_action)
         self.view_menu = self.menuBar().addMenu("&View")
         browser_action = self.browser.toggleViewAction()
         browser_action.setShortcut("Ctrl+B")
@@ -262,6 +278,23 @@ class MainWindow(QMainWindow):
     def open_file(self, path: str | Path):
         self.banner.hide()
         self.player.load(path)
+
+    def snapshot(self):
+        try:
+            saved = self.player.snapshot()
+        except (OSError, SystemError, ValueError) as error:
+            self.show_error(f"Could not save snapshot: {error}")
+            return
+        self._snapshot_folder = saved.parent
+        self.statusBar().showMessage(f"Saved snapshot: {saved}", 8000)
+        self.snapshot_button.show()
+        self._snapshot_timer.start(8000)
+
+    def open_snapshot_folder(self):
+        if self._snapshot_folder is not None and not QDesktopServices.openUrl(
+            QUrl.fromLocalFile(str(self._snapshot_folder)),
+        ):
+            self.show_error(f"Could not open snapshot folder: {self._snapshot_folder}")
 
     def show_error(self, message: str):
         self.banner.setText(message)

@@ -87,6 +87,19 @@ def test_frame_skip_setting_is_bounded(tmp_path, caplog):
     assert "Invalid playback/skip_frames" in caplog.text
 
 
+def test_snapshot_directory_requires_absolute_path(tmp_path, caplog):
+    settings = Settings(tmp_path / "settings.ini")
+    default = settings.snapshot_dir
+    settings.store.setValue("snapshot/dir", "relative/path")
+    with caplog.at_level(logging.WARNING):
+        settings.load()
+    assert settings.snapshot_dir == default
+    assert "Invalid snapshot/dir" in caplog.text
+    settings.store.setValue("snapshot/dir", str(tmp_path / "pictures"))
+    settings.load()
+    assert settings.snapshot_dir == tmp_path / "pictures"
+
+
 def test_connection_profile_create_update_read_delete_without_secrets(tmp_path):
     path = tmp_path / "settings.ini"
     settings = Settings(path)
