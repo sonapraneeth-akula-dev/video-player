@@ -418,7 +418,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.2.3.1.1 | Task | Position display — `HH:MM:SS.mmm`, duration, `f<n>` = round(time-pos × fps), "≈ f <n>" for VFR, "f —" for unknown; `toggle_overlay` (I) | 01:30 | 00:20 | Unit format tests; VFR test asserts labels | FR-014 |
+| 3.2.3.1.1 | Task | [x] Position display — `HH:MM:SS.mmm`, duration, `f<n>` = round(time-pos × fps), "≈ f <n>" for VFR, "f —" for unknown; `toggle_overlay` (I) | 01:30 | 00:20 | Unit format tests; VFR test asserts labels | FR-014; overlay visibility, real VFR label and unknown-fps tests; v0.21.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: frame-accuracy test on generated CFR clips (H.264/HEVC/VP9/AV1;

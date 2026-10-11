@@ -1,5 +1,6 @@
 """Main window for local playback."""
 
+import math
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, Signal
@@ -105,7 +106,7 @@ class MainWindow(QMainWindow):
         self.video.installEventFilter(self)
         self.seek_bar = SeekBar(content)
         layout.addWidget(self.seek_bar)
-        self.time_label = QLabel("00:00 / 00:00", content)
+        self.time_label = QLabel("00:00:00.000 / 00:00:00.000 · f —", content)
         self.time_label.setAccessibleName("Playback position")
         layout.addWidget(self.time_label)
         self.setCentralWidget(content)
@@ -129,6 +130,13 @@ class MainWindow(QMainWindow):
         self.view_menu.addAction(browser_action)
         self.playback_menu = self.menuBar().addMenu("&Playback")
         self.playback_menu.addAction(self.controls.play_action)
+        overlay_action = QAction("Show position overlay", self)
+        overlay_action.setObjectName("toggle_overlay")
+        overlay_action.setShortcut("I")
+        overlay_action.setCheckable(True)
+        overlay_action.setChecked(True)
+        overlay_action.toggled.connect(self.time_label.setVisible)
+        self.view_menu.addAction(overlay_action)
         self.speed_actions = {}
         for index, speed in enumerate((0.25, 0.5, 0.67, 1.0, 2.0, 4.0), start=1):
             action = QAction(f"{speed:g}× speed", self)
@@ -201,15 +209,24 @@ class MainWindow(QMainWindow):
         self._position = 0.0
         self.player.duration.connect(self._duration_changed)
         self.player.position.connect(self._position_changed)
+        self.player.vfr_detected.connect(self._update_time)
         self.seek_bar.seek_requested.connect(self._seek_from_bar)
 
     @staticmethod
     def _clock(seconds: float) -> str:
-        minutes, seconds = divmod(int(seconds), 60)
-        return f"{minutes:02}:{seconds:02}"
+        if not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds < 0:
+            return "—"
+        whole, millis = divmod(round(seconds * 1000), 1000)
+        hours, remainder = divmod(whole, 3600)
+        minutes, second = divmod(remainder, 60)
+        return f"{hours:02}:{minutes:02}:{second:02}.{millis:03}"
 
     def _update_time(self):
-        self.time_label.setText(f"{self._clock(self._position)} / {self._clock(self._duration)}")
+        fps = self.player.frame_rate()
+        frame = "f —" if fps is None else f"f{round(self._position * fps)}"
+        if fps is not None and self.player.variable_frame_rate:
+            frame = f"≈ f {round(self._position * fps)}"
+        self.time_label.setText(f"{self._clock(self._position)} / {self._clock(self._duration)} · {frame}")
 
     def _duration_changed(self, duration):
         self._duration = duration or 0.0
