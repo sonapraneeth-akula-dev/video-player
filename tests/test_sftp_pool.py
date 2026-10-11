@@ -61,9 +61,178 @@ def test_wrong_password_reports_error_and_retry_connects(qtbot, trusted_pool, sf
 @pytest.mark.sftp
 def test_unknown_host_key_is_never_accepted_implicitly(qtbot, sftp_server, tmp_path):
     pool = SshPool(KnownHosts(tmp_path / "missing_user", tmp_path / "missing_app"))
-    with qtbot.waitSignal(pool.error, timeout=10000) as result:
+    connected = []
+    pool.connected.connect(lambda transport: connected.append(transport))
+    with qtbot.waitSignal(pool.host_key_required, timeout=10000) as result:
         pool.connect(sftp_server.host, sftp_server.port, "password", sftp_server.password)
-    assert "Unknown SSH host key" in result.args[0]
+    assert result.args[:2] == [sftp_server.host, sftp_server.port]
+    assert pool.known_hosts.classify(*result.args[:3]) == "unknown"
+    assert not connected
+
+
+@pytest.mark.sftp
+def test_changed_key_requires_warning_and_rejection_prevents_authentication(
+    qtbot, sftp_server, tmp_path, monkeypatch,
+):
+    from vplayer.ui.dialogs import HostKeyDialog
+
+    known = KnownHosts(tmp_path / "missing_user", tmp_path / "app" / "known_hosts")
+    old_key = paramiko.RSAKey.generate(1024)
+    known.remember(sftp_server.host, sftp_server.port, old_key)
+    original = known.app_path.read_bytes()
+    pool = SshPool(known)
+    warnings = []
+    authenticated = []
+    original_auth = paramiko.Transport.auth_password
+
+    def record_auth(transport, *args, **kwargs):
+        authenticated.append(True)
+        return original_auth(transport, *args, **kwargs)
+
+    def reject_warning(dialog):
+        warnings.append(dialog.windowTitle())
+        assert dialog.reject_button.isDefault()
+        assert not dialog.accept_once.isDefault()
+        assert not dialog.remember_button.isDefault()
+        dialog.reject_button.click()
+        return dialog.result()
+
+    monkeypatch.setattr(paramiko.Transport, "auth_password", record_auth)
+    monkeypatch.setattr(HostKeyDialog, "exec", reject_warning)
+    dialog = ConnectDialog(pool=pool)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.host.setText(sftp_server.host)
+    dialog.port.setValue(sftp_server.port)
+    dialog.user.setText("password")
+    dialog.password.setText(sftp_server.password)
+    with qtbot.waitSignal(pool.host_key_required, timeout=10000):
+        dialog.accept()
+    qtbot.waitUntil(lambda: bool(warnings), timeout=10000)
+    assert "Changed SSH host key" in warnings
+    assert dialog.isVisible()
+    assert not authenticated
+    assert known.app_path.read_bytes() == original
+
+
+@pytest.mark.sftp
+def test_trust_changed_key_once_pins_retry_without_persisting(qtbot, sftp_server, tmp_path, monkeypatch):
+    from vplayer.ui.dialogs import HostKeyDialog
+
+    known = KnownHosts(tmp_path / "missing_user", tmp_path / "app" / "known_hosts")
+    old_key = paramiko.RSAKey.generate(1024)
+    known.remember(sftp_server.host, sftp_server.port, old_key)
+    original = known.app_path.read_bytes()
+    pool = SshPool(known)
+    prompts = []
+
+    def trust_once(dialog):
+        prompts.append(dialog.windowTitle())
+        dialog.accept_once.click()
+        return dialog.result()
+
+    monkeypatch.setattr(HostKeyDialog, "exec", trust_once)
+    dialog = ConnectDialog(pool=pool)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.host.setText(sftp_server.host)
+    dialog.port.setValue(sftp_server.port)
+    dialog.user.setText("password")
+    dialog.password.setText(sftp_server.password)
+    with qtbot.waitSignal(dialog.connected, timeout=10000) as result:
+        dialog.accept()
+    try:
+        assert result.args[0].is_authenticated()
+        assert prompts == ["Changed SSH host key"]
+        assert known.classify(sftp_server.host, sftp_server.port, result.args[0].get_remote_server_key()) == "changed"
+        assert known.app_path.read_bytes() == original
+    finally:
+        result.args[0].close()
+
+
+@pytest.mark.sftp
+def test_remember_unknown_key_allows_later_connection_without_prompt(qtbot, sftp_server, tmp_path, monkeypatch):
+    from vplayer.ui.dialogs import HostKeyDialog
+
+    user_file = tmp_path / "missing_user"
+    known = KnownHosts(user_file, tmp_path / "app" / "known_hosts")
+    pool = SshPool(known)
+    prompts = []
+
+    def remember(dialog):
+        prompts.append(dialog.windowTitle())
+        dialog.remember_button.click()
+        return dialog.result()
+
+    monkeypatch.setattr(HostKeyDialog, "exec", remember)
+    dialog = ConnectDialog(pool=pool)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.host.setText(sftp_server.host)
+    dialog.port.setValue(sftp_server.port)
+    dialog.user.setText("password")
+    dialog.password.setText(sftp_server.password)
+    with qtbot.waitSignal(dialog.connected, timeout=10000) as first:
+        dialog.accept()
+    server_key = first.args[0].get_remote_server_key()
+    first.args[0].close()
+    assert prompts == ["Unknown SSH host key"]
+    assert not user_file.exists()
+    assert KnownHosts(user_file, known.app_path).classify(
+        sftp_server.host, sftp_server.port, server_key,
+    ) == "trusted"
+    with qtbot.waitSignal(pool.connected, timeout=10000) as second:
+        pool.connect(sftp_server.host, sftp_server.port, "password", sftp_server.password)
+    second.args[0].close()
+    assert prompts == ["Unknown SSH host key"]
+
+
+@pytest.mark.sftp
+@pytest.mark.parametrize("pin_previous_key", [False, True])
+def test_reconnect_with_changed_key_fails_without_prompt(qtbot, sftp_server, tmp_path, pin_previous_key):
+    known = KnownHosts(tmp_path / "missing_user", tmp_path / "app" / "known_hosts")
+    old_key = paramiko.RSAKey.generate(1024)
+    known.remember(sftp_server.host, sftp_server.port, old_key)
+    pool = SshPool(known)
+    prompts = []
+    pool.host_key_required.connect(lambda *args: prompts.append(args))
+    with qtbot.waitSignal(pool.connection_failed, timeout=10000) as failed:
+        pool.connect(
+            sftp_server.host, sftp_server.port, "password", sftp_server.password,
+            approved_key=old_key if pin_previous_key else None, reconnect=True,
+        )
+    assert "SSH host key" in failed.args[0]
+    assert not prompts
+
+
+@pytest.mark.sftp
+def test_reconnect_with_unknown_key_fails_without_prompt(qtbot, sftp_server, tmp_path):
+    pool = SshPool(KnownHosts(tmp_path / "missing_user", tmp_path / "missing_app"))
+    prompts = []
+    pool.host_key_required.connect(lambda *args: prompts.append(args))
+    with qtbot.waitSignal(pool.connection_failed, timeout=10000) as failed:
+        pool.connect(sftp_server.host, sftp_server.port, "password", sftp_server.password, reconnect=True)
+    assert "Unknown SSH host key during reconnect" in failed.args[0]
+    assert not prompts
+
+
+@pytest.mark.sftp
+def test_cancelled_connection_does_not_open_late_host_key_prompt(qtbot, sftp_server, tmp_path, monkeypatch):
+    from vplayer.ui.dialogs import HostKeyDialog
+
+    pool = SshPool(KnownHosts(tmp_path / "missing_user", tmp_path / "missing_app"))
+    monkeypatch.setattr(HostKeyDialog, "exec", lambda dialog: pytest.fail("Prompt after cancellation"))
+    dialog = ConnectDialog(pool=pool)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.host.setText(sftp_server.host)
+    dialog.port.setValue(sftp_server.port)
+    dialog.user.setText("password")
+    dialog.password.setText(sftp_server.password)
+    with qtbot.waitSignal(pool.host_key_required, timeout=10000):
+        dialog.accept()
+        dialog.reject()
+    assert dialog.result() == QDialog.DialogCode.Rejected
 
 
 def test_invalid_ssh_connection_reports_error_without_worker(qtbot, tmp_path):

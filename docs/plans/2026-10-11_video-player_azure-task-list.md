@@ -247,7 +247,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.1.2.2.1 | Task | Changed-key path — trusted entries but no match → warning dialog with no default accept; during automatic reconnect → hard failure, no prompt | 01:30 | 00:15 | Unit: changed key → warning; reconnect with changed key → `connection_failed` \|\| |  |
+| 2.1.2.2.1 | Task | [x] Changed-key path — trusted entries but no match → warning dialog with no default accept; during automatic reconnect → hard failure, no prompt | 01:30 | 00:15 | Unit: changed key → warning; reconnect with changed key → `connection_failed` \|\| | Unknown/changed keys now prompt through ConnectDialog after closing the pre-auth transport; trust once pins retry, changed/unknown reconnect fails closed; v0.11.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: host-key trust table passes (old key in `known_hosts` + accepted new key in

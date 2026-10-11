@@ -32,6 +32,8 @@ class ConnectDialog(QDialog):
     def __init__(self, profile_id: str | None = None, parent=None, *, pool: SshPool | None = None):
         super().__init__(parent)
         self.pool = pool
+        self._approved_host_key: tuple[str, int, paramiko.PKey] | None = None
+        self._connecting = False
         self.profile_id = str(uuid.UUID(profile_id)) if profile_id is not None else str(uuid.uuid4())
         self.setWindowTitle("Connect to SFTP")
         form = QFormLayout()
@@ -82,6 +84,7 @@ class ConnectDialog(QDialog):
             pool.passphrase_required.connect(self._request_passphrase)
             pool.error.connect(self._connection_error)
             pool.connected.connect(self._connection_succeeded)
+            pool.host_key_required.connect(self._confirm_host_key)
 
     def _auth_changed(self):
         method = self.auth.currentData()
@@ -108,17 +111,33 @@ class ConnectDialog(QDialog):
                 return
         if self.pool is not None:
             method = self.auth.currentData()
+            approval = self._approved_host_key
+            self._connecting = True
             self.pool.connect(
                 host, self.port.value(), user,
                 password=self.password.text() if method == "password" else None,
                 auth=method,
                 key_path=self.key_path.text() if method == "key" else None,
                 passphrase=(self.password.text() or None) if method == "key" else None,
+                approved_key=approval[2] if approval is not None and approval[:2] == (host, self.port.value()) else None,
             )
             return
         super().accept()
 
+    def _confirm_host_key(self, host: str, port: int, key: paramiko.PKey, close_transport: Callable[[], None]):
+        if not self._connecting or not self.isVisible() or (host, port) != (self.host.text().strip(), self.port.value()):
+            close_transport()
+            return
+        self._connecting = False
+        dialog = HostKeyDialog(self.pool.known_hosts, host, port, key, close_transport, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._approved_host_key = (host, port, key)
+            self.accept()
+
     def _request_passphrase(self, key_path: str):
+        if not self._connecting:
+            return
+        self._connecting = False
         value, accepted = QInputDialog.getText(
             self, "Private key passphrase", f"Passphrase for {key_path}",
             QLineEdit.EchoMode.Password,
@@ -128,11 +147,24 @@ class ConnectDialog(QDialog):
             self.accept()
 
     def _connection_error(self, message: str):
+        if not self._connecting:
+            return
+        self._connecting = False
         QMessageBox.warning(self, "SSH connection failed", message)
 
     def _connection_succeeded(self, transport: paramiko.Transport):
+        if not self._connecting:
+            transport.close()
+            return
+        self._connecting = False
+        self._approved_host_key = None
         self.connected.emit(transport)
         super().accept()
+
+    def reject(self):
+        self._connecting = False
+        self._approved_host_key = None
+        super().reject()
 
 class HostKeyDialog(QDialog):
     def __init__(

@@ -47,3 +47,9 @@ process when the handler is installed.
 For the SSH integration fixtures, start a local Docker Linux daemon and run
 `python -m pytest -q -m sftp`; the tests build and remove a disposable OpenSSH
 container automatically.
+The SFTP connection dialog verifies unknown and changed SSH host keys before
+authentication. Trust once applies only to the current connection; trust and
+remember updates the application's known-hosts file without editing
+`~/.ssh/known_hosts`. Automatic reconnect fails without a trust prompt if the
+key is unknown or differs from the approved key. SFTP browsing is not yet
+exposed through the main window.

@@ -61,6 +61,7 @@ class _PoolSignals(QObject):
     connected = Signal(object)
     error = Signal(str)
     passphrase_required = Signal(str)
+    host_key_required = Signal(str, int, object, object)
 
 
 class SshPool:
@@ -70,7 +71,9 @@ class SshPool:
         self._signals = _PoolSignals()
         self.connected = self._signals.connected
         self.error = self._signals.error
+        self.connection_failed = self._signals.error
         self.passphrase_required = self._signals.passphrase_required
+        self.host_key_required = self._signals.host_key_required
 
     def connect(
         self, host: str, port: int, user: str, password: str | None = None, *,
@@ -78,6 +81,8 @@ class SshPool:
         key_path: str | Path | None = None,
         passphrase: str | None = None,
         keepalive_s: int = 15,
+        approved_key: paramiko.PKey | None = None,
+        reconnect: bool = False,
     ) -> None:
         if (
             not isinstance(host, str) or not host or any(char.isspace() for char in host)
@@ -89,17 +94,22 @@ class SshPool:
             or (passphrase is not None and not isinstance(passphrase, str))
             or isinstance(keepalive_s, bool) or not isinstance(keepalive_s, int)
             or not 5 <= keepalive_s <= 300
+            or (approved_key is not None and not isinstance(approved_key, paramiko.PKey))
+            or not isinstance(reconnect, bool)
         ):
             self.error.emit("Invalid SSH connection parameters")
             return
         self.workers.start(
-            lambda: self._connect(host, port, user, password, auth, key_path, passphrase, keepalive_s),
+            lambda: self._connect(
+                host, port, user, password, auth, key_path, passphrase, keepalive_s, approved_key, reconnect,
+            ),
         )
 
     def _connect(
         self, host: str, port: int, user: str, password: str | None,
         auth: Literal["password", "key", "agent"], key_path: str | Path | None,
-        passphrase: str | None, keepalive_s: int,
+        passphrase: str | None, keepalive_s: int, approved_key: paramiko.PKey | None,
+        reconnect: bool,
     ) -> None:
         transport = None
         try:
@@ -107,8 +117,14 @@ class SshPool:
             transport.start_client(timeout=10)
             key = transport.get_remote_server_key()
             trust = self.known_hosts.classify(host, port, key)
-            if trust != "trusted":
-                raise paramiko.SSHException(f"{trust.capitalize()} SSH host key for {host}:{port}")
+            if approved_key is not None and key != approved_key:
+                raise paramiko.SSHException(f"SSH host key changed since approval for {host}:{port}")
+            if trust != "trusted" and approved_key is None:
+                if reconnect:
+                    raise paramiko.SSHException(f"{trust.capitalize()} SSH host key during reconnect for {host}:{port}")
+                transport.close()
+                self.host_key_required.emit(host, port, key, transport.close)
+                return
             if auth == "password":
                 transport.auth_password(user, password)
             elif auth == "key":
