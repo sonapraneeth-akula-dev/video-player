@@ -42,9 +42,8 @@ def paused_video(qapp):
     try:
         yield player, widget
     finally:
-        widget.release()
+        widget.dispose()
         player.close()
-        widget.close()
 
 
 @pytest.mark.parametrize(("name", "codec", "fps", "gop", "start_pts"), CASES)

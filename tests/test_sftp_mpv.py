@@ -82,9 +82,8 @@ def test_mpv_plays_and_seeks_remote_file_without_copy(qtbot, sftp_server):
             widget.release()
             player.close()
     finally:
-        widget.release()
+        widget.dispose()
         player.close()
-        widget.close()
     assert not player._sftp_streams
 
 

@@ -3,6 +3,7 @@
 import math
 from pathlib import Path
 
+import shiboken6
 from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
@@ -330,6 +331,7 @@ class MainWindow(QMainWindow):
             self.showNormal()
 
     def closeEvent(self, event):
-        self.video.release()
+        if shiboken6.isValid(self.video):
+            self.video.dispose()
         self.player.close()
         super().closeEvent(event)

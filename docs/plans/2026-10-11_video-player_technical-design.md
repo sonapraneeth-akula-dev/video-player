@@ -810,8 +810,24 @@ responsibility in §3; split a module only when it passes ~600 lines.
   `libmpv-2.dll` emits LuaJIT's `0xe24c4a02` SEH exception even with
   `load_scripts=False`. With pytest's fault handler enabled, the full suite
   intermittently exits with `0xC0000005` (`-1073741819`). Disabling that
-  pytest hook yielded 12 consecutive full-suite passes with the native Qt
-  backend, but does not establish that the DLL is safe in every host process.
+  pytest hook yielded 12 consecutive full-suite passes before the audio-bearing
+  codec matrix was added; the expanded full suite still intermittently crashes.
+  One dump placed a failure in Qt's Windows application teardown (`qwindows` /
+  `QGuiApplicationPrivate`). A later `0xC0000409` dump identified Qt's fatal
+  `QOpenGLContext::makeCurrent` during `QOpenGLWidget` destruction, reached from
+  Shiboken deallocation during Python thread-state cleanup. The widget now
+  destroys its Qt surface on the GUI thread before the mpv worker shuts down;
+  repeated rendered-widget tests cover this path. The intermittent
+  `0xC0000005` remains a separate, unlocalized failure. Audio-only playback
+  with no video output survived
+  repeated runs, while combined OpenGL rendering and the default audio output
+  crashed on exit. Reusing one render widget and setting mpv `ao=null` made
+  five consecutive codec-only runs exit normally, but did not make the full
+  suite reliable. Both default Qt OpenGL and `QT_OPENGL=software` report
+  VMware/Gallium llvmpipe on this RDP host; forcing the software backend still
+  crashed with combined OpenGL and default audio. Neither RDP nor its virtual
+  GPU is proven to be the sole cause; codec playback and corrupt-file stress
+  remain unverified on a physical-GPU Windows desktop and on Ubuntu.
   The same tests run with Qt's `offscreen` backend failed the frame checks.
   [python-mpv #305](https://github.com/jaseg/python-mpv/issues/305) documents the
   failure and a no-Lua build; [shinchiro #811](https://github.com/shinchiro/mpv-winbuild-cmake/issues/811)

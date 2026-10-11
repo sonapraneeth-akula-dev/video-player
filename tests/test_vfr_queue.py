@@ -21,9 +21,8 @@ def paused_video(qapp):
     try:
         yield player, widget
     finally:
-        widget.release()
+        widget.dispose()
         player.close()
-        widget.close()
 
 
 @pytest.fixture(scope="module")
