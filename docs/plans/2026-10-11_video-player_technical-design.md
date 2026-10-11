@@ -806,6 +806,15 @@ responsibility in §3; split a module only when it passes ~600 lines.
 | AD-021 | `~/.ssh/config` support | `paramiko.SSHConfig`: HostName, Port, User, IdentityFile only | Full OpenSSH semantics (ProxyJump, Match exec); none | Covers the common alias case in a few lines; proxies would need a second SSH hop. Visible notice avoids silent surprises. |
 
 ## 13. Risks & Open Questions
+- [ ] **Windows libmpv embedding blocker (2026-10-11)**: the pinned shinchiro
+  `libmpv-2.dll` emits `0xe24c4a02` while running the `Player` integration tests even
+  with `load_scripts=False`. Tests currently exit successfully, but this LuaJIT SEH
+  exception can terminate Python when render contexts are created or switched.
+  [python-mpv #305](https://github.com/jaseg/python-mpv/issues/305) documents the
+  failure and a no-Lua build; [shinchiro #811](https://github.com/shinchiro/mpv-winbuild-cmake/issues/811)
+  confirms the stock release does not include that variant. Owner decision needed:
+  approve a pinned, tested no-Lua Windows build instead of the chosen stock binary,
+  or accept the crash risk before implementing the video widget.
 - [ ] **Spike — hwdec with render API on Windows**: desktop OpenGL lacks direct D3D11
   interop → mpv may use `d3d11va-copy`/`dxva2` (WGL_NV_DX_interop). Measure CPU and RSS for 4K
   HEVC on the owner's GPU. If copy-back blows NFR-001 or the CPU budget: accept `d3d11va-copy`,
