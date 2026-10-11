@@ -380,7 +380,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 3.2.1.1.1 | Task | [x] `tests/test_frame_accuracy.py` harness — read the displayed frame via `screenshot-raw`, decode the burned-in index; parametrize codec / fps / GOP / start PTS | 02:30 | 00:25 | Harness self-test on known frames green | Seven codec/fps/start cases including GOP 250; reusable for US-024, US-025, US-044 |
-| 3.2.1.1.2 | Task | `Player.frame_step(+1)` — pause if playing, then `frame-step`; `frame_next` (`.`) | 01:00 | 00:15 | Frame-accuracy: from playing and paused → index + 1 | FR-011 |
+| 3.2.1.1.2 | Task | [x] `Player.frame_step(+1)` — pause if playing, then `frame-step`; `frame_next` (`.`) | 01:00 | 00:15 | Frame-accuracy: from playing and paused → index + 1 | FR-011; forward step v0.10.0 |
 
 ##### User Story 3.2.1.2 (US-024): Step back one frame
 - **Est. Manual**: 04:00 | **Est. AI**: 00:50

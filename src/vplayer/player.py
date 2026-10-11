@@ -26,6 +26,7 @@ class Player(QObject):
         super().__init__(parent)
         self._closed = False
         self._uri = ""
+        self._pending_frame_steps = 0
         self._update.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
         self.mpv = mpv.MPV(
             vo=video_output,
@@ -69,6 +70,11 @@ class Player(QObject):
             self.duration.emit(value)
         elif name == "pause":
             self.paused.emit(value)
+            if value and self._pending_frame_steps:
+                steps = self._pending_frame_steps
+                self._pending_frame_steps = 0
+                for _ in range(steps):
+                    self.mpv.command("frame-step")
         elif name == "speed":
             self.speed_changed.emit(value)
         elif name == "hwdec-current":
@@ -108,6 +114,15 @@ class Player(QObject):
             self.error.emit("Speed adjustment must be finite")
             return
         self.set_speed(float(Decimal(str(self.mpv.speed)) + Decimal(str(amount))))
+
+    def frame_step(self, direction: int = 1) -> None:
+        if direction != 1:
+            raise ValueError("Only forward frame stepping is supported")
+        if self.mpv.pause:
+            self.mpv.command("frame-step")
+        else:
+            self._pending_frame_steps += 1
+            self.mpv.pause = True
 
     def seek(self, seconds: float, relative: bool = False) -> None:
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds):

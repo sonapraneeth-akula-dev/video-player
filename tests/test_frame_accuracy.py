@@ -75,3 +75,31 @@ def test_frame_index_harness_reads_decoded_video(qtbot, paused_video, name, code
         if frame_index(player) == gop - 1:
             player.mpv.command("frame-step")
             qtbot.waitUntil(lambda: frame_index(player) == gop, timeout=10000)
+
+
+@pytest.mark.parametrize("playing", (False, True))
+def test_forward_step_is_exact_from_playing_or_paused(qtbot, paused_video, playing):
+    player, _widget = paused_video
+    player.mpv.pause = True
+    with qtbot.waitSignal(player.file_loaded, timeout=10000):
+        player.load(MEDIA / "h264_25.mp4")
+    qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
+    paused_frames = []
+    if playing:
+        player.mpv.pause = False
+        assert player.mpv.pause is False
+        def record_pause(value):
+            if value and not paused_frames:
+                paused_frames.append(frame_index(player))
+
+        player.paused.connect(record_pause)
+    player.frame_step()
+    if playing:
+        qtbot.waitUntil(lambda: bool(paused_frames), timeout=10000)
+        expected = paused_frames[0] + 1
+        player.paused.disconnect(record_pause)
+    else:
+        expected = 1
+    qtbot.waitUntil(lambda: player.mpv.pause is True and frame_index(player) == expected, timeout=10000)
+    player.frame_step()
+    qtbot.waitUntil(lambda: frame_index(player) == expected + 1, timeout=10000)

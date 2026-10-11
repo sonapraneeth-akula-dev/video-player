@@ -145,6 +145,13 @@ class MainWindow(QMainWindow):
             action.setShortcut(key)
             action.triggered.connect(callback)
             self.playback_menu.addAction(action)
+        self.frame_next = QAction("Next frame", self)
+        self.frame_next.setObjectName("frame_next")
+        self.frame_next.setShortcut(".")
+        self.frame_next.setEnabled(False)
+        self.frame_next.triggered.connect(lambda: self.player.frame_step())
+        self.player.file_loaded.connect(lambda: self.frame_next.setEnabled(True))
+        self.playback_menu.addAction(self.frame_next)
         for label, key, amount in (
             ("Seek forward", "Right", self.settings.seek_short_s),
             ("Seek back", "Left", -self.settings.seek_short_s),

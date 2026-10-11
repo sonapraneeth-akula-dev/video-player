@@ -84,3 +84,20 @@ def test_volume_mute_and_fullscreen_shortcuts(qtbot, tmp_path):
         assert window.video.grabFramebuffer().pixelColor(200, 200).red() > 35
     finally:
         window.close()
+
+
+def test_forward_frame_action_is_available_after_load(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        assert not window.frame_next.isEnabled()
+        assert window.frame_next.shortcut().toString() == "."
+        assert window.frame_next in window.playback_menu.actions()
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        assert window.frame_next.isEnabled()
+        window.frame_next.trigger()
+        qtbot.waitUntil(lambda: window.player.mpv.pause is True)
+    finally:
+        window.close()
