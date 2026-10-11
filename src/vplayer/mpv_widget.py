@@ -10,6 +10,7 @@ from vplayer.player import Player
 
 class MpvWidget(QOpenGLWidget):
     _frame_ready = Signal()
+    ready = Signal()
 
     def __init__(self, player: Player, parent=None):
         super().__init__(parent)
@@ -30,6 +31,7 @@ class MpvWidget(QOpenGLWidget):
             opengl_init_params={"get_proc_address": self._get_proc},
         )
         self._render.update_cb = self._frame_ready.emit
+        self.ready.emit()
 
     @Slot()
     def _request_frame(self):
@@ -56,4 +58,3 @@ class MpvWidget(QOpenGLWidget):
             self._render.free()
             self._render = None
             self.doneCurrent()
-

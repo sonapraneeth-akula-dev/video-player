@@ -122,7 +122,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 1.1.3.1.1 | Task | `__main__.py` CLI — `argparse` for `FILE…`, `--new-window`, `--version`; relative paths → `os.path.abspath` | 01:30 | 00:15 | `tests/test_cli.py`: `--version` prints version; relative path resolves; missing file → banner, no traceback | Design §6 CLI |
+| 1.1.3.1.1 | Task | [x] `__main__.py` CLI — `argparse` for `FILE…`, `--new-window`, `--version`; relative paths → `os.path.abspath` | 01:30 | 00:15 | `tests/test_cli.py`: `--version` prints version; relative path resolves; missing file → banner, no traceback | v0.6.0; temporary one-window-per-file routing until tabs/IPC |
 | 1.1.3.1.2 | Task | Windows console output — `AttachConsole(ATTACH_PARENT_PROCESS)` and reopen `CONOUT$` for `--version` / `--help` / CLI errors (exe is `console=False`) | 01:00 | 00:10 | Packaged exe prints `--version` in cmd and PowerShell | Re-verified in M-008.1 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):

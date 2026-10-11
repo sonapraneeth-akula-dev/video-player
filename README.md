@@ -22,6 +22,10 @@ Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).
+You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
+`vplayer --version` to print the version, or `vplayer --new-window FILE`. Until
+tabs and single-instance routing are added, each CLI file opens in its own
+window; every launch already creates a new window.
 
 Generate the media fixtures with `python scripts/make_test_media.py`, then
 run `python -m pytest -q`. Pytest's fault handler is disabled in this project:

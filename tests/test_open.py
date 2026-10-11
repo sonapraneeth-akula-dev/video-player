@@ -55,7 +55,7 @@ def test_entrypoint_creates_rotating_log(qtbot, monkeypatch, tmp_path):
 
     monkeypatch.setattr(QApplication, "exec", exit_after_show)
     try:
-        assert entry.main() == 0
+        assert entry.main([]) == 0
         handler = next(h for h in logger.handlers if isinstance(h, RotatingFileHandler))
         assert Path(handler.baseFilename) == tmp_path / "vplayer.log"
         assert handler.maxBytes == 1_000_000
