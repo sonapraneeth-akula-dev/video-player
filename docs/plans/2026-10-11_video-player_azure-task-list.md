@@ -220,7 +220,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.1.1.1.1 | Task | `tests/docker/sshd/` — OpenSSH container fixture (password, key+passphrase and agent users; `/media` volume) + pytest fixture `sftp_server` (`-m sftp`) | 02:00 | 00:20 | `pytest -m sftp` starts the container and connects | Used by M-002.x and M-011.1 |
+| 2.1.1.1.1 | Task | [x] `tests/docker/sshd/` — OpenSSH container fixture (password, key+passphrase and agent users; `/media` volume) + pytest fixture `sftp_server` (`-m sftp`) | 02:00 | 00:20 | `pytest -m sftp` starts the container and connects | Three auth accounts verified; reused by M-002.x and M-011.1 |
 | 2.1.1.1.2 | Task | `src/vplayer/sftp.py` — `SshPool.connect()` with password auth on a worker thread (`QThreadPool`), keepalive `keepalive_s`, errors → signal | 02:30 | 00:25 | Container test: correct password connects; wrong password → clear error, retry works \|\| |  |
 | 2.1.1.1.3 | Task | [x] `ui/dialogs.py` `ConnectDialog` — host, port (22), user, auth choice, password; "Save secret" writes only to `keyring` (service `vplayer`) and is disabled with a tooltip when no backend exists | 02:00 | 00:20 | Saving stores the secret in keyring; grep of the INI finds no password | NFR-010, AD-012; form tested, connect wiring follows SshPool |
 

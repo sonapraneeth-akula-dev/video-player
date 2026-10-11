@@ -44,3 +44,6 @@ damaged-media corpus. The corrupt option uses the previously generated codec
 fixtures as inputs. Run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
 the pinned Windows libmpv emits LuaJIT exceptions that can crash the test
 process when the handler is installed.
+For the SSH integration fixtures, start a local Docker Linux daemon and run
+`python -m pytest -q -m sftp`; the tests build and remove a disposable OpenSSH
+container automatically.

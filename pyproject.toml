@@ -25,6 +25,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["sftp: requires a running local Docker Linux daemon"]
 # Windows libmpv/LuaJIT emits SEH exceptions that pytest's fault handler can turn into a crash.
 addopts = "-p no:faulthandler"
 
