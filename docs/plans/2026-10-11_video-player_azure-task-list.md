@@ -104,7 +104,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 1.1.2.1.1 | Task | `ui/main_window.py` — `ControlBar` play/pause button and `SeekBar` (drag/click → keyframe seek); `play_pause` action (Space) | 02:30 | 00:20 | `tests/test_transport.py`: click at 50% → `time-pos` ≈ duration/2 within one GOP \|\| |  |
+| 1.1.2.1.1 | Task | [x] `ui/main_window.py` — `ControlBar` play/pause button and `SeekBar` (drag/click → keyframe seek); `play_pause` action (Space) | 02:30 | 00:20 | `tests/test_transport.py`: click at 50% → `time-pos` ≈ duration/2 within one GOP \|\| | Transport controls: v0.4.0 |
 | 1.1.2.1.2 | Task | [x] `src/vplayer/settings.py` — QSettings INI load/validate/migrate (`schema_version` 1), defaults incl. `seek_short_s` 5 / `seek_long_s` 60; `Player.seek()` clamps to [0, last frame]; `seek_fwd`/`seek_back`/`seek_long_*` actions | 02:00 | 00:20 | Unit: invalid INI value → default + log warning; seek < 0 → 0; past end → last frame | Keyboard seek: v0.3.0; Windows test-harness mitigation in pytest config; residual DLL risk in design §13 |
 
 ##### User Story 1.1.2.2 (US-004): Volume, mute and fullscreen

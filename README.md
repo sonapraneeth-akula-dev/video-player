@@ -18,6 +18,8 @@ built-in `tar`.
 On Ubuntu 22.04, run `sudo apt install libmpv1 libxcb-cursor0` instead.
 
 Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
+Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
+**Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 
 Generate the media fixtures with `python scripts/make_test_media.py`, then
 run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
