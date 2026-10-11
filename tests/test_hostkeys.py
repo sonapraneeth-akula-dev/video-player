@@ -1,9 +1,15 @@
+import base64
+import hashlib
 from pathlib import Path
 
 import paramiko
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QDialog, QMessageBox
 
 from vplayer.sftp import KnownHosts
+from vplayer.ui.dialogs import HostKeyDialog
 
 
 @pytest.fixture
@@ -67,3 +73,70 @@ def test_invalid_host_or_port_fails_closed(tmp_path, keys):
             known.classify(host, port, keys[0])
     with pytest.raises(TypeError):
         known.classify("example", 22, None)
+
+
+def test_host_key_dialog_accept_once_does_not_write_and_rejects_by_default(qtbot, tmp_path, keys):
+    known = KnownHosts(tmp_path / "missing_user", tmp_path / "app" / "known_hosts")
+    closed = []
+    dialog = HostKeyDialog(known, "host.example", 2222, keys[0], lambda: closed.append(True))
+    qtbot.addWidget(dialog)
+    dialog.show()
+    fingerprint = base64.b64encode(hashlib.sha256(keys[0].asbytes()).digest()).decode().rstrip("=")
+    assert f"SHA256:{fingerprint}" in dialog.fingerprint.text()
+    assert dialog.fingerprint.textFormat() == Qt.TextFormat.PlainText
+    assert dialog.reject_button.isDefault()
+    assert "unknown" in dialog.windowTitle().lower()
+    dialog.accept_once.click()
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert not closed
+    assert not known.app_path.exists()
+    assert known.classify("host.example", 2222, keys[0]) == "unknown"
+    other = HostKeyDialog(known, "host.example", 2222, keys[0], lambda: closed.append(True))
+    qtbot.addWidget(other)
+    other.show()
+    QTest.keyClick(other, Qt.Key.Key_Escape)
+    assert other.result() == QDialog.DialogCode.Rejected
+    assert closed == [True]
+
+
+def test_remember_writes_only_app_file_and_persists_trust(qtbot, tmp_path, keys):
+    user_file = tmp_path / "user_known_hosts"
+    write_hosts(user_file, ("host.example", keys[0]))
+    original = user_file.read_bytes()
+    known = KnownHosts(user_file, tmp_path / "app" / "known_hosts")
+    dialog = HostKeyDialog(known, "host.example", 22, keys[1], lambda: None)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    assert "changed" in dialog.windowTitle().lower()
+    dialog.remember_button.click()
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert user_file.read_bytes() == original
+    assert KnownHosts(user_file, known.app_path).classify("host.example", 22, keys[1]) == "trusted"
+    assert not list(known.app_path.parent.glob(".known_hosts-*"))
+
+
+def test_failed_save_keeps_existing_trust_and_dialog_open(qtbot, tmp_path, keys, monkeypatch):
+    app_file = tmp_path / "app" / "known_hosts"
+    app_file.parent.mkdir()
+    write_hosts(app_file, ("host.example", keys[0]))
+    original = app_file.read_bytes()
+    known = KnownHosts(tmp_path / "missing_user", app_file)
+    closed = []
+    dialog = HostKeyDialog(known, "host.example", 22, keys[1], lambda: closed.append(True))
+    qtbot.addWidget(dialog)
+    dialog.show()
+    errors = []
+    def fail_replace(*args):
+        raise OSError("disk unavailable")
+
+    monkeypatch.setattr("vplayer.sftp.os.replace", fail_replace)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *args: errors.append(args))
+    dialog.remember_button.click()
+    assert dialog.isVisible()
+    assert errors and "disk unavailable" in str(errors[0])
+    assert app_file.read_bytes() == original
+    assert known.classify("host.example", 22, keys[1]) == "changed"
+    assert not list(app_file.parent.glob(".known_hosts-*"))
+    dialog.reject_button.click()
+    assert dialog.result() == QDialog.DialogCode.Rejected
+    assert closed == [True]

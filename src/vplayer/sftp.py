@@ -1,5 +1,7 @@
 """SFTP host-key trust shared by connection and reconnect flows."""
 
+import os
+import tempfile
 from pathlib import Path
 from typing import Literal
 
@@ -38,3 +40,18 @@ class KnownHosts:
                 if entry.key == key:
                     return "trusted"
         return "changed" if found else "unknown"
+
+    def remember(self, host: str, port: int, key: paramiko.PKey) -> None:
+        self.classify(host, port, key)
+        name = host if port == 22 else f"[{host}]:{port}"
+        self.app_path.parent.mkdir(parents=True, exist_ok=True)
+        updated = paramiko.HostKeys(str(self.app_path)) if self.app_path.exists() else paramiko.HostKeys()
+        updated.add(name, key.get_name(), key)
+        fd, temporary = tempfile.mkstemp(prefix=".known_hosts-", dir=self.app_path.parent)
+        os.close(fd)
+        try:
+            updated.save(temporary)
+            os.replace(temporary, self.app_path)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+        self.app = updated

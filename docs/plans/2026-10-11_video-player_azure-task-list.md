@@ -240,7 +240,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 2.1.2.1.1 | Task | [x] `sftp.py` host-key policy — `~/.ssh/known_hosts` (read-only) and `<config>/known_hosts` in separate `HostKeys`; walk all entries for `host` / `[host]:port`, hashed names included | 02:30 | 00:25 | `tests/test_hostkeys.py` trust table green | Design §5.2; connection UI wiring follows in 2.1.1.x |
-| 2.1.2.1.2 | Task | `ui/dialogs.py` `HostKeyDialog` — SHA-256 fingerprint, Accept / Reject; accept → `add()` + `save()` on the app file only | 01:30 | 00:15 | Unknown host → dialog; reject closes transport; `~/.ssh/known_hosts` mtime unchanged | AD-013 |
+| 2.1.2.1.2 | Task | [x] `ui/dialogs.py` `HostKeyDialog` — SHA-256 fingerprint, Accept / Reject; accept → `add()` + `save()` on the app file only | 01:30 | 00:15 | Unknown host → dialog; reject closes transport; `~/.ssh/known_hosts` mtime unchanged | AD-013; reject default, trust once or atomically remember in app file; transport wiring follows Connect |
 
 ##### User Story 2.1.2.2 (US-014): A hard warning on a changed host key
 - **Est. Manual**: 01:30 | **Est. AI**: 00:15
