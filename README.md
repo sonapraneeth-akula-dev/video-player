@@ -31,6 +31,8 @@ files outside the media extension filter. Double-click or press **Enter** on a
 folder to open it, or on a video to play it.
 The browser, video surface, and seek bar are reachable with **Tab** and
 **Shift+Tab**; the focused video has a visible outline.
+Use **Alt+1** through **Alt+6** for playback speeds 0.25×, 0.5×, 0.67×, 1×, 2× and 4×;
+the current speed appears in the status bar.
 
 Generate the frame-indexed and codec/container media fixtures with
 `python scripts/make_test_media.py` (requires FFmpeg and ffprobe), then

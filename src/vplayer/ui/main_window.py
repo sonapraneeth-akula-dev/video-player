@@ -81,6 +81,10 @@ class MainWindow(QMainWindow):
         self.settings = settings or Settings()
         self.settings.load()
         self.player = Player(self)
+        self.speed_label = QLabel("1×", self)
+        self.speed_label.setAccessibleName("Playback speed")
+        self.statusBar().addPermanentWidget(self.speed_label)
+        self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
 
         content = QWidget(self)
         layout = QVBoxLayout(content)
@@ -123,6 +127,14 @@ class MainWindow(QMainWindow):
         self.view_menu.addAction(browser_action)
         self.playback_menu = self.menuBar().addMenu("&Playback")
         self.playback_menu.addAction(self.controls.play_action)
+        self.speed_actions = {}
+        for index, speed in enumerate((0.25, 0.5, 0.67, 1.0, 2.0, 4.0), start=1):
+            action = QAction(f"{speed:g}× speed", self)
+            action.setObjectName(f"speed_{str(speed).replace('.', '_')}")
+            action.setShortcut(f"Alt+{index}")
+            action.triggered.connect(lambda checked=False, rate=speed: self.player.set_speed(rate))
+            self.playback_menu.addAction(action)
+            self.speed_actions[speed] = action
         for label, key, amount in (
             ("Seek forward", "Right", self.settings.seek_short_s),
             ("Seek back", "Left", -self.settings.seek_short_s),

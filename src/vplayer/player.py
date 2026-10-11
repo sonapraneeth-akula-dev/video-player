@@ -8,7 +8,7 @@ import mpv
 from PySide6.QtCore import QObject, Qt, Signal, Slot
 
 log = logging.getLogger(__name__)
-OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "hwdec-current")
+OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "speed", "hwdec-current")
 
 
 class Player(QObject):
@@ -16,6 +16,7 @@ class Player(QObject):
     position = Signal(object)
     duration = Signal(object)
     paused = Signal(object)
+    speed_changed = Signal(object)
     hwdec_current = Signal(object)
     error = Signal(str)
     _update = Signal(str, object)
@@ -67,6 +68,8 @@ class Player(QObject):
             self.duration.emit(value)
         elif name == "pause":
             self.paused.emit(value)
+        elif name == "speed":
+            self.speed_changed.emit(value)
         elif name == "hwdec-current":
             if value is not None:
                 log.info("Decoder: %s", value)
@@ -92,6 +95,12 @@ class Player(QObject):
     def toggle_mute(self) -> None:
         self.mpv.mute = not self.mpv.mute
         self.mpv.show_text("Muted" if self.mpv.mute else f"Volume: {self.mpv.volume:.0f}%", 1000)
+
+    def set_speed(self, speed: float) -> None:
+        if isinstance(speed, bool) or not isinstance(speed, (int, float)) or not math.isfinite(speed):
+            self.error.emit("Playback speed must be finite")
+            return
+        self.mpv.speed = max(0.05, min(speed, 8.0))
 
     def seek(self, seconds: float, relative: bool = False) -> None:
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds):
