@@ -63,3 +63,6 @@ main-window browser.
 the INI settings file. Passwords and private-key passphrases are saved only
 when opted in, in the OS keyring, never in the INI; a saved profile restores
 the secret for subsequent connections when that keyring is available.
+`parse_sftp_uri()` validates and decodes SFTP URIs without accepting passwords
+in URLs; `ConnectDialog.for_sftp_uri()` selects one matching saved profile or
+prefills a new connection. CLI remote playback still awaits stream integration.

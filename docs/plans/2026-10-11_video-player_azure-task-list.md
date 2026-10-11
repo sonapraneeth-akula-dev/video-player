@@ -297,7 +297,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.2.2.3.1 | Task | `sftp.parse_sftp_uri()` — `sftp://[user@]host[:port]/path` with percent-decoding; matching saved profile else prefilled `ConnectDialog`; errors name the problem | 01:30 | 00:15 | `tests/test_uri.py`: valid and malformed tables | FR-002, design §6 CLI |
+| 2.2.2.3.1 | Task | [x] `sftp.parse_sftp_uri()` — `sftp://[user@]host[:port]/path` with percent-decoding; matching saved profile else prefilled `ConnectDialog`; errors name the problem | 01:30 | 00:15 | `tests/test_uri.py`: valid and malformed tables | FR-002, design §6 CLI; strict URI validation and profile selection covered; CLI playback awaits the mpv stream callback; v0.15.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: SFTP play/seek/back-step via local OpenSSH container, including the

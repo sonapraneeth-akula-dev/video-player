@@ -24,11 +24,26 @@ from PySide6.QtWidgets import (
 )
 
 from vplayer.settings import ConnectionProfile, Settings
-from vplayer.sftp import KnownHosts, SshPool
+from vplayer.sftp import KnownHosts, SshPool, match_sftp_profile, parse_sftp_uri
 
 
 class ConnectDialog(QDialog):
     connected = Signal(object)
+
+    @classmethod
+    def for_sftp_uri(
+        cls, uri: str, *, settings: Settings | None = None, pool: SshPool | None = None, parent=None,
+    ) -> "ConnectDialog":
+        parsed = parse_sftp_uri(uri)
+        settings = settings or Settings()
+        profile = match_sftp_profile(parsed, settings.connection_profiles())
+        dialog = cls(profile_id=profile.id if profile is not None else None, settings=settings, pool=pool, parent=parent)
+        if profile is None:
+            dialog.host.setText(parsed.host)
+            dialog.port.setValue(parsed.port)
+            dialog.user.setText(parsed.user or "")
+        dialog.remote_path = parsed.path
+        return dialog
 
     def __init__(
         self, profile_id: str | None = None, parent=None, *,

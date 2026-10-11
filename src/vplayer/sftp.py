@@ -1,12 +1,76 @@
 """SFTP host-key trust shared by connection and reconnect flows."""
 
 import os
+import re
 import tempfile
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from urllib.parse import unquote, urlsplit
 
 import paramiko
 from PySide6.QtCore import QObject, QStandardPaths, QThreadPool, Signal
+
+from vplayer.settings import ConnectionProfile
+
+
+@dataclass(frozen=True)
+class SftpUri:
+    user: str | None
+    host: str
+    port: int
+    path: str
+
+
+def parse_sftp_uri(uri: str) -> SftpUri:
+    if not isinstance(uri, str):
+        raise TypeError("SFTP URI must be a string")
+    if re.search(r"%(?![0-9a-fA-F]{2})", uri):
+        raise ValueError("Malformed percent escape in SFTP URI")
+    try:
+        parsed = urlsplit(uri)
+        host = parsed.hostname
+    except ValueError as error:
+        raise ValueError("Invalid SFTP URI host") from error
+    if parsed.scheme.lower() != "sftp":
+        raise ValueError("SFTP URI must start with sftp://")
+    if not host:
+        raise ValueError("SFTP URI is missing a host")
+    if parsed.password is not None:
+        raise ValueError("Passwords in SFTP URIs are not allowed")
+    if parsed.query or parsed.fragment:
+        raise ValueError("SFTP URI must not contain a query or fragment")
+    if not parsed.path:
+        raise ValueError("SFTP URI is missing an absolute path")
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("Invalid SFTP URI port") from error
+    if parsed.netloc.endswith(":") or (port is not None and not 1 <= port <= 65535):
+        raise ValueError("Invalid SFTP URI port")
+    try:
+        host = unquote(host, encoding="utf-8", errors="strict")
+        user = unquote(parsed.username, encoding="utf-8", errors="strict") if parsed.username is not None else None
+        path = unquote(parsed.path, encoding="utf-8", errors="strict")
+    except UnicodeError as error:
+        raise ValueError("Invalid UTF-8 in SFTP URI") from error
+    if any(char.isspace() for char in host) or any(char in host for char in ("/", "\\", "\x00")):
+        raise ValueError("Invalid SFTP URI host")
+    if user is not None and (not user or any(char.isspace() for char in user) or "\x00" in user):
+        raise ValueError("Invalid SFTP URI username")
+    if "\x00" in path:
+        raise ValueError("Invalid SFTP URI path")
+    return SftpUri(user, host, port or 22, path)
+
+
+def match_sftp_profile(uri: SftpUri, profiles: Iterable[ConnectionProfile]) -> ConnectionProfile | None:
+    matches = [
+        profile for profile in profiles
+        if profile.host.casefold() == uri.host.casefold() and profile.port == uri.port
+        and (uri.user is None or profile.user == uri.user)
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 class KnownHosts:
