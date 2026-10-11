@@ -59,3 +59,7 @@ integration needed for remote playback is still pending.
 The lazy `SftpDirModel` lists remote folders on a worker thread and displays
 permission or missing-folder errors inline. It is not yet attached to the
 main-window browser.
+`ConnectDialog` can save, select, update and delete SSH connection profiles in
+the INI settings file. Passwords and private-key passphrases are saved only
+when opted in, in the OS keyring, never in the INI; a saved profile restores
+the secret for subsequent connections when that keyring is available.

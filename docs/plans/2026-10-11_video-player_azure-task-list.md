@@ -914,7 +914,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 11.1.1.1.1 | Task | Recent files — `recent/items`, max 20 newest first, local paths or `sftp://user@host:port/path`; File → Recent menu | 01:00 | 00:15 | Unit: dedupe, cap 20, no secrets | FR-028 |
-| 11.1.1.1.2 | Task | Connection profiles — `connections/<uuid>/…` CRUD in `ConnectDialog`; secrets only in keyring (`vplayer`, `<uuid>/<auth>`) | 02:00 | 00:25 | Saving a profile leaves no secret in the INI (grep); reconnect from profile without retyping | NFR-010 |
+| 11.1.1.1.2 | Task | [x] Connection profiles — `connections/<uuid>/…` CRUD in `ConnectDialog`; secrets only in keyring (`vplayer`, `<uuid>/<auth>`) | 02:00 | 00:25 | Saving a profile leaves no secret in the INI (grep); reconnect from profile without retyping | NFR-010; CRUD and Docker-backed reconnect covered; main-window dialog entry pending; v0.14.0 |
 
 #### Feature 11.1.2 (FEAT-011.1.2): `~/.ssh/config` aliases
 - **Est. Manual**: 02:00 | **Est. AI**: 00:25

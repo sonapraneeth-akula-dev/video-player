@@ -1,8 +1,10 @@
+import keyring
 import paramiko
 import pytest
 from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QApplication, QDialog, QInputDialog
 
+from vplayer.settings import Settings
 from vplayer.sftp import KnownHosts, SshPool
 from vplayer.ui.dialogs import ConnectDialog
 
@@ -351,3 +353,39 @@ def test_cancelled_passphrase_prompt_keeps_connection_dialog_open(qtbot, trusted
         dialog.accept()
     assert dialog.isVisible()
     assert dialog.password.text() == ""
+
+
+@pytest.mark.sftp
+def test_saved_profile_reconnects_without_retyping_secret(qtbot, trusted_pool, sftp_server, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    stored = {}
+    monkeypatch.setattr(keyring, "get_keyring", lambda: SimpleNamespace(priority=5))
+    monkeypatch.setattr(keyring, "set_password", lambda service, account, secret: stored.__setitem__(account, secret))
+    monkeypatch.setattr(keyring, "get_password", lambda service, account: stored.get(account))
+    settings = Settings(tmp_path / "settings.ini")
+    setup = ConnectDialog(settings=settings)
+    qtbot.addWidget(setup)
+    setup.host.setText(sftp_server.host)
+    setup.port.setValue(sftp_server.port)
+    setup.user.setText("password")
+    setup.password.setText(sftp_server.password)
+    setup.save_secret.setChecked(True)
+    setup.save_profile.click()
+    profile_id = setup.profile_id
+
+    dialog = ConnectDialog(settings=Settings(tmp_path / "settings.ini"), pool=trusted_pool)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.profiles.setCurrentIndex(dialog.profiles.findData(profile_id))
+    assert dialog.password.text() == sftp_server.password
+    assert sftp_server.password.encode() not in (tmp_path / "settings.ini").read_bytes()
+    with qtbot.waitSignal(dialog.connected, timeout=10000) as result:
+        dialog.accept()
+        assert not dialog.profiles.isEnabled()
+        assert not dialog.save_profile.isEnabled()
+    try:
+        assert result.args[0].is_authenticated()
+        assert dialog.profiles.isEnabled()
+    finally:
+        result.args[0].close()
