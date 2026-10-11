@@ -32,7 +32,8 @@ folder to open it, or on a video to play it.
 The browser, video surface, and seek bar are reachable with **Tab** and
 **Shift+Tab**; the focused video has a visible outline.
 
-Generate the media fixtures with `python scripts/make_test_media.py`, then
+Generate the frame-indexed and codec/container media fixtures with
+`python scripts/make_test_media.py` (requires FFmpeg and ffprobe), then
 run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
 the pinned Windows libmpv emits LuaJIT exceptions that can crash the test
 process when the handler is installed.
