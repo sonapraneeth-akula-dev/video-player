@@ -7,13 +7,14 @@ from collections.abc import Callable
 
 import keyring
 import paramiko
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -22,12 +23,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from vplayer.sftp import KnownHosts
+from vplayer.sftp import KnownHosts, SshPool
 
 
 class ConnectDialog(QDialog):
-    def __init__(self, profile_id: str | None = None, parent=None):
+    connected = Signal(object)
+
+    def __init__(self, profile_id: str | None = None, parent=None, *, pool: SshPool | None = None):
         super().__init__(parent)
+        self.pool = pool
         self.profile_id = str(uuid.UUID(profile_id)) if profile_id is not None else str(uuid.uuid4())
         self.setWindowTitle("Connect to SFTP")
         form = QFormLayout()
@@ -74,6 +78,10 @@ class ConnectDialog(QDialog):
             self.save_secret.setToolTip("No OS keyring backend is available; the secret will not be saved.")
         self.auth.currentIndexChanged.connect(self._auth_changed)
         self._auth_changed()
+        if pool is not None:
+            pool.passphrase_required.connect(self._request_passphrase)
+            pool.error.connect(self._connection_error)
+            pool.connected.connect(self._connection_succeeded)
 
     def _auth_changed(self):
         method = self.auth.currentData()
@@ -98,8 +106,33 @@ class ConnectDialog(QDialog):
             except (keyring.errors.KeyringError, RuntimeError) as error:
                 QMessageBox.critical(self, "Could not save secret", str(error))
                 return
+        if self.pool is not None:
+            method = self.auth.currentData()
+            self.pool.connect(
+                host, self.port.value(), user,
+                password=self.password.text() if method == "password" else None,
+                auth=method,
+                key_path=self.key_path.text() if method == "key" else None,
+                passphrase=(self.password.text() or None) if method == "key" else None,
+            )
+            return
         super().accept()
 
+    def _request_passphrase(self, key_path: str):
+        value, accepted = QInputDialog.getText(
+            self, "Private key passphrase", f"Passphrase for {key_path}",
+            QLineEdit.EchoMode.Password,
+        )
+        if accepted:
+            self.password.setText(value)
+            self.accept()
+
+    def _connection_error(self, message: str):
+        QMessageBox.warning(self, "SSH connection failed", message)
+
+    def _connection_succeeded(self, transport: paramiko.Transport):
+        self.connected.emit(transport)
+        super().accept()
 
 class HostKeyDialog(QDialog):
     def __init__(

@@ -229,7 +229,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.1.1.2.1 | Task | `sftp.py` — private-key auth (passphrase prompt on `PasswordRequiredException`) and agent auth (`paramiko.Agent`) | 02:00 | 00:20 | Container tests: key+passphrase and agent connect; wrong passphrase → error, no crash \|\| |  |
+| 2.1.1.2.1 | Task | [x] `sftp.py` — private-key auth (passphrase prompt on `PasswordRequiredException`) and agent auth (`paramiko.Agent`) | 02:00 | 00:20 | Container tests: key+passphrase and agent connect; wrong passphrase → error, no crash \|\| | Key prompt/retry and agent-key signing verified; native OS agent availability not yet tested |
 
 #### Feature 2.1.2 (FEAT-002.1.2): Host-key verification
 - **Est. Manual**: 05:30 | **Est. AI**: 00:55
