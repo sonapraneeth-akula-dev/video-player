@@ -2,7 +2,7 @@
 **Date**: 2026-10-11 | **Status**: Final (15 alternating GPT-6 Sol / Claude Opus review rounds; remaining unknowns tracked in §13 spikes) | **Requirements**: [Discovery (Approved)](2026-10-11_video-player_discovery.md)
 
 ## 1. Overview
-VPlayer (working name; binary `vplayer`) is a Python desktop app: a thin Qt shell around libmpv,
+VPlayer (app name approved 2026-10-11, may change later; binary `vplayer`) is a Python desktop app: a thin Qt shell around libmpv,
 which does all demuxing, decoding, rendering, buffering and screenshots. The app adds what mpv
 lacks: a local + SFTP file browser, SFTP streaming that never touches disk, tabs and multiple
 windows, synced compare, one action registry giving every action both a UI control and a
