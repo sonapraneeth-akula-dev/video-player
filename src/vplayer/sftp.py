@@ -172,3 +172,89 @@ class SshPool:
             self.error.emit(f"Could not connect to {host}:{port}: {error}")
             return
         self.connected.emit(transport)
+
+
+class SftpStream:
+    BLOCK_SIZE = 4 * 1024 * 1024
+    CHUNK_SIZE = 32 * 1024
+
+    def __init__(self, remote_file: paramiko.SFTPFile):
+        size = remote_file.stat().st_size
+        if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+            raise ValueError("Remote file size must be a nonnegative integer")
+        self.remote_file = remote_file
+        self._size = size
+        self._position = 0
+        self._block_offset = -1
+        self._block = b""
+        self._closed = False
+        self._cancelled = False
+
+    def size(self) -> int:
+        return self._size
+
+    def read(self, count: int) -> bytes:
+        if self._cancelled:
+            raise OSError("SFTP stream cancelled")
+        if self._closed:
+            raise ValueError("SFTP stream is closed")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise ValueError("Read size must be a nonnegative integer")
+        if count == 0 or self._position >= self._size:
+            return b""
+        offset = self._position - self._position % self.BLOCK_SIZE
+        if offset != self._block_offset:
+            length = min(self.BLOCK_SIZE, self._size - offset)
+            chunks = [
+                (offset + start, min(self.CHUNK_SIZE, length - start))
+                for start in range(0, length, self.CHUNK_SIZE)
+            ]
+            block = b"".join(
+                self.remote_file.readv(chunks, max_concurrent_prefetch_requests=64)
+            )
+            if self._cancelled:
+                raise OSError("SFTP stream cancelled")
+            if self._closed:
+                raise ValueError("SFTP stream is closed")
+            if len(block) != length:
+                raise EOFError(f"Expected {length} SFTP bytes at offset {offset}, got {len(block)}")
+            self._block = block
+            self._block_offset = offset
+        start = self._position - offset
+        data = self._block[start:start + min(count, len(self._block) - start)]
+        if self._cancelled:
+            raise OSError("SFTP stream cancelled")
+        if self._closed:
+            raise ValueError("SFTP stream is closed")
+        self._position += len(data)
+        return data
+
+    def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        if self._cancelled:
+            raise OSError("SFTP stream cancelled")
+        if self._closed:
+            raise ValueError("SFTP stream is closed")
+        if (
+            isinstance(offset, bool) or not isinstance(offset, int)
+            or isinstance(whence, bool) or not isinstance(whence, int)
+            or whence not in (
+            os.SEEK_SET, os.SEEK_CUR, os.SEEK_END,
+            )
+        ):
+            raise ValueError("Invalid SFTP seek")
+        base = (0, self._position, self._size)[whence]
+        position = base + offset
+        if position < 0:
+            raise ValueError("Cannot seek before the start of a remote file")
+        self._position = position
+        return position
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            self._block = b""
+            self.remote_file.close()
+
+    def cancel(self) -> None:
+        self._cancelled = True
+        self.close()

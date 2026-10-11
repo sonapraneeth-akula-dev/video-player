@@ -53,3 +53,6 @@ remember updates the application's known-hosts file without editing
 `~/.ssh/known_hosts`. Automatic reconnect fails without a trust prompt if the
 key is unknown or differs from the approved key. SFTP browsing is not yet
 exposed through the main window.
+`SftpStream` reads remote files into one in-memory 4 MiB block using bounded
+SFTP requests. Reads may stop at a block boundary; the mpv stream callback
+integration needed for remote playback is still pending.
