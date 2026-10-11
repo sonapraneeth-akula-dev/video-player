@@ -2,10 +2,11 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFocusFrame,
     QLabel,
     QMainWindow,
     QSlider,
@@ -90,7 +91,13 @@ class MainWindow(QMainWindow):
         self.banner.hide()
         layout.addWidget(self.banner)
         self.video = MpvWidget(self.player, content)
+        self.video.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.video.setAccessibleName("Video playback")
         layout.addWidget(self.video, 1)
+        self.video_focus = QFocusFrame(content)
+        self.video_focus.setWidget(self.video)
+        self.video_focus.hide()
+        self.video.installEventFilter(self)
         self.seek_bar = SeekBar(content)
         layout.addWidget(self.seek_bar)
         self.time_label = QLabel("00:00 / 00:00", content)
@@ -103,6 +110,9 @@ class MainWindow(QMainWindow):
         self.browser = BrowserDock(self)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.browser)
         self.browser.file_activated.connect(self.open_file)
+        QWidget.setTabOrder(self.browser.all_files, self.browser.tree)
+        QWidget.setTabOrder(self.browser.tree, self.video)
+        QWidget.setTabOrder(self.video, self.seek_bar)
         open_action = QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.choose_file)
@@ -165,6 +175,14 @@ class MainWindow(QMainWindow):
     def _seek_from_bar(self, value):
         if self._duration:
             self.player.seek(value / self.seek_bar.maximum() * self._duration)
+
+    def eventFilter(self, watched, event):
+        if watched is self.video:
+            if event.type() == QEvent.Type.FocusIn:
+                self.video_focus.show()
+            elif event.type() == QEvent.Type.FocusOut:
+                self.video_focus.hide()
+        return super().eventFilter(watched, event)
 
     def choose_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open Video")

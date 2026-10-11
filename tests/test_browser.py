@@ -97,3 +97,48 @@ def test_browser_double_click_folder_then_enter_file(qtbot, tmp_path):
         assert activated == [str(clip), str(clip)]
     finally:
         window.close()
+
+
+def test_keyboard_only_opens_file_and_reaches_video_focus(qtbot, tmp_path):
+    folder = tmp_path / "videos"
+    folder.mkdir()
+    clip = folder / "clip.mp4"
+    copyfile(MEDIA, clip)
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    tree = window.browser.tree
+    model = window.browser.model
+    tree.setRootIndex(model.setRootPath(str(tmp_path)))
+    window.show()
+    try:
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
+        qtbot.waitUntil(lambda: window.video._render is not None, timeout=10000)
+        assert window.browser.accessibleName() == "Local browser"
+        assert window.browser.all_files.accessibleName() == "Show all files"
+        assert tree.accessibleName() == "Local files"
+        assert window.video.accessibleName() == "Video playback"
+
+        window.browser.all_files.setFocus()
+        assert not window.video_focus.isVisible()
+        QTest.keyClick(window.browser.all_files, Qt.Key.Key_Tab)
+        assert tree.hasFocus()
+        qtbot.waitUntil(lambda: model.index(str(folder)).isValid())
+        tree.setCurrentIndex(model.index(str(folder)))
+        QTest.keyClick(tree, Qt.Key.Key_Return)
+        qtbot.waitUntil(lambda: tree.rootIndex() == model.index(str(folder)))
+        qtbot.waitUntil(lambda: model.index(str(clip)).isValid())
+        tree.setCurrentIndex(model.index(str(clip)))
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            QTest.keyClick(tree, Qt.Key.Key_Return)
+        assert window.player._uri == str(clip)
+
+        QTest.keyClick(tree, Qt.Key.Key_Tab)
+        assert window.video.hasFocus()
+        assert window.video_focus.widget() is window.video
+        assert window.video_focus.isVisible()
+        QTest.keyClick(window.video, Qt.Key.Key_Tab, Qt.KeyboardModifier.ShiftModifier)
+        assert tree.hasFocus()
+        assert not window.video_focus.isVisible()
+    finally:
+        window.close()

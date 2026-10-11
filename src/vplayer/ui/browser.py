@@ -20,6 +20,7 @@ class BrowserDock(QDockWidget):
 
     def __init__(self, parent=None, root: Path | None = None):
         super().__init__("Browser", parent)
+        self.setAccessibleName("Local browser")
         content = QWidget(self)
         layout = QVBoxLayout(content)
         self.all_files = QCheckBox("All files", content)

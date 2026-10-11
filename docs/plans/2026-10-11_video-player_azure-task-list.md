@@ -155,7 +155,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 1.2.1.2.1 | Task | [x] Browser `activated` (double-click / Enter): file → play in active tab; folder → open folder | 01:00 | 00:15 | `tests/test_browser.py`: Enter on a clip plays it; Enter on a folder navigates \|\| | Browser playback: v0.7.0; active window (tabs pending) |
-| 1.2.1.2.2 | Task | Keyboard navigation — tab order dock ↔ player, visible focus, accessible names on browser widgets | 01:00 | 00:10 | Keyboard-only run opens a file with no mouse | NFR-011 |
+| 1.2.1.2.2 | Task | [x] Keyboard navigation — tab order dock ↔ player, visible focus, accessible names on browser widgets | 01:00 | 00:10 | Keyboard-only run opens a file with no mouse | NFR-011; accessibility patch v0.7.1 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: extension filter and "All files" toggle pass

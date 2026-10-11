@@ -29,6 +29,8 @@ window; every launch already creates a new window.
 Use **Ctrl+B** to show or hide the local file browser; **All files** reveals
 files outside the media extension filter. Double-click or press **Enter** on a
 folder to open it, or on a video to play it.
+The browser, video surface, and seek bar are reachable with **Tab** and
+**Shift+Tab**; the focused video has a visible outline.
 
 Generate the media fixtures with `python scripts/make_test_media.py`, then
 run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
