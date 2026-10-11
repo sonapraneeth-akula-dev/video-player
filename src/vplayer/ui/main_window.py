@@ -135,6 +135,16 @@ class MainWindow(QMainWindow):
             action.triggered.connect(lambda checked=False, rate=speed: self.player.set_speed(rate))
             self.playback_menu.addAction(action)
             self.speed_actions[speed] = action
+        for name, label, key, callback in (
+            ("speed_up", "Speed up", "]", lambda: self.player.nudge_speed(self.settings.speed_step)),
+            ("speed_down", "Speed down", "[", lambda: self.player.nudge_speed(-self.settings.speed_step)),
+            ("speed_reset", "Normal speed", "Backspace", lambda: self.player.set_speed(1.0)),
+        ):
+            action = QAction(label, self)
+            action.setObjectName(name)
+            action.setShortcut(key)
+            action.triggered.connect(callback)
+            self.playback_menu.addAction(action)
         for label, key, amount in (
             ("Seek forward", "Right", self.settings.seek_short_s),
             ("Seek back", "Left", -self.settings.seek_short_s),

@@ -1,6 +1,7 @@
 """Validated INI settings backed by Qt."""
 
 import logging
+import math
 from pathlib import Path
 
 from PySide6.QtCore import QSettings
@@ -18,6 +19,7 @@ class Settings:
         )
         self.seek_short_s = 5
         self.seek_long_s = 60
+        self.speed_step = 0.05
 
     def _bounded_int(self, key: str, default: int, minimum: int, maximum: int) -> int:
         value = self.store.value(key)
@@ -41,6 +43,18 @@ class Settings:
             self.store.setValue("schema_version", SCHEMA_VERSION)
         self.seek_short_s = self._bounded_int("playback/seek_short_s", 5, 1, 600)
         self.seek_long_s = self._bounded_int("playback/seek_long_s", 60, 1, 3600)
+        value = self.store.value("playback/speed_step", 0.05)
+        try:
+            if isinstance(value, bool):
+                raise TypeError("speed step must be a number")
+            step = float(value)
+            if not math.isfinite(step) or not 0.01 <= step <= 1.0:
+                raise ValueError("speed step out of range")
+        except (TypeError, ValueError):
+            log.warning("Invalid playback/speed_step setting %r; using 0.05", value)
+            step = 0.05
+            self.store.setValue("playback/speed_step", step)
+        self.speed_step = step
         self.store.sync()
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not read/write settings: {self.store.fileName()}")

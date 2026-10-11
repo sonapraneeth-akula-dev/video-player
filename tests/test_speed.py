@@ -58,3 +58,51 @@ def test_speed_actions_update_status_label(qtbot, tmp_path: Path):
         qtbot.waitUntil(lambda: window.speed_label.text() == "0.67×")
     finally:
         window.close()
+
+
+def test_speed_nudges_are_decimal_and_bounded(qtbot):
+    player = Player(video_output="null")
+    try:
+        for _ in range(20):
+            player.nudge_speed(0.05)
+        assert player.mpv.speed == 2.0
+        for _ in range(40):
+            player.nudge_speed(-0.05)
+        assert player.mpv.speed == 0.05
+        for _ in range(200):
+            player.nudge_speed(0.05)
+        assert player.mpv.speed == 8.0
+        with qtbot.waitSignal(player.error):
+            player.nudge_speed(float("nan"))
+    finally:
+        player.close()
+
+
+def test_speed_adjustment_actions_use_setting(qtbot, tmp_path: Path):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("playback/speed_step", "0.1")
+    window = MainWindow(settings)
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        actions = {action.objectName(): action for action in window.playback_menu.actions()}
+        for name, shortcut in (("speed_up", "]"), ("speed_down", "["), ("speed_reset", "Backspace")):
+            assert actions[name].shortcut().toString() == shortcut
+        actions["speed_up"].trigger()
+        qtbot.waitUntil(lambda: window.player.mpv.speed == 1.1)
+        actions["speed_down"].trigger()
+        qtbot.waitUntil(lambda: window.player.mpv.speed == 1.0)
+        window.player.set_speed(4)
+        actions["speed_reset"].trigger()
+        qtbot.waitUntil(lambda: window.player.mpv.speed == 1.0)
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
+        window.video.setFocus()
+        qtbot.waitUntil(window.video.hasFocus)
+        QTest.qWait(200)
+        QTest.keyClick(window.video, Qt.Key.Key_BracketRight)
+        qtbot.waitUntil(lambda: window.player.mpv.speed == 1.1)
+        QTest.keyClick(window.video, Qt.Key.Key_Backspace)
+        qtbot.waitUntil(lambda: window.player.mpv.speed == 1.0)
+    finally:
+        window.close()

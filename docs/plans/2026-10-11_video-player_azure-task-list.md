@@ -361,7 +361,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.1.1.2.1 | Task | `nudge_speed(±speed_step)` with decimal rounding, clamp 0.05–8.0; `speed_up` / `speed_down` / `speed_reset` (] / [ / Backspace) | 01:30 | 00:15 | Unit: 1.0 + 20 × 0.05 == 2.0; clamps at both ends | FR-009 |
+| 3.1.1.2.1 | Task | [x] `nudge_speed(±speed_step)` with decimal rounding, clamp 0.05–8.0; `speed_up` / `speed_down` / `speed_reset` (] / [ / Backspace) | 01:30 | 00:15 | Unit: 1.0 + 20 × 0.05 == 2.0; clamps at both ends | FR-009; fine-step speed v0.9.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: speed clamping and step arithmetic (no float drift: 1.0 + 20 × 0.05 = 2.0)

@@ -2,6 +2,7 @@
 
 import logging
 import math
+from decimal import Decimal
 from pathlib import Path
 
 import mpv
@@ -101,6 +102,12 @@ class Player(QObject):
             self.error.emit("Playback speed must be finite")
             return
         self.mpv.speed = max(0.05, min(speed, 8.0))
+
+    def nudge_speed(self, amount: float) -> None:
+        if isinstance(amount, bool) or not isinstance(amount, (int, float)) or not math.isfinite(amount):
+            self.error.emit("Speed adjustment must be finite")
+            return
+        self.set_speed(float(Decimal(str(self.mpv.speed)) + Decimal(str(amount))))
 
     def seek(self, seconds: float, relative: bool = False) -> None:
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds):
