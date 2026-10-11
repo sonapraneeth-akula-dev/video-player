@@ -60,6 +60,8 @@ def generate(directory: Path = MEDIA) -> None:
             check=True,
         )
 
+    generate_vfr(directory)
+
     for codec, containers in VIDEO_CONTAINERS.items():
         for ext in containers:
             audio = CONTAINER_AUDIO[ext]
@@ -88,6 +90,25 @@ def generate(directory: Path = MEDIA) -> None:
                 ],
                 check=True,
             )
+
+
+def generate_vfr(directory: Path = MEDIA) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "h264_vfr.mkv"
+    subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", f"nullsrc=s={SIZE}:r=60",
+            "-frames:v", "90",
+            "-vf", f"{INDEX},setpts='3*floor(N/2)+2*mod(N,2)'",
+            "-fps_mode", "passthrough", "-c:v", "libx264",
+            "-pix_fmt", "yuv420p", "-qp", "0",
+            "-g", "250", "-keyint_min", "250", "-sc_threshold", "0",
+            str(target),
+        ],
+        check=True,
+    )
+    return target
 
 
 def generate_corrupt(directory: Path = MEDIA, seed: int = 20261011) -> None:

@@ -406,7 +406,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.2.2.2.1 | Task | Extend `make_test_media.py` — VFR MKV alternating 1/30 s and 1/60 s frame durations, index burned in | 00:45 | 00:10 | `ffprobe` shows alternating durations \|\| |  |
+| 3.2.2.2.1 | Task | [x] Extend `make_test_media.py` — VFR MKV alternating 1/30 s and 1/60 s frame durations, index burned in | 00:45 | 00:10 | `ffprobe` shows alternating durations \|\| | `test_vfr_media.py` verifies 90 alternating PTS intervals and decoded frame indices; fixture tooling only, version unchanged |
 | 3.2.2.2.2 | Task | VFR / unknown-fps detection — once per load after ≥ 1 s media time; mark never cleared; test hook forcing unknown fps | 02:00 | 00:20 | VFR clip sets the mark; CFR clips don't | Design §4.3 |
 | 3.2.2.2.3 | Task | Single-step queue — n queued `frame-step`s with "Skipping i/n"; any other command cancels; early end when `time-pos` doesn't change or after 2 s → "Skipped i/n" | 02:30 | 00:25 | `tests/test_vfr.py` cases (a)–(c) green | FR-013/014 |
 
