@@ -1,12 +1,18 @@
 """Qt-facing facade for one libmpv playback core."""
 
+import ctypes
 import logging
 import math
+import posixpath
+import uuid
 from decimal import Decimal
 from pathlib import Path
 
 import mpv
+import paramiko
 from PySide6.QtCore import QObject, Qt, Signal, Slot
+
+from vplayer.sftp import SftpStream
 
 log = logging.getLogger(__name__)
 OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "speed", "hwdec-current")
@@ -22,11 +28,24 @@ class Player(QObject):
     error = Signal(str)
     _update = Signal(str, object)
 
-    def __init__(self, parent: QObject | None = None, *, video_output: str = "libmpv"):
+    def __init__(
+        self, parent: QObject | None = None, *, video_output: str = "libmpv",
+        readahead_mb: int = 64, backbuffer_mb: int = 256,
+    ):
         super().__init__(parent)
+        if (
+            isinstance(readahead_mb, bool) or not isinstance(readahead_mb, int) or not 16 <= readahead_mb <= 64
+            or isinstance(backbuffer_mb, bool) or not isinstance(backbuffer_mb, int) or not 0 <= backbuffer_mb <= 256
+        ):
+            raise ValueError("Invalid SFTP buffer limits")
         self._closed = False
         self._uri = ""
         self._pending_frame_steps = 0
+        self.readahead_mb = readahead_mb
+        self.backbuffer_mb = backbuffer_mb
+        self._sftp_sources: dict[str, tuple[paramiko.Transport, str]] = {}
+        self._sftp_streams: dict[int, tuple[SftpStream, paramiko.SFTPClient]] = {}
+        self._sftp_callbacks = None
         self._update.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
         self.mpv = mpv.MPV(
             vo=video_output,
@@ -84,11 +103,114 @@ class Player(QObject):
         elif name == "error":
             self.error.emit(value)
 
-    def load(self, path: str | Path) -> None:
+    def _register_sftp(self) -> None:
+        callbacks = (
+            mpv.StreamOpenFn(self._sftp_open),
+            mpv.StreamReadFn(self._sftp_read),
+            mpv.StreamSeekFn(self._sftp_seek),
+            mpv.StreamSizeFn(self._sftp_size),
+            mpv.StreamCloseFn(self._sftp_close),
+            mpv.StreamCancelFn(self._sftp_cancel),
+        )
+        mpv._mpv_stream_cb_add_ro(self.mpv.handle, b"vpsftp", None, callbacks[0])
+        self._sftp_callbacks = callbacks
+
+    def _sftp_open(self, _userdata, uri: bytes, info) -> int:
+        client = None
+        cookie = None
+        try:
+            transport, path = self._sftp_sources[uri.decode("utf-8")]
+            client = paramiko.SFTPClient.from_transport(transport)
+            stream = SftpStream(client.open(path, "rb"))
+            cookie = id(stream)
+            self._sftp_streams[cookie] = (stream, client)
+            info.contents.cookie = cookie
+            info.contents.read = self._sftp_callbacks[1]
+            info.contents.seek = self._sftp_callbacks[2]
+            info.contents.size = self._sftp_callbacks[3]
+            info.contents.close = self._sftp_callbacks[4]
+            info.contents.cancel = self._sftp_callbacks[5]
+            return 0
+        except Exception as error:
+            if cookie is not None:
+                self._sftp_streams.pop(cookie, None)
+            if client is not None:
+                try:
+                    client.close()
+                except Exception:
+                    log.exception("Could not close failed SFTP connection")
+            log.exception("Could not open SFTP stream")
+            self._update.emit("error", f"Could not open remote file: {error}")
+            return mpv.ErrorCode.LOADING_FAILED
+
+    def _sftp_read(self, cookie, buffer, count) -> int:
+        try:
+            data = self._sftp_streams[cookie][0].read(count)
+            ctypes.memmove(buffer, data, len(data))
+            return len(data)
+        except Exception as error:
+            log.exception("Could not read SFTP stream")
+            self._update.emit("error", f"Could not read remote file: {error}")
+            return -1
+
+    def _sftp_seek(self, cookie, offset) -> int:
+        try:
+            return self._sftp_streams[cookie][0].seek(offset)
+        except Exception as error:
+            log.exception("Could not seek SFTP stream")
+            self._update.emit("error", f"Could not seek remote file: {error}")
+            return mpv.ErrorCode.GENERIC
+
+    def _sftp_size(self, cookie) -> int:
+        try:
+            return self._sftp_streams[cookie][0].size()
+        except Exception as error:
+            log.exception("Could not get SFTP stream size")
+            self._update.emit("error", f"Could not get remote file size: {error}")
+            return mpv.ErrorCode.GENERIC
+
+    def _sftp_close(self, cookie) -> None:
+        try:
+            stream, client = self._sftp_streams.pop(cookie)
+            try:
+                stream.close()
+            finally:
+                client.close()
+        except Exception as error:
+            log.exception("Could not close SFTP stream")
+            self._update.emit("error", f"Could not close remote file: {error}")
+
+    def _sftp_cancel(self, cookie) -> None:
+        try:
+            self._sftp_streams[cookie][0].cancel()
+        except Exception as error:
+            log.exception("Could not cancel SFTP stream")
+            self._update.emit("error", f"Could not cancel remote file: {error}")
+
+    def load(self, path: str | Path, *, transport: paramiko.Transport | None = None) -> None:
+        if transport is not None:
+            if not isinstance(transport, paramiko.Transport) or not transport.is_authenticated():
+                self.error.emit("An authenticated SSH connection is required")
+                return
+            if not isinstance(path, str) or not path.startswith("/") or "\x00" in path:
+                self.error.emit("Remote file path must be an absolute SFTP path")
+                return
+            if self._sftp_callbacks is None:
+                self._register_sftp()
+            self.mpv["demuxer-max-bytes"] = (self.readahead_mb - 10) * 1024 * 1024
+            self.mpv["demuxer-max-back-bytes"] = max(0, self.backbuffer_mb - 1) * 1024 * 1024
+            self._sftp_sources.clear()
+            self._uri = f"vpsftp://{uuid.uuid4().hex}/{posixpath.basename(path)}"
+            self._sftp_sources[self._uri] = (transport, path)
+            self.mpv.loadfile(self._uri)
+            return
         file = Path(path)
         if not file.is_file():
             self.error.emit(f"File not found: {file}")
             return
+        self._sftp_sources.clear()
+        self.mpv["demuxer-max-bytes"] = 64 * 1024 * 1024
+        self.mpv["demuxer-max-back-bytes"] = 32 * 1024 * 1024
         self._uri = str(file.resolve())
         self.mpv.loadfile(self._uri)
 
@@ -152,5 +274,7 @@ class Player(QObject):
             for name in OBSERVED_PROPERTIES:
                 self.mpv.unobserve_property(name, self._on_property)
             self.mpv.unregister_event_callback(self._on_event)
-            # ponytail: local-only shutdown is synchronous; use a worker when remote streams can block it.
+            # ponytail: remote shutdown may block the GUI while an SFTP read is in flight.
             self.mpv.terminate()
+            self._sftp_sources.clear()
+            self._sftp_callbacks = None

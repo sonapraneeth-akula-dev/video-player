@@ -281,7 +281,7 @@
 |---|------|------|-------------|---------|--------------|-------|
 | 2.2.2.1.1 | Debug | Spike — Paramiko throughput for one and two streams over the owner's VPN using `readv` (128 × 32 KiB) | 01:30 | 00:20 | ≥ 25 MB/s → stay Python; otherwise AD-018 Rust trigger recorded in design §13 | Design §13 |
 | 2.2.2.1.2 | Task | [x] `sftp.py` `SftpStream` — `read` / `seek` / `size` / `close` / `cancel`; 4 MiB blocks via `readv` (128 tuples ≤ 32 KiB, `max_concurrent_prefetch_requests=64`), joined with `b"".join` | 03:00 | 00:30 | `tests/test_sftp_stream.py` (fake file): block cache, seek, EOF branches green | AD-005; bounded one-block cache, short read at a block boundary, Docker-backed read; v0.12.0 |
-| 2.2.2.1.3 | Task | Register `vpsftp://` via `_mpv_stream_cb_add_ro` with `ctypes.memmove`; `Player.load()` sets `demuxer-max-bytes` = `readahead_mb` − 10 MiB and `demuxer-max-back-bytes` for SFTP | 02:30 | 00:25 | Container test: remote play, seek, back-step; frame-accuracy harness passes on an SFTP clip | AD-003, AD-004 |
+| 2.2.2.1.3 | Task | [x] Register `vpsftp://` via `_mpv_stream_cb_add_ro` with `ctypes.memmove`; `Player.load()` sets `demuxer-max-bytes` = `readahead_mb` − 10 MiB and `demuxer-max-back-bytes` for SFTP | 02:30 | 00:25 | Container test: remote play, seek, back-step; frame-accuracy harness passes on an SFTP clip | AD-003, AD-004; native callback and buffer limits covered; local load restores limits; v0.17.0 |
 | 2.2.2.1.4 | Task | Perf test with `tc netem` 50 ms delay / 50 Mbit on the container — first frame and seek-bar seek | 01:30 | 00:15 | First frame < 3 s, seek < 2 s, reported in CI | NFR-007 |
 
 ##### User Story 2.2.2.2 (US-017): Zero disk writes and bounded memory while streaming

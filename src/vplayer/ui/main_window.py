@@ -80,7 +80,9 @@ class MainWindow(QMainWindow):
         self.resize(960, 600)
         self.settings = settings or Settings()
         self.settings.load()
-        self.player = Player(self)
+        self.player = Player(
+            self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
+        )
         self.speed_label = QLabel("1×", self)
         self.speed_label.setAccessibleName("Playback speed")
         self.statusBar().addPermanentWidget(self.speed_label)

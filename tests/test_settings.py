@@ -60,6 +60,21 @@ def test_speed_step_validation_and_custom_value(tmp_path, caplog):
     assert "Invalid playback/speed_step" in caplog.text
 
 
+def test_remote_buffer_settings_are_bounded(tmp_path, caplog):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("network/readahead_mb", 16)
+    settings.store.setValue("network/backbuffer_mb", 0)
+    settings.load()
+    assert (settings.readahead_mb, settings.backbuffer_mb) == (16, 0)
+    settings.store.setValue("network/readahead_mb", 15)
+    settings.store.setValue("network/backbuffer_mb", 257)
+    with caplog.at_level(logging.WARNING):
+        settings.load()
+    assert (settings.readahead_mb, settings.backbuffer_mb) == (64, 256)
+    assert "Invalid network/readahead_mb" in caplog.text
+    assert "Invalid network/backbuffer_mb" in caplog.text
+
+
 def test_connection_profile_create_update_read_delete_without_secrets(tmp_path):
     path = tmp_path / "settings.ini"
     settings = Settings(path)
