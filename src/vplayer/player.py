@@ -32,6 +32,7 @@ class Player(QObject):
             input_default_bindings=False,
             input_vo_keyboard=False,
             osc=False,
+            keepaspect=True,
             keep_open=True,
             cache="yes",
             cache_on_disk="no",
