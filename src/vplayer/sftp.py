@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import paramiko
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QObject, QStandardPaths, QThreadPool, Signal
 
 
 class KnownHosts:
@@ -55,3 +55,50 @@ class KnownHosts:
         finally:
             Path(temporary).unlink(missing_ok=True)
         self.app = updated
+
+
+class _PoolSignals(QObject):
+    connected = Signal(object)
+    error = Signal(str)
+
+
+class SshPool:
+    def __init__(self, known_hosts: KnownHosts):
+        self.known_hosts = known_hosts
+        self.workers = QThreadPool()
+        self._signals = _PoolSignals()
+        self.connected = self._signals.connected
+        self.error = self._signals.error
+
+    def connect(self, host: str, port: int, user: str, password: str, *, keepalive_s: int = 15) -> None:
+        if (
+            not isinstance(host, str) or not host or any(char.isspace() for char in host)
+            or isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535
+            or not isinstance(user, str) or not user or any(char.isspace() for char in user)
+            or not isinstance(password, str)
+            or isinstance(keepalive_s, bool) or not isinstance(keepalive_s, int)
+            or not 5 <= keepalive_s <= 300
+        ):
+            self.error.emit("Invalid SSH connection parameters")
+            return
+        self.workers.start(lambda: self._connect(host, port, user, password, keepalive_s))
+
+    def _connect(self, host: str, port: int, user: str, password: str, keepalive_s: int) -> None:
+        transport = None
+        try:
+            transport = paramiko.Transport((host, port))
+            transport.start_client(timeout=10)
+            key = transport.get_remote_server_key()
+            trust = self.known_hosts.classify(host, port, key)
+            if trust != "trusted":
+                raise paramiko.SSHException(f"{trust.capitalize()} SSH host key for {host}:{port}")
+            transport.auth_password(user, password)
+            if not transport.is_authenticated():
+                raise paramiko.AuthenticationException("Authentication failed")
+            transport.set_keepalive(keepalive_s)
+        except (OSError, EOFError, paramiko.SSHException) as error:
+            if transport is not None:
+                transport.close()
+            self.error.emit(f"Could not connect to {host}:{port}: {error}")
+            return
+        self.connected.emit(transport)
