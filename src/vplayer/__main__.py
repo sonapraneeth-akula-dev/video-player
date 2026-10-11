@@ -1,6 +1,7 @@
 """Application entry point."""
 
 import argparse
+import ctypes
 import locale
 import logging
 import os
@@ -12,6 +13,24 @@ from PySide6.QtCore import QStandardPaths, Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
 from vplayer import APP_NAME, __version__
+
+
+def _attach_parent_console() -> None:
+    if sys.platform != "win32" or (sys.stdout is not None and sys.stderr is not None):
+        return
+    attach = ctypes.WinDLL("kernel32", use_last_error=True).AttachConsole
+    attach.argtypes = [ctypes.c_uint32]
+    attach.restype = ctypes.c_int
+    if not attach(0xFFFFFFFF):
+        error = ctypes.get_last_error()
+        if error == 6:
+            return
+        if error != 5:
+            raise ctypes.WinError(error)
+    if sys.stdout is None:
+        sys.stdout = open("CONOUT$", "w", encoding="utf-8", buffering=1)  # noqa: SIM115
+    if sys.stderr is None:
+        sys.stderr = open("CONOUT$", "w", encoding="utf-8", buffering=1)  # noqa: SIM115
 
 
 def _probe_codec(app: QApplication, window, kind: str) -> int:
@@ -70,6 +89,7 @@ def _probe_codec(app: QApplication, window, kind: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _attach_parent_console()
     parser = argparse.ArgumentParser(prog="vplayer")
     parser.add_argument("files", metavar="FILE", nargs="*")
     parser.add_argument("--new-window", action="store_true")

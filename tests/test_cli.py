@@ -2,6 +2,7 @@ import logging
 import os
 import subprocess
 import sys
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,59 @@ from vplayer.settings import Settings
 from vplayer.ui.main_window import MainWindow
 
 MEDIA = Path(__file__).resolve().parent / "media" / "h264_25.mp4"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows console API")
+@pytest.mark.parametrize(("attached", "error"), ((True, 0), (False, 5), (False, 6)))
+def test_console_output_when_packaged_without_stdio(monkeypatch, attached, error):
+    class Attach:
+        def __call__(self, parent):
+            assert parent == 0xFFFFFFFF
+            return int(attached)
+
+    class Kernel:
+        AttachConsole = Attach()
+
+    outputs = []
+
+    def console_file(path, mode, **options):
+        assert (path, mode, options) == ("CONOUT$", "w", {"encoding": "utf-8", "buffering": 1})
+        output = StringIO()
+        outputs.append(output)
+        return output
+
+    with monkeypatch.context() as patch:
+        patch.setattr(entry.ctypes, "WinDLL", lambda *args, **kwargs: Kernel())
+        patch.setattr(entry.ctypes, "get_last_error", lambda: error)
+        patch.setattr(entry, "open", console_file, raising=False)
+        patch.setattr(sys, "stdout", None)
+        patch.setattr(sys, "stderr", None)
+        entry._attach_parent_console()
+        if error != 6:
+            print("console output")
+            assert outputs[0].getvalue() == "console output\n"
+            assert len(outputs) == 2
+        else:
+            assert not outputs
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows console API")
+def test_console_attachment_surfaces_unexpected_errors(monkeypatch):
+    class Attach:
+        def __call__(self, _parent):
+            return 0
+
+    class Kernel:
+        AttachConsole = Attach()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(entry.ctypes, "WinDLL", lambda *args, **kwargs: Kernel())
+        patch.setattr(entry.ctypes, "get_last_error", lambda: 87)
+        patch.setattr(sys, "stdout", None)
+        patch.setattr(sys, "stderr", None)
+        with pytest.raises(OSError) as failure:
+            entry._attach_parent_console()
+    assert failure.value.winerror == 87
 
 
 def test_version_prints_without_starting_qt(capsys, monkeypatch):
