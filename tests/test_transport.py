@@ -53,3 +53,34 @@ def test_play_pause_and_click_drag_seek(qtbot, tmp_path, monkeypatch):
         assert " / " in window.time_label.text()
     finally:
         window.close()
+
+
+def test_volume_mute_and_fullscreen_shortcuts(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        qtbot.waitUntil(lambda: window.video._render is not None, timeout=10000)
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        window.player.mpv.volume = 40
+        QTest.keyClick(window, Qt.Key.Key_Up)
+        qtbot.waitUntil(lambda: window.player.mpv.volume == 45)
+        QTest.keyClick(window, Qt.Key.Key_Down)
+        qtbot.waitUntil(lambda: window.player.mpv.volume == 40)
+        QTest.keyClick(window, Qt.Key.Key_M)
+        qtbot.waitUntil(lambda: window.player.mpv.mute is True)
+        assert window.player.mpv.volume == 40
+        QTest.keyClick(window, Qt.Key.Key_M)
+        qtbot.waitUntil(lambda: window.player.mpv.mute is False)
+        QTest.keyClick(window, Qt.Key.Key_F)
+        qtbot.waitUntil(window.isFullScreen)
+        QTest.keyClick(window, Qt.Key.Key_F)
+        qtbot.waitUntil(lambda: not window.isFullScreen())
+        QTest.keyClick(window, Qt.Key.Key_F)
+        qtbot.waitUntil(window.isFullScreen)
+        QTest.keyClick(window, Qt.Key.Key_Escape)
+        qtbot.waitUntil(lambda: not window.isFullScreen())
+        assert window.video.grabFramebuffer().pixelColor(200, 200).red() > 35
+    finally:
+        window.close()

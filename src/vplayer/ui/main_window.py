@@ -116,6 +116,17 @@ class MainWindow(QMainWindow):
             action.setShortcut(key)
             action.triggered.connect(lambda checked=False, delta=amount: self.player.seek(delta, relative=True))
             self.playback_menu.addAction(action)
+        for label, key, callback in (
+            ("Volume up", "Up", lambda: self.player.adjust_volume(5)),
+            ("Volume down", "Down", lambda: self.player.adjust_volume(-5)),
+            ("Mute", "M", self.player.toggle_mute),
+            ("Fullscreen", "F", self.toggle_fullscreen),
+            ("Exit fullscreen", "Esc", self.exit_fullscreen),
+        ):
+            action = QAction(label, self)
+            action.setShortcut(key)
+            action.triggered.connect(callback)
+            self.playback_menu.addAction(action)
         self.player.error.connect(self.show_error)
         self.player.file_loaded.connect(self.banner.hide)
         self._duration = 0.0
@@ -159,6 +170,16 @@ class MainWindow(QMainWindow):
     def show_error(self, message: str):
         self.banner.setText(message)
         self.banner.show()
+
+    def toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def exit_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()
 
     def closeEvent(self, event):
         self.video.release()

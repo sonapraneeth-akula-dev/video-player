@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import QApplication
@@ -66,5 +67,28 @@ def test_seek_clamps_to_first_and_last_frame(qtbot):
         qtbot.waitUntil(lambda: player.state()["time-pos"] < 0.05)
         with qtbot.waitSignal(player.error):
             player.seek(float("nan"))
+    finally:
+        player.close()
+
+
+def test_volume_is_bounded_and_mute_keeps_level():
+    player = Player(video_output="null")
+    try:
+        player.mpv.volume = 40
+        with patch.object(player.mpv, "show_text") as osd:
+            player.adjust_volume(5)
+            assert player.mpv.volume == 45
+            osd.assert_called_with("Volume: 45%", 1000)
+            player.toggle_mute()
+            assert player.mpv.mute is True
+            assert player.mpv.volume == 45
+            osd.assert_called_with("Muted", 1000)
+            player.toggle_mute()
+            assert player.mpv.mute is False
+            assert player.mpv.volume == 45
+            player.adjust_volume(1000)
+            assert player.mpv.volume == 100
+            player.adjust_volume(-1000)
+            assert player.mpv.volume == 0
     finally:
         player.close()

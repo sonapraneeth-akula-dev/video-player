@@ -84,6 +84,14 @@ class Player(QObject):
     def play_pause(self) -> None:
         self.mpv.pause = not self.mpv.pause
 
+    def adjust_volume(self, amount: int) -> None:
+        self.mpv.volume = max(0, min(self.mpv.volume + amount, 100))
+        self.mpv.show_text(f"Volume: {self.mpv.volume:.0f}%", 1000)
+
+    def toggle_mute(self) -> None:
+        self.mpv.mute = not self.mpv.mute
+        self.mpv.show_text("Muted" if self.mpv.mute else f"Volume: {self.mpv.volume:.0f}%", 1000)
+
     def seek(self, seconds: float, relative: bool = False) -> None:
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds):
             self.error.emit("Seek position must be finite")

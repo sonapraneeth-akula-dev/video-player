@@ -112,7 +112,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 1.1.2.2.1 | Task | `volume_up` / `volume_down` (Up / Down, OSD level), `mute` (M, keeps level), `fullscreen` (F, Esc exits) in `player.py` + `ui/main_window.py` | 02:00 | 00:20 | `tests/test_transport.py`: volume steps, mute keeps `volume`, fullscreen toggles, Esc exits | FR-021 |
+| 1.1.2.2.1 | Task | [x] `volume_up` / `volume_down` (Up / Down, OSD level), `mute` (M, keeps level), `fullscreen` (F, Esc exits) in `player.py` + `ui/main_window.py` | 02:00 | 00:20 | `tests/test_transport.py`: volume steps, mute keeps `volume`, fullscreen toggles, Esc exits | FR-021; v0.5.0 |
 
 #### Feature 1.1.3 (FEAT-001.1.3): Command-line open
 - **Est. Manual**: 02:30 | **Est. AI**: 00:25

@@ -75,7 +75,7 @@ def test_seek_actions_use_configured_short_and_long_steps(qtbot, tmp_path, monke
     calls = []
     monkeypatch.setattr(window.player, "seek", lambda seconds, relative: calls.append((seconds, relative)))
     try:
-        actions = window.playback_menu.actions()[1:]
+        actions = window.playback_menu.actions()[1:5]
         assert [action.shortcut().toString() for action in actions] == [
             "Right", "Left", "Shift+Right", "Shift+Left",
         ]
