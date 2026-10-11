@@ -25,6 +25,7 @@ class Player(QObject):
     paused = Signal(object)
     speed_changed = Signal(object)
     hwdec_current = Signal(object)
+    vfr_detected = Signal()
     error = Signal(str)
     _update = Signal(str, object)
 
@@ -41,6 +42,8 @@ class Player(QObject):
         self._closed = False
         self._uri = ""
         self._pending_frame_steps: list[int] = []
+        self.variable_frame_rate = False
+        self._vfr_checked = False
         self.readahead_mb = readahead_mb
         self.backbuffer_mb = backbuffer_mb
         self._sftp_sources: dict[str, tuple[paramiko.Transport, str]] = {}
@@ -85,6 +88,16 @@ class Player(QObject):
             self.file_loaded.emit()
         elif name == "time-pos":
             self.position.emit(value)
+            if not self._vfr_checked and isinstance(value, (int, float)) and value >= 1:
+                container, estimated = self._fps_values()
+                if (
+                    isinstance(container, (int, float)) and math.isfinite(container) and container > 0
+                    and isinstance(estimated, (int, float)) and math.isfinite(estimated) and estimated > 0
+                ):
+                    self._vfr_checked = True
+                    if abs(estimated / container - 1) > 0.01:
+                        self.variable_frame_rate = True
+                        self.vfr_detected.emit()
         elif name == "duration":
             self.duration.emit(value)
         elif name == "pause":
@@ -187,6 +200,15 @@ class Player(QObject):
             log.exception("Could not cancel SFTP stream")
             self._update.emit("error", f"Could not cancel remote file: {error}")
 
+    def _fps_values(self) -> tuple[float | None, float | None]:
+        return self.mpv.container_fps, self.mpv.estimated_vf_fps
+
+    def frame_rate(self) -> float | None:
+        for value in self._fps_values():
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0:
+                return value
+        return None
+
     def load(self, path: str | Path, *, transport: paramiko.Transport | None = None) -> None:
         if transport is not None:
             if not isinstance(transport, paramiko.Transport) or not transport.is_authenticated():
@@ -202,6 +224,8 @@ class Player(QObject):
             self._sftp_sources.clear()
             self._uri = f"vpsftp://{uuid.uuid4().hex}/{posixpath.basename(path)}"
             self._sftp_sources[self._uri] = (transport, path)
+            self.variable_frame_rate = False
+            self._vfr_checked = False
             self.mpv.loadfile(self._uri)
             return
         file = Path(path)
@@ -212,6 +236,8 @@ class Player(QObject):
         self.mpv["demuxer-max-bytes"] = 64 * 1024 * 1024
         self.mpv["demuxer-max-back-bytes"] = 32 * 1024 * 1024
         self._uri = str(file.resolve())
+        self.variable_frame_rate = False
+        self._vfr_checked = False
         self.mpv.loadfile(self._uri)
 
     def play_pause(self) -> None:
@@ -254,7 +280,7 @@ class Player(QObject):
         if duration is None:
             self.error.emit("Cannot seek before a file is loaded")
             return
-        fps = self.mpv.container_fps or self.mpv.estimated_vf_fps
+        fps = self.frame_rate()
         last_frame = max(0.0, duration - (1.0 / fps if fps else 1e-6))
         target = seconds + (self.mpv.time_pos or 0.0) if relative else seconds
         target = max(0.0, min(target, last_frame))
