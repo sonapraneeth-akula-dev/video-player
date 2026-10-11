@@ -354,7 +354,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.1.1.1.1 | Task | [x] `Player.set_speed()` + `speed_0_25` … `speed_4_0` actions (Alt+1…6); speed label in the status bar | 01:30 | 00:15 | `tests/test_speed.py`: each preset → mpv `speed` exact | FR-008; speed presets v0.8.0 |
+| 3.1.1.1.1 | Task | [x] `Player.set_speed()` + `speed_0_25` … `speed_4_0` actions (Alt+1…6); speed label in the status bar | 01:30 | 00:15 | `tests/test_speed.py`: each preset → mpv `speed` exact | FR-008; speed presets v0.8.0; seek regression test now selects shortcuts rather than stale menu positions |
 
 ##### User Story 3.1.1.2 (US-022): Raise or lower speed in fine steps
 - **Est. Manual**: 01:30 | **Est. AI**: 00:15
