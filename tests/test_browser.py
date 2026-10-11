@@ -42,10 +42,13 @@ def test_ctrl_b_toggles_browser_dock(qtbot, tmp_path):
         window.activateWindow()
         qtbot.waitUntil(window.isActiveWindow)
         assert window.browser.toggleViewAction().shortcut().toString() == "Ctrl+B"
+        window.browser.tree.setFocus()
+        qtbot.waitUntil(window.browser.tree.hasFocus)
+        QTest.qWait(200)
         with qtbot.waitSignal(window.browser.toggleViewAction().triggered, timeout=2000):
-            QTest.keyClick(window, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
+            QTest.keyClick(window.browser.tree, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
         qtbot.waitUntil(lambda: not window.browser.isVisible())
-        QTest.keyClick(window, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
+        QTest.keyClick(window.browser.tree, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
         qtbot.waitUntil(window.browser.isVisible)
     finally:
         window.close()
@@ -120,7 +123,7 @@ def test_keyboard_only_opens_file_and_reaches_video_focus(qtbot, tmp_path):
         assert window.video.accessibleName() == "Video playback"
 
         window.browser.all_files.setFocus()
-        assert not window.video_focus.isVisible()
+        qtbot.waitUntil(lambda: window.browser.all_files.hasFocus() and not window.video_focus.isVisible())
         QTest.keyClick(window.browser.all_files, Qt.Key.Key_Tab)
         assert tree.hasFocus()
         qtbot.waitUntil(lambda: model.index(str(folder)).isValid())

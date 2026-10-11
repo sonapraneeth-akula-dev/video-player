@@ -95,7 +95,6 @@ class MainWindow(QMainWindow):
         self.video.setAccessibleName("Video playback")
         layout.addWidget(self.video, 1)
         self.video_focus = QFocusFrame(content)
-        self.video_focus.setWidget(self.video)
         self.video_focus.hide()
         self.video.installEventFilter(self)
         self.seek_bar = SeekBar(content)
@@ -179,8 +178,10 @@ class MainWindow(QMainWindow):
     def eventFilter(self, watched, event):
         if watched is self.video:
             if event.type() == QEvent.Type.FocusIn:
+                self.video_focus.setWidget(self.video)
                 self.video_focus.show()
             elif event.type() == QEvent.Type.FocusOut:
+                self.video_focus.setWidget(None)
                 self.video_focus.hide()
         return super().eventFilter(watched, event)
 
