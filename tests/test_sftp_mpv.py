@@ -76,7 +76,7 @@ def test_mpv_plays_and_seeks_remote_file_without_copy(qtbot, sftp_server):
             frame = frame_index(player)
             player.mpv.command("frame-step")
             qtbot.waitUntil(lambda: frame_index(player) == frame + 1, timeout=10000)
-            player.mpv.command("frame-back-step")
+            player.frame_step(-1)
             qtbot.waitUntil(lambda: frame_index(player) == frame, timeout=10000)
             assert player._sftp_streams
             widget.release()

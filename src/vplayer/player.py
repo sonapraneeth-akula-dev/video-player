@@ -40,7 +40,7 @@ class Player(QObject):
             raise ValueError("Invalid SFTP buffer limits")
         self._closed = False
         self._uri = ""
-        self._pending_frame_steps = 0
+        self._pending_frame_steps: list[int] = []
         self.readahead_mb = readahead_mb
         self.backbuffer_mb = backbuffer_mb
         self._sftp_sources: dict[str, tuple[paramiko.Transport, str]] = {}
@@ -91,9 +91,9 @@ class Player(QObject):
             self.paused.emit(value)
             if value and self._pending_frame_steps:
                 steps = self._pending_frame_steps
-                self._pending_frame_steps = 0
-                for _ in range(steps):
-                    self.mpv.command("frame-step")
+                self._pending_frame_steps = []
+                for direction in steps:
+                    self.mpv.command("frame-step" if direction == 1 else "frame-back-step")
         elif name == "speed":
             self.speed_changed.emit(value)
         elif name == "hwdec-current":
@@ -238,12 +238,12 @@ class Player(QObject):
         self.set_speed(float(Decimal(str(self.mpv.speed)) + Decimal(str(amount))))
 
     def frame_step(self, direction: int = 1) -> None:
-        if direction != 1:
-            raise ValueError("Only forward frame stepping is supported")
+        if type(direction) is not int or direction not in (-1, 1):
+            raise ValueError("Frame step direction must be -1 or 1")
         if self.mpv.pause:
-            self.mpv.command("frame-step")
+            self.mpv.command("frame-step" if direction == 1 else "frame-back-step")
         else:
-            self._pending_frame_steps += 1
+            self._pending_frame_steps.append(direction)
             self.mpv.pause = True
 
     def seek(self, seconds: float, relative: bool = False) -> None:

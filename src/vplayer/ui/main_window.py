@@ -154,6 +154,13 @@ class MainWindow(QMainWindow):
         self.frame_next.triggered.connect(lambda: self.player.frame_step())
         self.player.file_loaded.connect(lambda: self.frame_next.setEnabled(True))
         self.playback_menu.addAction(self.frame_next)
+        self.frame_prev = QAction("Previous frame", self)
+        self.frame_prev.setObjectName("frame_prev")
+        self.frame_prev.setShortcut(",")
+        self.frame_prev.setEnabled(False)
+        self.frame_prev.triggered.connect(lambda: self.player.frame_step(-1))
+        self.player.file_loaded.connect(lambda: self.frame_prev.setEnabled(True))
+        self.playback_menu.addAction(self.frame_prev)
         for label, key, amount in (
             ("Seek forward", "Right", self.settings.seek_short_s),
             ("Seek back", "Left", -self.settings.seek_short_s),

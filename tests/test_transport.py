@@ -94,9 +94,13 @@ def test_forward_frame_action_is_available_after_load(qtbot, tmp_path):
         assert not window.frame_next.isEnabled()
         assert window.frame_next.shortcut().toString() == "."
         assert window.frame_next in window.playback_menu.actions()
+        assert not window.frame_prev.isEnabled()
+        assert window.frame_prev.shortcut().toString() == ","
+        assert window.frame_prev in window.playback_menu.actions()
         with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
             window.open_file(MEDIA)
         assert window.frame_next.isEnabled()
+        assert window.frame_prev.isEnabled()
         window.frame_next.trigger()
         qtbot.waitUntil(lambda: window.player.mpv.pause is True)
     finally:

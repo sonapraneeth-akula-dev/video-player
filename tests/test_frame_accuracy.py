@@ -103,3 +103,48 @@ def test_forward_step_is_exact_from_playing_or_paused(qtbot, paused_video, playi
     qtbot.waitUntil(lambda: player.mpv.pause is True and frame_index(player) == expected, timeout=10000)
     player.frame_step()
     qtbot.waitUntil(lambda: frame_index(player) == expected + 1, timeout=10000)
+
+
+@pytest.mark.parametrize("name", [case[0] for case in CASES])
+def test_back_step_is_exact_across_cfr_matrix(qtbot, paused_video, name):
+    player, _widget = paused_video
+    player.mpv.pause = True
+    with qtbot.waitSignal(player.file_loaded, timeout=10000):
+        player.load(MEDIA / name)
+    qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
+    for index in range(1, 11):
+        player.frame_step()
+        qtbot.waitUntil(lambda index=index: frame_index(player) == index, timeout=10000)
+    for index in range(9, -1, -1):
+        player.frame_step(-1)
+        qtbot.waitUntil(lambda index=index: frame_index(player) == index, timeout=10000)
+
+
+def test_back_step_from_playing_pauses_then_moves_one_frame(qtbot, paused_video):
+    player, _widget = paused_video
+    player.mpv.pause = True
+    with qtbot.waitSignal(player.file_loaded, timeout=10000):
+        player.load(MEDIA / "h264_25.mp4")
+    player.mpv.pause = False
+    qtbot.waitUntil(lambda: frame_index(player) > 5, timeout=10000)
+    paused_frames = []
+
+    def record_pause(value):
+        if value and not paused_frames:
+            paused_frames.append(frame_index(player))
+
+    player.paused.connect(record_pause)
+    try:
+        player.frame_step(-1)
+        qtbot.waitUntil(lambda: bool(paused_frames), timeout=10000)
+        expected = paused_frames[0] - 1
+        qtbot.waitUntil(lambda: player.mpv.pause is True and frame_index(player) == expected, timeout=10000)
+    finally:
+        player.paused.disconnect(record_pause)
+
+
+@pytest.mark.parametrize("direction", [0, 2, -2, True, 1.0, "1"])
+def test_frame_step_rejects_invalid_direction(qtbot, paused_video, direction):
+    player, _widget = paused_video
+    with pytest.raises(ValueError, match="Frame step direction"):
+        player.frame_step(direction)

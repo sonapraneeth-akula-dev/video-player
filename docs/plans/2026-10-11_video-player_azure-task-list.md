@@ -387,7 +387,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.2.1.2.1 | Task | `Player.frame_step(-1)` via `frame-back-step`, back-buffer from `backbuffer_mb`; `frame_prev` (`,`) | 01:30 | 00:15 | Frame-accuracy: back-step exact on 100% of the CFR matrix | FR-012 |
+| 3.2.1.2.1 | Task | [x] `Player.frame_step(-1)` via `frame-back-step`, back-buffer from `backbuffer_mb`; `frame_prev` (`,`) | 01:30 | 00:15 | Frame-accuracy: back-step exact on 100% of the CFR matrix | FR-012; 7/7 CFR clips plus playing-state and SFTP back-step tests; v0.18.0 |
 | 3.2.1.2.2 | Debug | hr-seek rounding — check an exact seek to `k/fps` shows frame k on mpv 0.34 and the Windows build; else use `(k + 0.5)/fps` | 01:00 | 00:20 | Result in design §13; test pins the chosen formula | Design §13; affects US-025 |
 | 3.2.1.2.3 | Task | Perf test — local back-step p95 on 4K HEVC GOP 250 at 50 random positions | 01:30 | 00:15 | p95 < 300 ms on both OSes | NFR-008 |
 
