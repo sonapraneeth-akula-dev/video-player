@@ -1,5 +1,5 @@
 # Discovery: Desktop Video Player (local + SFTP, frame-accurate)
-**Date**: 2026-10-11 | **Status**: Approved (2026-10-11) | **Owner**: soakula
+**Date**: 2026-10-11 | **Status**: Approved (2026-10-11; amended same day: FR-050/051 added) | **Owner**: soakula | **Design**: [technical design](2026-10-11_video-player_technical-design.md)
 
 ## 1. Idea Summary
 A lightweight, VLC-like desktop video player for Windows and Linux that plays local files and
@@ -64,7 +64,7 @@ install cleanly with OS integration (PATH, desktop entry, "Open with").
 ## 6. Key Scenarios / User Journeys
 ### Open a local file from the OS
 User right-clicks `clip.mp4` in Explorer / Nautilus → "Open with <App>" → player opens and starts
-playing within ~1 s. Typing `<app> clip.mp4` in a terminal does the same (PATH).
+playing within 1.5 s (NFR-006). Typing `<app> clip.mp4` in a terminal does the same (PATH).
 
 ### Stream a remote file over SFTP
 User opens "Connect to server", enters host, port, username, chooses key/agent or password, and
@@ -97,8 +97,8 @@ play, pause, speed changes and frame steps move both videos together. They toggl
 nudge one side by a frame, toggle it back on, then snapshot both sides as two PNGs.
 
 ### Rebind shortcuts
-User opens Preferences → Shortcuts and rebinds "Step back 1 frame" to `,`. The UI warns that `,`
-is already bound and offers to swap. The binding persists across restarts and the toolbar
+User opens Preferences → Shortcuts and rebinds "Step back 1 frame" to `A`. The UI warns that `A`
+is already bound to "Cycle audio track" and offers to swap. The binding persists across restarts and the toolbar
 tooltip reflects the new key.
 
 ## 7. Functional Requirements
@@ -110,7 +110,7 @@ tooltip reflects the new key.
 | FR-004 | The system shall verify server host keys against `known_hosts` and require explicit user confirmation for unknown or changed keys. | Must | No silent accept |
 | FR-005 | The system shall browse remote SFTP directories and play a selected file by streaming byte ranges on demand. | Must | |
 | FR-006 | The system shall not write any media bytes to local disk during playback (no temp files, no disk cache). | Must | RAM read-ahead only |
-| FR-007 | The system shall bound in-memory network buffers per stream: read-ahead (default 64 MB) and back-buffer for seeking/back-step (max 256 MB). | Must | Owner confirmed 256 MB max 2026-10-11 |
+| FR-007 | The system shall bound in-memory network buffers per stream: read-ahead (default 64 MB) and back-buffer for seeking/back-step (max 256 MB). | Must | Owner confirmed 256 MB max 2026-10-11. Here and in NFR-001, MB for these buffers means MiB (1,048,576 bytes) |
 | FR-008 | The system shall support playback speed presets 0.25x, 0.5x, 0.67x, 1.0x, 2.0x, 4.0x. | Must | |
 | FR-009 | The system shall support custom speed increments/decrements with a configurable step (default 0.05x) within 0.05x–8.0x. | Must | |
 | FR-010 | The system shall preserve audio pitch at non-1.0 speeds, with an option to disable. | Should | |
@@ -123,7 +123,7 @@ tooltip reflects the new key.
 | FR-017 | The system shall decode at least H.264, HEVC, VP9, AV1 video and AAC, MP3, Opus, AC-3 audio in MP4, MKV, WebM, MOV, AVI, TS containers. | Must | |
 | FR-018 | The system shall capture the current video frame at native resolution (no overlays, no scaling) and save as PNG or JPEG. | Must | |
 | FR-019 | The system shall support snapshot quick-save to a configurable default directory and a "Save As" dialog. | Must | Default format PNG |
-| FR-020 | The system shall name quick-saved snapshots `<source>_<HH-MM-SS.mmm>_f<frame>.<ext>` and never overwrite existing files. | Should | |
+| FR-020 | The system shall name quick-saved snapshots `<source>_<HH-MM-SS.mmm>_f<frame>.<ext>` and never overwrite existing files. | Should | If the frame rate is unknown, `_f<frame>` is omitted |
 | FR-021 | The system shall provide volume control, mute, and fullscreen toggle. | Must | |
 | FR-022 | The system shall expose every user action (play/pause, speed, frame step, skip, seek, snapshot, volume, mute, fullscreen, open, connect) as both a UI control and a keyboard shortcut. | Must | Single action registry |
 | FR-023 | The system shall let users rebind any shortcut, detect conflicts, reset to defaults, and persist bindings. | Must | |
@@ -142,33 +142,35 @@ tooltip reflects the new key.
 | FR-036 | The system shall support multiple top-level windows, each with its own set of tabs. | Must | Owner confirmed 2026-10-11 |
 | FR-037 | Keyboard shortcuts and toolbar actions shall apply to the active tab of the focused window only. | Must | |
 | FR-038 | The system shall provide actions to open a new tab, close a tab, switch to the next/previous tab, and open a new window, each with UI control + shortcut. | Must | Extends FR-022 |
-| FR-039 | Background tabs shall auto-pause when not visible by default, with a user setting to keep playing (muted or with audio). | Should | Owner confirmed default 2026-10-11 |
+| FR-039 | Background tabs shall auto-pause when not visible by default, with a user setting to keep playing (muted or with audio). | Should | Owner confirmed default 2026-10-11. Wayland doesn't report window minimize to apps, so there only non-current tabs count as not visible |
 | FR-040 | The system shall allow at most 4 tabs per window and show a clear message when the limit is reached. | Must | Owner confirmed 2026-10-11; memory guard |
 | FR-041 | The system shall let a tab be dragged out into a new window or between windows without losing playback state. | Must | Owner confirmed 2026-10-11 |
 | FR-042 | Opening a file via "Open with"/CLI while the app runs shall add it as a new tab in the last-used window; if that window already has 4 tabs, it opens in a new window. | Must | Owner confirmed 2026-10-11 |
-| FR-043 | The system shall offer an explicit "Open in new window" option in the OS "Open with" context menu, in the in-app file browsers, and as a CLI flag. | Must | Owner confirmed 2026-10-11 |
+| FR-043 | The system shall offer an explicit "Open in new window" option in the OS "Open with" context menu, in the in-app file browsers, and as a CLI flag. | Must | Owner confirmed 2026-10-11. Windows allows one "Open with" entry per app, so there it's a separate context-menu item next to "Open with" (design §11) |
 | FR-044 | The system shall show two videos side by side in one window in a synced-compare view. | Must | Owner confirmed 2026-10-11 |
 | FR-045 | In synced-compare view, play/pause, seek, speed changes, frame step (±1) and n-frame skips shall apply to both videos together. | Must | |
 | FR-046 | In synced-compare view, the user shall be able to set a time or frame offset between the two videos and toggle sync off to adjust one side alone. | Must | Aligns recordings that started at different times |
 | FR-047 | In synced-compare view, snapshot shall offer capturing the active side or both sides (as separate PNGs at native resolution). | Should | |
-| FR-048 | The system shall refuse to open two videos in synced-compare view if their frame rates differ, showing an error with both frame rates; each video can still be played in its own tab. | Must | Owner confirmed 2026-10-11. Compare nominal fps as exact fractions (30000/1001 ≠ 30) |
+| FR-048 | The system shall refuse to open two videos in synced-compare view if their frame rates differ, showing an error with both frame rates; each video can still be played in its own tab. | Must | Owner confirmed 2026-10-11. mpv reports fps as decimals, so rates match within 0.001 fps (29.97 = 30000/1001; 29.97 ≠ 30) |
 | FR-049 | In synced-compare view, the system shall show buffer health for each side when streaming over SFTP. | Should | |
+| FR-050 | The system shall copy the current timestamp and frame number (e.g. `00:12:34.567 f22213`) to the clipboard from a UI control and a shortcut. | Should | Owner confirmed 2026-10-11 (from §11). If the frame rate is unknown, only the timestamp is copied |
+| FR-051 | The SFTP connect dialog shall accept a `Host` alias from `~/.ssh/config` and fill hostname, port, user and identity file from it; any other directives for that host are ignored and listed by name in a visible notice. | Should | Owner confirmed 2026-10-11 (from §11) |
 
 ## 8. Non-Functional Requirements
 | ID | Category | Target | Notes |
 |----|----------|--------|-------|
-| NFR-001 | Memory | Local: RSS < 250 MB playing one 4K HEVC video; each additional paused tab adds < 60 MB. SFTP: same, plus per-stream buffers capped at 64 MB read-ahead + 256 MB back-buffer | Worst case 4 tabs × 2 windows bounded by FR-040 |
+| NFR-001 | Memory | Local: RSS < 250 MB playing one 4K HEVC video; each additional background tab adds < 60 MB once suspended (≤ 60 s after being hidden; design AD-019). SFTP: same, plus per-stream buffers capped at 64 MB read-ahead + 256 MB back-buffer | 4-tab limit is per window; no window cap. Memory test workload: 2 windows × 4 tabs (design §10). RSS limits are MiB, like the FR-007 buffers |
 | NFR-002 | Memory stability | RSS growth < 5% over 8 h; 24 h soak with no crash | |
 | NFR-003 | Disk | 0 bytes of media written to disk during SFTP playback | Procmon / `inotifywait` |
 | NFR-004 | Robustness | 0 crashes over a corpus of ≥ 50 corrupt/truncated/fuzzed files | |
 | NFR-005 | Robustness | 0 crashes over 100 scripted network drops (1–60 s) during SFTP streaming | |
 | NFR-006 | Startup | Cold start to first frame < 1.5 s for local file on SSD | |
-| NFR-007 | SFTP latency | First frame < 3 s and seek < 2 s on 50 ms RTT / 50 Mbps link | |
-| NFR-008 | Frame accuracy | ±1 step correct in 100% of CFR clips; local back-step p95 < 300 ms for GOP ≤ 250. Remote back-step served from the ≤ 256 MB back-buffer; slower when it must re-fetch from the server (accepted) | Synced compare: both sides land on the target frame |
-| NFR-009 | Input latency | UI action → visible response p95 < 100 ms | |
+| NFR-007 | SFTP latency | First frame < 3 s and seek < 2 s on 50 ms RTT / 50 Mbps link | Seek time = until the first frame shows at the new position (keyframe seek). Landing on an exact frame in long-GOP remote files may take longer, like remote back-step (accepted) |
+| NFR-008 | Frame accuracy | ±1 step correct in 100% of CFR clips; local back-step p95 < 300 ms for GOP ≤ 250. Remote back-step served from the ≤ 256 MB back-buffer; slower when it must re-fetch from the server (accepted) | Synced compare (CFR files): both sides land on the target frame |
+| NFR-009 | Input latency | UI action → visible response p95 < 100 ms | Visible acknowledgement (control, status or OSD update). Finishing a frame change or seek is covered by NFR-007/008 |
 | NFR-010 | Security | Host-key verification enforced; secrets only in OS keyring (Credential Manager / Secret Service) | |
 | NFR-011 | Accessibility | Full keyboard operability, visible focus, accessible names on controls; WCAG 2.2 AA where applicable | |
-| NFR-012 | Portability | Windows 10 22H2+ / 11 x64; Ubuntu 22.04 x64 (X11 and Wayland — under Wayland, run via XWayland if native video embedding misbehaves) | Owner's Linux: Ubuntu 22.04 |
+| NFR-012 | Portability | Windows 10 22H2+ / 11 x64; Ubuntu 22.04 x64 (X11 and Wayland) | Owner's Linux: Ubuntu 22.04. Video drawn via mpv render API in a Qt widget, so works natively on Wayland (technical design AD-002) |
 | NFR-013 | Install footprint | Installer < 120 MB; per-user install without admin rights | |
 | NFR-014 | Licensing | GPL/LGPL components (incl. GPL libmpv builds) acceptable; personal use only, no redistribution | Re-review if ever shared (§12) |
 
@@ -182,7 +184,7 @@ Owner decisions are marked "owner confirmed"; remaining assumptions to validate 
 - **Constraint**: Python is the primary language; Rust only where a feature can't meet its requirements in Python (owner confirmed 2026-10-11).
 - **Assumption**: Typical media is up to 4K, 1–10 h, H.264/HEVC, streamed over VPN (owner accepted default 2026-10-11) — _Validated by: buffer/latency tests on a VPN link._
 - **Assumption**: Remote servers run standard OpenSSH SFTP — _Validated by: tests against OpenSSH 8.x/9.x._
-- **Assumption**: Most review content is CFR; VFR frame numbers may be shown as approximate — _Validated by: sample of real files._
+- **Assumption**: Most review content is CFR; VFR frame numbers may be shown as approximate. Frame-exact ±n skip assumes CFR with correct fps metadata (design §4.4 detects gross mismatches) — _Validated by: sample of real files._
 - **Assumption**: Back-step (re-decode from keyframe) < 300 ms is acceptable on long-GOP 4K — _Validated by: benchmark, 4K HEVC, 250-frame GOP._
 - **Assumption**: Per-user install (no admin) is the preferred Windows default — _Validated by: owner confirmation._
 - **Assumption**: Python meets NFR-001/006/007 since the native engine does the heavy lifting — _Validated by: memory/latency spike; a miss triggers a targeted Rust module, not a rewrite._
@@ -190,7 +192,7 @@ Owner decisions are marked "owner confirmed"; remaining assumptions to validate 
 ## 10. Prior Art & Research
 - [mpv](https://mpv.io/) / [libmpv client API](https://github.com/mpv-player/mpv/blob/master/include/mpv/client.h) — embeddable engine with `frame-step`, `frame-back-step`, exact `speed`, `screenshot-to-file` (native res, `video` mode), `hwdec=auto-safe`, and a stream-callback API (`mpv_stream_cb_add_ro`) to feed bytes from memory. **Best fit**: covers FR-008–FR-019 natively; back-step is first-class.
 - [VLC / libvlc](https://www.videolan.org/vlc/libvlc.html) — native `sftp://` access (libssh2) and snapshots, but frame step is forward-only; back-step needs seek hacks. Weaker fit for FR-012.
-- [python-mpv](https://github.com/jaseg/python-mpv) — Python libmpv binding incl. `register_stream_protocol` → in-memory SFTP stream, no temp file. Pairs with PySide6.
+- [python-mpv](https://github.com/jaseg/python-mpv) — Python libmpv binding incl. `register_stream_protocol` → in-memory SFTP stream, no temp file. Pairs with PySide6. Caveat found in design: its stream adapter copies bytes one at a time in Python, so the app registers its own stream callback (technical design AD-004).
 - [Paramiko](https://www.paramiko.org/) / [AsyncSSH](https://asyncssh.readthedocs.io/) — SFTP with random-access reads, prefetch, agent/key auth, `known_hosts`.
 - [FFmpeg `sftp` protocol (libssh)](https://ffmpeg.org/ffmpeg-protocols.html#sftp) — mpv can open `sftp://` directly if FFmpeg was built with libssh; build-dependent, poor host-key UX → prefer app-side stream callback.
 - [SMPlayer](https://www.smplayer.info/), [Celluloid](https://celluloid-player.github.io/), [MPC-HC](https://github.com/clsid2/mpc-hc), [mpv.net](https://github.com/mpvnet-player/mpv.net) — prove the "GUI shell + mpv" pattern; none has an integrated SFTP browser.
@@ -208,13 +210,13 @@ don't drift into rebuilding the engine.
 ## 11. Suggestions & Opportunities
 - **Single action registry** driving toolbar, menus, tooltips, and shortcuts → FR-022/023/024 for free; parity checkable by one test.
 - **On-screen frame/timecode overlay** (toggle) — snapshots must exclude it (FR-018).
-- **Copy timestamp/frame number to clipboard** — cheap, high value for reporting.
-- **Reuse `~/.ssh/config`** host aliases and agent → zero-friction connect.
+- **Copy timestamp/frame number to clipboard** — cheap, high value for reporting. → Adopted as FR-050.
+- **Reuse `~/.ssh/config`** host aliases and agent → zero-friction connect. → Adopted as FR-051 (basic fields only).
 - **Buffer-health indicator** for SFTP streams; tune read-ahead for high-RTT links.
 - **Local rotating log** (no media bytes, no secrets) for diagnosing field issues.
 - **Edge cases**: VFR and open-GOP back-step; files > 4 GB / > 24 h; seek past EOF; rotation metadata (snapshot orientation); HDR → PNG tone-mapping; HiDPI; remote file modified/truncated mid-play; SSH idle timeouts (keepalive); permission-denied dirs; non-UTF-8 filenames; many tabs open at once (memory pressure, multiple GPU decoders — hardware decoders have session limits, so fall back to software per tab); several tabs streaming from the same SFTP server (reuse one SSH connection, one channel per file); closing a window with tabs still streaming.
 - **Abuse/security**: host-key spoofing (FR-004); passphrases held in memory only as long as needed; malicious crafted media (keep FFmpeg current); installer modifies PATH only with its own directory.
-- **Sequencing / cut from v1**: A-B loop, resume position, external subtitles. Ship order: (1) local playback + action registry + frame/speed/snapshot, (2) tabs + multiple windows + synced compare, (3) SFTP streaming + reconnect, (4) packaging/OS integration, (5) Should/Could items.
+- **Sequencing / cut from v1**: A-B loop (FR-033), resume position (FR-032), other protocols (FR-034). Ship order: (1) local playback + action registry + frame/speed/snapshot, (2) tabs + multiple windows + synced compare, (3) SFTP streaming + reconnect, (4) packaging/OS integration, (5) Should/Could items.
 
 ## 12. Risks & Open Questions
 - [x] **Licensing**: libmpv is LGPL only if built with `-Dgpl=false`; most prebuilt Windows libmpv builds are GPL. PySide6 is LGPL; PyQt6 is GPL/commercial. — _Resolved 2026-10-11: GPL acceptable; app is for personal use only, not shared. Re-review if that ever changes._
@@ -312,6 +314,10 @@ risk is low.
 if a specific feature cannot meet its requirements in Python, and then only for that piece, as a
 Python extension module (PyO3/maturin). Likeliest candidate: the SFTP read-ahead buffer, if Python's
 global lock causes playback stutter (NFR-007). Rewriting the whole app in Rust is not planned.
+
+_Note: the Option A details above were pre-design estimates. The technical design replaces native-window
+embedding with the mpv render API (AD-002) and uses mpv's own RAM cache instead of a custom
+read-ahead buffer (AD-006). See [technical design](2026-10-11_video-player_technical-design.md)._
 
 ## 13. Glossary
 | Term | Meaning |
