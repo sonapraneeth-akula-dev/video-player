@@ -649,7 +649,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 7.1.1.2.1 | Task | `sync.fps_match(a, b)` — tolerance 0.001; unknown → "Frame rate unknown"; error shows both rates; candidate tab unchanged (suspended stays suspended) | 01:00 | 00:15 | Unit: 29.97 vs 30000/1001 ok; 29.97 vs 30 refused; unknown refused | FR-048 |
+| 7.1.1.2.1 | Task | [x] `sync.fps_match(a, b)` — tolerance 0.001; unknown → "Frame rate unknown"; error shows both rates; candidate tab unchanged (suspended stays suspended) | 01:00 | 00:15 | Unit: 29.97 vs 30000/1001 ok; 29.97 vs 30 refused; unknown refused | FR-048; pure admission check raises before callers change tabs; compare-tab wiring and suspended-tab integration await 7.1.1.1.1 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: fps comparison (tolerance, unknown) (US-043)
