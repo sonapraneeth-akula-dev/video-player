@@ -389,3 +389,29 @@ def test_saved_profile_reconnects_without_retyping_secret(qtbot, trusted_pool, s
         assert dialog.profiles.isEnabled()
     finally:
         result.args[0].close()
+
+
+@pytest.mark.sftp
+def test_ssh_alias_from_uri_uses_resolved_host_key_and_config_user(qtbot, trusted_pool, sftp_server, tmp_path):
+    config = tmp_path / "ssh_config"
+    config.write_text(
+        f"Host video-alias\n    HostName {sftp_server.host}\n"
+        f"    Port {sftp_server.port}\n    User password\n    ProxyJump ignored-gateway\n",
+        encoding="utf-8",
+    )
+    dialog = ConnectDialog.for_sftp_uri(
+        "sftp://video-alias/media/h264_25.mp4",
+        settings=Settings(tmp_path / "settings.ini"), pool=trusted_pool, ssh_config_path=config,
+    )
+    qtbot.addWidget(dialog)
+    dialog.show()
+    dialog.password.setText(sftp_server.password)
+    with qtbot.waitSignal(dialog.connected, timeout=10000) as result:
+        dialog.accept()
+    try:
+        assert result.args[0].is_authenticated()
+        assert "ProxyJump" in dialog.ssh_notice.text()
+        assert f"{sftp_server.host}:{sftp_server.port}" in dialog.ssh_notice.text()
+        assert dialog.remote_path == "/media/h264_25.mp4"
+    finally:
+        result.args[0].close()

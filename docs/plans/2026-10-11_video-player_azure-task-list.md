@@ -924,7 +924,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 11.1.2.1.1 | Task | `sftp.resolve_alias()` — `paramiko.SSHConfig` for HostName / Port / User / IdentityFile; strip `Canonical*` lines and `Match exec` blocks before parsing; notice lists ignored directives | 02:00 | 00:25 | `tests/test_ssh_config.py`: override, ProxyJump notice, missing file, `Match exec` skipped (no command runs), Canonical* dropped, parse error → notice | FR-051, AD-021 |
+| 11.1.2.1.1 | Task | [x] `sftp.resolve_alias()` — `paramiko.SSHConfig` for HostName / Port / User / IdentityFile; strip `Canonical*` lines and `Match exec` blocks before parsing; notice lists ignored directives | 02:00 | 00:25 | `tests/test_ssh_config.py`: override, ProxyJump notice, missing file, `Match exec` skipped (no command runs), Canonical* dropped, parse error → notice | FR-051, AD-021; dialog and URI alias flow verified against OpenSSH, unsupported directives shown without execution; v0.16.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: ssh config alias resolution (override, ProxyJump notice, missing file,

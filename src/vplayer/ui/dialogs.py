@@ -4,6 +4,8 @@ import base64
 import hashlib
 import uuid
 from collections.abc import Callable
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import keyring
 import paramiko
@@ -24,7 +26,13 @@ from PySide6.QtWidgets import (
 )
 
 from vplayer.settings import ConnectionProfile, Settings
-from vplayer.sftp import KnownHosts, SshPool, match_sftp_profile, parse_sftp_uri
+from vplayer.sftp import (
+    KnownHosts,
+    SshPool,
+    match_sftp_profile,
+    parse_sftp_uri,
+    resolve_alias,
+)
 
 
 class ConnectDialog(QDialog):
@@ -32,29 +40,38 @@ class ConnectDialog(QDialog):
 
     @classmethod
     def for_sftp_uri(
-        cls, uri: str, *, settings: Settings | None = None, pool: SshPool | None = None, parent=None,
+        cls, uri: str, *, settings: Settings | None = None, pool: SshPool | None = None,
+        ssh_config_path: Path | None = None, parent=None,
     ) -> "ConnectDialog":
         parsed = parse_sftp_uri(uri)
         settings = settings or Settings()
         profile = match_sftp_profile(parsed, settings.connection_profiles())
-        dialog = cls(profile_id=profile.id if profile is not None else None, settings=settings, pool=pool, parent=parent)
+        dialog = cls(
+            profile_id=profile.id if profile is not None else None, settings=settings,
+            pool=pool, ssh_config_path=ssh_config_path, parent=parent,
+        )
         if profile is None:
             dialog.host.setText(parsed.host)
             dialog.port.setValue(parsed.port)
             dialog.user.setText(parsed.user or "")
+            dialog._port_explicit = urlsplit(uri).port is not None
         dialog.remote_path = parsed.path
         return dialog
 
     def __init__(
         self, profile_id: str | None = None, parent=None, *,
         pool: SshPool | None = None, settings: Settings | None = None,
+        ssh_config_path: Path | None = None,
     ):
         super().__init__(parent)
         self.pool = pool
         self.settings = settings or Settings()
+        self.ssh_config_path = ssh_config_path
         self._profiles: dict[str, ConnectionProfile] = {}
         self._approved_host_key: tuple[str, int, paramiko.PKey] | None = None
+        self._pending_host_port: tuple[str, int] | None = None
         self._connecting = False
+        self._port_explicit = False
         self.profile_id = str(uuid.UUID(profile_id)) if profile_id is not None else str(uuid.uuid4())
         self.setWindowTitle("Connect to SFTP")
         form = QFormLayout()
@@ -69,6 +86,7 @@ class ConnectDialog(QDialog):
         self.port.setValue(22)
         self.port.setAccessibleName("SSH port")
         form.addRow("Port", self.port)
+        self.port.textChanged.connect(lambda _: setattr(self, "_port_explicit", True))
         self.user = QLineEdit(self)
         self.user.setAccessibleName("SSH username")
         form.addRow("User", self.user)
@@ -88,6 +106,10 @@ class ConnectDialog(QDialog):
         form.addRow(self.save_secret)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+        self.ssh_notice = QLabel("", self)
+        self.ssh_notice.setTextFormat(Qt.TextFormat.PlainText)
+        self.ssh_notice.setAccessibleName("Ignored SSH config settings")
+        layout.addWidget(self.ssh_notice)
         buttons = QHBoxLayout()
         connect = QPushButton("Connect", self)
         cancel = QPushButton("Cancel", self)
@@ -130,6 +152,12 @@ class ConnectDialog(QDialog):
 
     def _set_connecting(self, connecting: bool):
         self._connecting = connecting
+        for control in (self.host, self.port, self.user, self.auth, self.key_path, self.password):
+            control.setEnabled(not connecting)
+        if not connecting:
+            self._auth_changed()
+        else:
+            self.save_secret.setEnabled(False)
         self.profiles.setEnabled(not connecting)
         self.save_profile.setEnabled(not connecting)
         self.delete_profile.setEnabled(not connecting and self.profiles.currentData() is not None)
@@ -161,11 +189,13 @@ class ConnectDialog(QDialog):
             self.user.clear()
             self.auth.setCurrentIndex(0)
             self.key_path.clear()
+            self._port_explicit = False
             return
         profile = self._profiles[profile_id]
         self.profile_id = profile.id
         self.host.setText(profile.host)
         self.port.setValue(profile.port)
+        self._port_explicit = True
         self.user.setText(profile.user)
         self.auth.setCurrentIndex(self.auth.findData(profile.auth))
         self.key_path.setText(profile.key_path)
@@ -232,10 +262,29 @@ class ConnectDialog(QDialog):
     def accept(self):
         host = self.host.text().strip()
         user = self.user.text().strip()
-        if not host or any(char.isspace() for char in host) or not user or any(char.isspace() for char in user):
-            QMessageBox.warning(self, "Invalid SSH connection", "Enter a host and username without whitespace.")
+        if not host or any(char.isspace() for char in host):
+            QMessageBox.warning(self, "Invalid SSH connection", "Enter a host without whitespace.")
             return
-        if self.auth.currentData() == "key" and not self.key_path.text().strip():
+        try:
+            resolved = resolve_alias(
+                host, config_path=self.ssh_config_path,
+                port=self.port.value() if self._port_explicit else None,
+                user=user or None,
+                key_path=(self.key_path.text().strip() or None) if self.auth.currentData() == "key" else None,
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Invalid SSH connection", str(error))
+            return
+        target_notice = (
+            f"Resolved SSH target: {resolved.host}:{resolved.port}"
+            if (resolved.host, resolved.port) != (host, self.port.value()) else ""
+        )
+        self.ssh_notice.setText("\n".join(part for part in (target_notice, resolved.notice) if part))
+        user = resolved.user or ""
+        if not user:
+            QMessageBox.warning(self, "Invalid SSH connection", "Enter a username without whitespace.")
+            return
+        if self.auth.currentData() == "key" and not resolved.key_path:
             QMessageBox.warning(self, "Invalid SSH connection", "Choose a private key file.")
             return
         if self.save_secret.isChecked():
@@ -247,20 +296,21 @@ class ConnectDialog(QDialog):
         if self.pool is not None:
             method = self.auth.currentData()
             approval = self._approved_host_key
+            self._pending_host_port = (resolved.host, resolved.port)
             self._set_connecting(True)
             self.pool.connect(
-                host, self.port.value(), user,
+                resolved.host, resolved.port, user,
                 password=self.password.text() if method == "password" else None,
                 auth=method,
-                key_path=self.key_path.text() if method == "key" else None,
+                key_path=resolved.key_path if method == "key" else None,
                 passphrase=(self.password.text() or None) if method == "key" else None,
-                approved_key=approval[2] if approval is not None and approval[:2] == (host, self.port.value()) else None,
+                approved_key=approval[2] if approval is not None and approval[:2] == self._pending_host_port else None,
             )
             return
         super().accept()
 
     def _confirm_host_key(self, host: str, port: int, key: paramiko.PKey, close_transport: Callable[[], None]):
-        if not self._connecting or not self.isVisible() or (host, port) != (self.host.text().strip(), self.port.value()):
+        if not self._connecting or not self.isVisible() or (host, port) != self._pending_host_port:
             close_transport()
             return
         self._set_connecting(False)
@@ -292,12 +342,14 @@ class ConnectDialog(QDialog):
             transport.close()
             return
         self._set_connecting(False)
+        self._pending_host_port = None
         self._approved_host_key = None
         self.connected.emit(transport)
         super().accept()
 
     def reject(self):
         self._set_connecting(False)
+        self._pending_host_port = None
         self._approved_host_key = None
         super().reject()
 

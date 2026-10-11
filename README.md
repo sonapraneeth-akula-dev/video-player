@@ -66,3 +66,7 @@ the secret for subsequent connections when that keyring is available.
 `parse_sftp_uri()` validates and decodes SFTP URIs without accepting passwords
 in URLs; `ConnectDialog.for_sftp_uri()` selects one matching saved profile or
 prefills a new connection. CLI remote playback still awaits stream integration.
+SSH aliases resolve HostName, Port, User and IdentityFile before connecting;
+typed fields take precedence. Potentially executable `Match exec` blocks and
+canonicalization directives are skipped; ignored settings appear in the
+connection dialog without invoking a proxy or external command.

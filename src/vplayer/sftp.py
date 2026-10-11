@@ -2,6 +2,7 @@
 
 import os
 import re
+import shlex
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -71,6 +72,72 @@ def match_sftp_profile(uri: SftpUri, profiles: Iterable[ConnectionProfile]) -> C
         and (uri.user is None or profile.user == uri.user)
     ]
     return matches[0] if len(matches) == 1 else None
+
+
+@dataclass(frozen=True)
+class ResolvedSshAlias:
+    host: str
+    port: int
+    user: str | None
+    key_path: str | None
+    notice: str | None
+
+
+def resolve_alias(
+    alias: str, *, config_path: Path | None = None,
+    port: int | None = None, user: str | None = None, key_path: str | None = None,
+) -> ResolvedSshAlias:
+    if not isinstance(alias, str) or not alias or any(char.isspace() for char in alias):
+        raise ValueError("SSH alias must be a host name without whitespace")
+    if port is not None and (isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535):
+        raise ValueError("SSH port must be between 1 and 65535")
+    if user is not None and (not isinstance(user, str) or not user or any(char.isspace() for char in user)):
+        raise ValueError("SSH username must be nonempty and contain no whitespace")
+    if key_path is not None and (not isinstance(key_path, str) or not key_path):
+        raise ValueError("SSH private key path must be nonempty")
+    path = config_path or Path.home() / ".ssh" / "config"
+    fallback = ResolvedSshAlias(alias, port or 22, user, key_path, None)
+    if not path.exists():
+        return fallback
+    try:
+        lines = []
+        skipped = set()
+        names = {}
+        in_exec_block = False
+        for line in path.read_text(encoding="utf-8").splitlines():
+            directive = re.match(r"\s*(\w+)(?:\s*=\s*|\s+)(.+)", line)
+            if directive:
+                name, value = directive.group(1), directive.group(2)
+                names[name.lower()] = name
+                if name.lower() in ("host", "match"):
+                    in_exec_block = name.lower() == "match" and any(
+                        token.lstrip("!").lower() == "exec" for token in shlex.split(value)
+                    )
+                    if in_exec_block:
+                        skipped.add("Match exec blocks skipped")
+                if name.lower().startswith("canonical"):
+                    skipped.add(name)
+                    continue
+            if not in_exec_block:
+                lines.append(line)
+        found = paramiko.SSHConfig.from_text("\n".join(lines)).lookup(alias)
+        ignored = [names.get(key, key) for key in set(found) - {"hostname", "port", "user", "identityfile"}]
+        skipped.update(ignored)
+        resolved_port = port if port is not None else int(found.get("port", 22))
+        if not 1 <= resolved_port <= 65535:
+            raise ValueError("Invalid port in SSH config")
+        host = found.get("hostname", alias)
+        resolved_user = user if user is not None else found.get("user")
+        if not host or any(char.isspace() for char in host):
+            raise ValueError("Invalid HostName in SSH config")
+        if resolved_user is not None and (not resolved_user or any(char.isspace() for char in resolved_user)):
+            raise ValueError("Invalid User in SSH config")
+        keys = found.get("identityfile", [])
+        identity = key_path if key_path is not None else (keys[0] if keys else None)
+        notice = f"Ignored SSH config settings: {', '.join(sorted(skipped))}" if skipped else None
+        return ResolvedSshAlias(host, resolved_port, resolved_user, identity, notice)
+    except (OSError, UnicodeError, paramiko.SSHException, ValueError, TypeError, KeyError) as error:
+        return ResolvedSshAlias(alias, port or 22, user, key_path, f"Couldn't read ~/.ssh/config: {error}")
 
 
 class KnownHosts:
