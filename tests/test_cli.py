@@ -1,5 +1,7 @@
 import logging
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +21,23 @@ def test_version_prints_without_starting_qt(capsys, monkeypatch):
         entry.main(["--version"])
     assert exit_status.value.code == 0
     assert capsys.readouterr().out == f"VPlayer {__version__}\n"
+
+
+@pytest.mark.parametrize(
+    ("kind", "file", "expected"),
+    (
+        ("video", "matrix_h264_mp4.mp4", 0),
+        ("audio", "matrix_mp3_mp3.mp3", 0),
+        ("video", "missing.mp4", 1),
+        ("video", "matrix_mp3_mp3.mp3", 1),
+    ),
+)
+def test_codec_probe_reports_decoding_result(kind, file, expected):
+    result = subprocess.run(
+        [sys.executable, "-m", "vplayer", "--codec-probe", kind, str(MEDIA.parent / file)],
+        capture_output=True, text=True, timeout=40, check=False,
+    )
+    assert result.returncode == expected, result.stderr
 
 
 @pytest.mark.parametrize("flags", [[], ["--new-window"]])

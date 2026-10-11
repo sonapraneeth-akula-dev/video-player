@@ -176,7 +176,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 1.3.1.1.1 | Task | [x] Extend `make_test_media.py` — codec × container matrix (H.264/HEVC/VP9/AV1 in each of MP4/MKV/WebM/MOV/AVI/TS that can hold it; AAC/MP3/Opus/AC-3 in MKV + one native container) | 02:00 | 00:20 | `ffprobe` confirms every generated clip's codecs \|\| | 17 supported video/container pairs + 8 audio/container pairs |
-| 1.3.1.1.2 | Task | `tests/test_codecs.py` — parametrized: `file-loaded`, a decoded video frame, `audio-params` present, no `end-file` error; `VPLAYER_BIN` env runs it against a packaged build | 02:00 | 00:20 | Green on dev installs of both OSes; re-run on packaged builds in M-008.1 / M-008.2 | FR-017 |
+| 1.3.1.1.2 | Task | [x] `tests/test_codecs.py` — parametrized: `file-loaded`, a decoded video frame, `audio-params` present, no `end-file` error; `VPLAYER_BIN` env runs it against a packaged build | 02:00 | 00:20 | Green on dev installs of both OSes; re-run on packaged builds in M-008.1 / M-008.2 | 25 Windows dev cases + 25 executable-probe cases pass; actual bundles and Ubuntu remain for M-008.1 / M-008.2; intermittent full-suite `0xC0000005` remains under design §13 |
 | 1.3.1.1.3 | Debug | [x] Destroy the rendered Qt surface on the GUI thread before mpv shutdown; reject off-thread disposal | — | — | Repeated playback/widget teardown; destruction thread asserted, widget coverage 100% | Fixes the diagnosed `0xC0000409` Qt fatal; separate intermittent `0xC0000005` remains open; v0.24.1 |
 
 #### Feature 1.3.2 (FEAT-001.3.2): Corrupt-file resilience

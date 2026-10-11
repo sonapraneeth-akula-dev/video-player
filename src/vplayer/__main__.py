@@ -8,18 +8,76 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths, Qt
+from PySide6.QtCore import QStandardPaths, Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
 from vplayer import APP_NAME, __version__
+
+
+def _probe_codec(app: QApplication, window, kind: str) -> int:
+    loaded = False
+    completed = False
+    eof_seen = False
+    errors = []
+    audio_seen = False
+    frame_seen = False
+    window.player.mpv.ao = "null"
+    window.player.mpv.pause = True
+
+    def file_loaded():
+        nonlocal loaded, audio_seen
+        loaded = True
+        if window.player.mpv.audio_params is not None:
+            audio_seen = True
+        window.player.mpv.pause = False
+
+    window.player.file_loaded.connect(file_loaded)
+    window.player.error.connect(errors.append)
+    timer = QTimer(window)
+
+    def check():
+        nonlocal audio_seen, frame_seen, completed, eof_seen
+        if errors:
+            app.exit(1)
+            return
+        if not loaded:
+            return
+        if window.player.mpv.audio_params is not None:
+            audio_seen = True
+        if kind == "video" and not frame_seen:
+            image = window.video.grabFramebuffer()
+            if not image.isNull() and image.pixelColor(image.width() // 2, image.height() // 2).red() > 35:
+                frame_seen = True
+        if window.player.mpv.eof_reached:
+            eof_seen = True
+            timer.stop()
+            completed = audio_seen and (kind == "audio" or frame_seen)
+            QTimer.singleShot(100, lambda: app.exit(0 if completed and not errors else 1))
+
+    timer.timeout.connect(check)
+    timer.start(50)
+    QTimer.singleShot(30000, lambda: app.exit(1))
+    window.show()
+    status = app.exec()
+    window.close()
+    if status or not completed or errors:
+        logging.getLogger("vplayer").error(
+            "Codec probe failed: kind=%s loaded=%s audio=%s frame=%s eof=%s errors=%s",
+            kind, loaded, audio_seen, frame_seen, eof_seen, errors,
+        )
+        return 1
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vplayer")
     parser.add_argument("files", metavar="FILE", nargs="*")
     parser.add_argument("--new-window", action="store_true")
+    parser.add_argument("--codec-probe", choices=("video", "audio"), help=argparse.SUPPRESS)
     parser.add_argument("--version", action="version", version=f"{APP_NAME} {__version__}")
     args = parser.parse_args(argv)
+    if args.codec_probe and len(args.files) != 1:
+        parser.error("--codec-probe requires exactly one FILE")
 
     if sys.platform == "win32":
         vendor = Path(__file__).resolve().parents[2] / "vendor"
@@ -45,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
                 lambda window=window, path=path: window.open_file(path),
                 Qt.ConnectionType.SingleShotConnection,
             )
+        if args.codec_probe:
+            return _probe_codec(app, window, args.codec_probe)
         window.show()
         windows.append(window)
     # ponytail: until tabs/IPC exist, separate windows keep every CLI file reachable.
