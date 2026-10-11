@@ -35,7 +35,7 @@ class Player(QObject):
     def __init__(
         self, parent: QObject | None = None, *, video_output: str = "libmpv",
         readahead_mb: int = 64, backbuffer_mb: int = 256,
-        snapshot_dir: Path | None = None,
+        snapshot_dir: Path | None = None, jpeg_quality: int = 90,
     ):
         super().__init__(parent)
         if (
@@ -43,6 +43,8 @@ class Player(QObject):
             or isinstance(backbuffer_mb, bool) or not isinstance(backbuffer_mb, int) or not 0 <= backbuffer_mb <= 256
         ):
             raise ValueError("Invalid SFTP buffer limits")
+        if type(jpeg_quality) is not int or not 50 <= jpeg_quality <= 100:
+            raise ValueError("JPEG quality must be between 50 and 100")
         self._closed = False
         self._uri = ""
         self._pending_frame_steps: list[int] = []
@@ -63,6 +65,7 @@ class Player(QObject):
         self.snapshot_dir = snapshot_dir or Path(
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
         ) / "vplayer"
+        self.jpeg_quality = jpeg_quality
         self._sftp_sources: dict[str, tuple[paramiko.Transport, str]] = {}
         self._sftp_streams: dict[int, tuple[SftpStream, paramiko.SFTPClient]] = {}
         self._sftp_callbacks = None
@@ -442,6 +445,8 @@ class Player(QObject):
                 if path is not None:
                     raise
         try:
+            if target.suffix.lower() in (".jpg", ".jpeg"):
+                self.mpv["screenshot-jpeg-quality"] = self.jpeg_quality
             self.mpv.command("screenshot-to-file", str(target), "video")
         except Exception:
             try:

@@ -100,6 +100,18 @@ def test_snapshot_directory_requires_absolute_path(tmp_path, caplog):
     assert settings.snapshot_dir == tmp_path / "pictures"
 
 
+def test_jpeg_quality_setting_is_bounded(tmp_path, caplog):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("snapshot/jpeg_quality", 73)
+    settings.load()
+    assert settings.jpeg_quality == 73
+    settings.store.setValue("snapshot/jpeg_quality", 101)
+    with caplog.at_level(logging.WARNING):
+        settings.load()
+    assert settings.jpeg_quality == 90
+    assert "Invalid snapshot/jpeg_quality" in caplog.text
+
+
 def test_connection_profile_create_update_read_delete_without_secrets(tmp_path):
     path = tmp_path / "settings.ini"
     settings = Settings(path)

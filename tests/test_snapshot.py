@@ -82,3 +82,44 @@ def test_snapshot_rejects_missing_media_and_unsupported_extension(qtbot, tmp_pat
             player.snapshot(tmp_path / "frame.txt")
     finally:
         player.close()
+
+
+def test_snapshot_as_uses_extension_for_jpeg_and_cancel_writes_nothing(qtbot, tmp_path, monkeypatch):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("snapshot/dir", str(tmp_path))
+    settings.store.setValue("snapshot/jpeg_quality", 73)
+    window = MainWindow(settings)
+    qtbot.addWidget(window)
+    window.player.mpv.ao = "null"
+    window.show()
+    try:
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        qtbot.waitUntil(lambda: window.video.grabFramebuffer().pixelColor(128, 72).red() > 35, timeout=10000)
+        window.player.mpv.pause = True
+        action = next(action for action in window.file_menu.actions() if action.objectName() == "snapshot_as")
+        assert action.shortcut().toString() == "Ctrl+Shift+S"
+        jpeg = tmp_path / "frame.jpg"
+        monkeypatch.setattr(
+            "vplayer.ui.main_window.QFileDialog.getSaveFileName",
+            lambda *args: (str(jpeg), "JPEG image (*.jpg *.jpeg)"),
+        )
+        action.trigger()
+        qtbot.waitUntil(lambda: jpeg.exists() and jpeg.stat().st_size > 0, timeout=10000)
+        assert jpeg.read_bytes().startswith(b"\xff\xd8")
+        assert (QImage(str(jpeg)).width(), QImage(str(jpeg)).height()) == (256, 144)
+        assert window.player.mpv["screenshot-jpeg-quality"] == 73
+        monkeypatch.setattr(
+            "vplayer.ui.main_window.QFileDialog.getSaveFileName",
+            lambda *args: (str(tmp_path / "frame2"), "PNG image (*.png)"),
+        )
+        action.trigger()
+        png = tmp_path / "frame2.png"
+        qtbot.waitUntil(lambda: png.exists() and png.stat().st_size > 0, timeout=10000)
+        assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+        files = set(tmp_path.iterdir())
+        monkeypatch.setattr("vplayer.ui.main_window.QFileDialog.getSaveFileName", lambda *args: ("", ""))
+        action.trigger()
+        assert set(tmp_path.iterdir()) == files
+    finally:
+        window.close()

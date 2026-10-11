@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         self.settings.load()
         self.player = Player(
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
-            snapshot_dir=self.settings.snapshot_dir,
+            snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
         )
         self.speed_label = QLabel("1×", self)
         self.speed_label.setAccessibleName("Playback speed")
@@ -141,6 +141,11 @@ class MainWindow(QMainWindow):
         snapshot_action.setShortcut("S")
         snapshot_action.triggered.connect(self.snapshot)
         self.file_menu.addAction(snapshot_action)
+        snapshot_as_action = QAction("Snapshot As...", self)
+        snapshot_as_action.setObjectName("snapshot_as")
+        snapshot_as_action.setShortcut("Ctrl+Shift+S")
+        snapshot_as_action.triggered.connect(self.snapshot_as)
+        self.file_menu.addAction(snapshot_as_action)
         self.view_menu = self.menuBar().addMenu("&View")
         browser_action = self.browser.toggleViewAction()
         browser_action.setShortcut("Ctrl+B")
@@ -280,8 +285,22 @@ class MainWindow(QMainWindow):
         self.player.load(path)
 
     def snapshot(self):
+        self._save_snapshot()
+
+    def snapshot_as(self):
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self, "Save Snapshot As", str(self.settings.snapshot_dir),
+            "PNG image (*.png);;JPEG image (*.jpg *.jpeg)",
+        )
+        if not path:
+            return
+        if not Path(path).suffix:
+            path += ".jpg" if selected_filter.startswith("JPEG") else ".png"
+        self._save_snapshot(path)
+
+    def _save_snapshot(self, path: str | None = None):
         try:
-            saved = self.player.snapshot()
+            saved = self.player.snapshot(path)
         except (OSError, SystemError, ValueError) as error:
             self.show_error(f"Could not save snapshot: {error}")
             return

@@ -54,6 +54,7 @@ class Settings:
         self.snapshot_dir = Path(
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
         ) / "vplayer"
+        self.jpeg_quality = 90
 
     def _bounded_int(self, key: str, default: int, minimum: int, maximum: int) -> int:
         value = self.store.value(key)
@@ -87,6 +88,7 @@ class Settings:
             else:
                 log.warning("Invalid snapshot/dir setting %r; using %s", snapshot_dir, self.snapshot_dir)
                 self.store.setValue("snapshot/dir", str(self.snapshot_dir))
+        self.jpeg_quality = self._bounded_int("snapshot/jpeg_quality", 90, 50, 100)
         value = self.store.value("playback/speed_step", 0.05)
         try:
             if isinstance(value, bool):

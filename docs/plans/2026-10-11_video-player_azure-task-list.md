@@ -452,7 +452,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 4.1.1.2.1 | Task | `snapshot_as` (Ctrl+Shift+S) — `QFileDialog` with PNG / JPEG filters; extension decides format; `screenshot-jpeg-quality` from `jpeg_quality`; cancel saves nothing | 01:30 | 00:15 | Test: `.jpg` → JPEG magic bytes; cancel → no file | FR-019 |
+| 4.1.1.2.1 | Task | [x] `snapshot_as` (Ctrl+Shift+S) — `QFileDialog` with PNG / JPEG filters; extension decides format; `screenshot-jpeg-quality` from `jpeg_quality`; cancel saves nothing | 01:30 | 00:15 | Test: `.jpg` → JPEG magic bytes; cancel → no file | FR-019; native 256×144 JPEG, PNG auto-extension, cancel and quality bounds tested; v0.24.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: snapshot native resolution test (PNG size == video size, no overlay)
