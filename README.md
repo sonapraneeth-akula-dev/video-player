@@ -17,3 +17,4 @@ built-in `tar`.
 
 On Ubuntu 22.04, run `sudo apt install libmpv1 libxcb-cursor0` instead.
 
+Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.

@@ -85,7 +85,7 @@
 | 1.1.1.1.4 | Task | [x] CI — `.github/workflows/ci.yml`: ruff + pytest on `windows-latest` and `ubuntu-22.04` (xvfb, `libmpv1`), test media generated in the job | 01:30 | 00:15 | Pipeline green on both OSes \|\| | Runner results pending first push |
 | 1.1.1.1.5 | Task | [x] `src/vplayer/player.py` — `Player` facade over `mpv.MPV`: `load()`, `play_pause()`, `state()`, property observers re-emitted as Qt signals on the GUI thread; `cache-on-disk=no`, `hwdec=auto-safe` | 03:00 | 00:20 | `tests/test_player.py`: load → `file_loaded`; `cache-on-disk` reads `no` | AD-001, AD-006; Windows render blocker in design §13 |
 | 1.1.1.1.6 | Task | [x] `src/vplayer/mpv_widget.py` — `QOpenGLWidget` + `MpvRenderContext` (get_proc_address, update callback → `update()`), aspect-ratio scaling | 03:00 | 00:25 | Frame renders in a test window on Windows, Ubuntu X11 and Wayland | AD-002; Windows verified; Ubuntu X11/Wayland pending |
-| 1.1.1.1.7 | Task | `src/vplayer/__main__.py` + `ui/main_window.py` — `QApplication`, File → Open (`QFileDialog`), non-blocking error banner, rotating log in the config dir | 02:00 | 00:20 | `tests/test_open.py`: open → first frame < 1.5 s; missing path → banner, app alive | NFR-006 |
+| 1.1.1.1.7 | Task | [x] `src/vplayer/__main__.py` + `ui/main_window.py` — `QApplication`, File → Open (`QFileDialog`), non-blocking error banner, rotating log in the config dir | 02:00 | 00:20 | `tests/test_open.py`: open → first frame < 1.5 s; missing path → banner, app alive | NFR-006; first usable local feature: v0.2.0 |
 
 ##### User Story 1.1.1.2 (US-002): Hardware decoding with automatic fallback
 - **Est. Manual**: 05:30 | **Est. AI**: 01:15
