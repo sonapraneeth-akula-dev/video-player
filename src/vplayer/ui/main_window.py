@@ -102,6 +102,7 @@ class MainWindow(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.controls)
         self.browser = BrowserDock(self)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.browser)
+        self.browser.file_activated.connect(self.open_file)
         open_action = QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.choose_file)

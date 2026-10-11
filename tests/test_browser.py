@@ -1,9 +1,14 @@
+from pathlib import Path
+from shutil import copyfile
+
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
 from vplayer.settings import Settings
 from vplayer.ui.browser import BrowserDock
 from vplayer.ui.main_window import MainWindow
+
+MEDIA = Path(__file__).resolve().parent / "media" / "h264_25.mp4"
 
 
 def test_media_filter_hides_text_until_all_files_enabled(qtbot, tmp_path):
@@ -42,5 +47,53 @@ def test_ctrl_b_toggles_browser_dock(qtbot, tmp_path):
         qtbot.waitUntil(lambda: not window.browser.isVisible())
         QTest.keyClick(window, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
         qtbot.waitUntil(window.browser.isVisible)
+    finally:
+        window.close()
+
+
+def test_browser_double_click_folder_then_enter_file(qtbot, tmp_path):
+    folder = tmp_path / "videos"
+    folder.mkdir()
+    clip = folder / "clip.mp4"
+    copyfile(MEDIA, clip)
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    tree = window.browser.tree
+    model = window.browser.model
+    tree.setRootIndex(model.setRootPath(str(tmp_path)))
+    window.show()
+    try:
+        qtbot.waitUntil(lambda: window.video._render is not None, timeout=10000)
+        qtbot.waitUntil(
+            lambda: model.index(str(folder)).isValid()
+            and not tree.visualRect(model.index(str(folder))).isEmpty()
+        )
+        folder_index = model.index(str(folder))
+        tree.setCurrentIndex(folder_index)
+        tree.setFocus()
+        QTest.keyClick(tree, Qt.Key.Key_Return)
+        qtbot.waitUntil(lambda: tree.rootIndex() == folder_index)
+        tree.setRootIndex(model.index(str(tmp_path)))
+        qtbot.waitUntil(lambda: not tree.visualRect(folder_index).isEmpty())
+        tree.scrollTo(folder_index)
+        center = tree.visualRect(folder_index).center()
+        QTest.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=center)
+        QTest.mouseDClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=center)
+        qtbot.waitUntil(lambda: tree.rootIndex() == folder_index)
+
+        qtbot.waitUntil(lambda: model.index(str(clip)).isValid())
+        clip_index = model.index(str(clip))
+        tree.setCurrentIndex(clip_index)
+        tree.setFocus()
+        activated = []
+        window.browser.file_activated.connect(activated.append)
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            QTest.keyClick(tree, Qt.Key.Key_Return)
+        assert window.player._uri == str(clip)
+        assert activated == [str(clip)]
+        center = tree.visualRect(clip_index).center()
+        QTest.mouseClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=center)
+        QTest.mouseDClick(tree.viewport(), Qt.MouseButton.LeftButton, pos=center)
+        assert activated == [str(clip), str(clip)]
     finally:
         window.close()
