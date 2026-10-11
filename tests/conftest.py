@@ -64,7 +64,7 @@ def sftp_server(tmp_path_factory):
         else:
             raise RuntimeError(f"OpenSSH container failed to start: {docker('logs', container)}")
         yield SimpleNamespace(
-            host="127.0.0.1", port=port, password=password, key=keys / "key",
+            host="127.0.0.1", port=port, container=container, password=password, key=keys / "key",
             agent_key=keys / "agent", passphrase="test-key-passphrase",
         )
     finally:

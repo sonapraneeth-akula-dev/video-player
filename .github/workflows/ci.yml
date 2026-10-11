@@ -36,4 +36,8 @@ jobs:
       - name: Test on Ubuntu
         if: runner.os == 'Linux'
         run: xvfb-run -a python -m pytest -q --cov=src/vplayer --cov=scripts --cov-report=term-missing --cov-fail-under=80
-
+      - name: Report emulated SFTP playback latency
+        if: runner.os == 'Linux'
+        run: |
+          docker info > /dev/null
+          xvfb-run -a python -m pytest -q -s tests/test_sftp_perf.py
