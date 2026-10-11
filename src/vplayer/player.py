@@ -8,6 +8,7 @@ import mpv
 from PySide6.QtCore import QObject, Qt, Signal, Slot
 
 log = logging.getLogger(__name__)
+OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "hwdec-current")
 
 
 class Player(QObject):
@@ -41,7 +42,7 @@ class Player(QObject):
             demuxer_max_back_bytes=32 * 1024 * 1024,
             demuxer_donate_buffer="no",
         )
-        for name in ("time-pos", "duration", "pause", "hwdec-current"):
+        for name in OBSERVED_PROPERTIES:
             self.mpv.observe_property(name, self._on_property)
         self.mpv.register_event_callback(self._on_event)
 
@@ -117,5 +118,8 @@ class Player(QObject):
     def close(self) -> None:
         if not self._closed:
             self._closed = True
+            for name in OBSERVED_PROPERTIES:
+                self.mpv.unobserve_property(name, self._on_property)
+            self.mpv.unregister_event_callback(self._on_event)
             # ponytail: local-only shutdown is synchronous; use a worker when remote streams can block it.
             self.mpv.terminate()

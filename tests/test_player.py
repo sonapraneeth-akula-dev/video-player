@@ -92,3 +92,13 @@ def test_volume_is_bounded_and_mute_keeps_level():
             assert player.mpv.volume == 0
     finally:
         player.close()
+
+
+def test_close_unregisters_mpv_callbacks():
+    player = Player(video_output="null")
+    assert player.mpv._event_callbacks
+    assert all(player.mpv._property_handlers.values())
+    player.close()
+    player.close()
+    assert not player.mpv._event_callbacks
+    assert not any(player.mpv._property_handlers.values())
