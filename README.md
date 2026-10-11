@@ -34,6 +34,8 @@ The browser, video surface, and seek bar are reachable with **Tab** and
 
 Generate the frame-indexed and codec/container media fixtures with
 `python scripts/make_test_media.py` (requires FFmpeg and ffprobe), then
-run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
+`python scripts/make_test_media.py --corrupt` for the deterministic 50-file
+damaged-media corpus. The corrupt option uses the previously generated codec
+fixtures as inputs. Run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
 the pinned Windows libmpv emits LuaJIT exceptions that can crash the test
 process when the handler is installed.

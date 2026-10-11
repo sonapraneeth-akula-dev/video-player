@@ -1,5 +1,7 @@
 """Generate frame-indexed playback fixtures and a small codec/container matrix."""
 
+import argparse
+import random
 import subprocess
 from pathlib import Path
 
@@ -27,6 +29,13 @@ AUDIO_ENCODERS = {
 }
 CONTAINER_AUDIO = {"mp4": "aac", "mkv": "aac", "mov": "aac", "avi": "mp3", "ts": "aac", "webm": "opus"}
 AUDIO_CONTAINERS = {"aac": "mp4", "mp3": "mp3", "opus": "ogg", "ac3": "ac3"}
+CORRUPT_SOURCES = (
+    ("matrix_h264_mp4.mp4", "mkv"),
+    ("matrix_hevc_mkv.mkv", "avi"),
+    ("matrix_vp9_webm.webm", "mp4"),
+    ("matrix_av1_mp4.mp4", "webm"),
+    ("matrix_aac_mp4.mp4", "mkv"),
+)
 
 
 def generate(directory: Path = MEDIA) -> None:
@@ -81,5 +90,27 @@ def generate(directory: Path = MEDIA) -> None:
             )
 
 
+def generate_corrupt(directory: Path = MEDIA, seed: int = 20261011) -> None:
+    rng = random.Random(seed)
+    directory.mkdir(parents=True, exist_ok=True)
+    for index in range(50):
+        source, wrong_ext = CORRUPT_SOURCES[index % len(CORRUPT_SOURCES)]
+        data = bytearray((MEDIA / source).read_bytes())
+        kind = ("truncated", "flipped", "wrong_extension")[index % 3]
+        ext = wrong_ext if kind == "wrong_extension" else Path(source).suffix[1:]
+        if kind == "truncated":
+            data = data[:rng.randrange(256, len(data))]
+        elif kind == "flipped":
+            for _ in range(rng.randint(1, 16)):
+                offset = rng.randrange(256, len(data))
+                data[offset] ^= rng.randint(1, 255)
+        (directory / f"corrupt_{index:02}_{kind}.{ext}").write_bytes(data)
+
+
 if __name__ == "__main__":
-    generate()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--corrupt", action="store_true")
+    if parser.parse_args().corrupt:
+        generate_corrupt()
+    else:
+        generate()

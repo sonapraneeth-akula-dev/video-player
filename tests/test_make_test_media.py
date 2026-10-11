@@ -2,7 +2,14 @@ import json
 import subprocess
 from fractions import Fraction
 
-from scripts.make_test_media import FRAMES, SIZE, generate
+from scripts.make_test_media import (
+    CORRUPT_SOURCES,
+    FRAMES,
+    MEDIA,
+    SIZE,
+    generate,
+    generate_corrupt,
+)
 
 
 def test_frame_indexed_clips(tmp_path):
@@ -51,3 +58,29 @@ def test_frame_indexed_clips(tmp_path):
                 for bit in range(9)
             )
             assert bits == number, (name, number, bits)
+
+
+def test_corrupt_corpus_is_seeded_and_covers_three_mutations(tmp_path):
+    generate_corrupt(tmp_path)
+    files = sorted(tmp_path.iterdir())
+    assert len(files) == 50
+    first_run = {path.name: path.read_bytes() for path in files}
+    for path in files:
+        index = int(path.name.split("_")[1])
+        source, wrong_ext = CORRUPT_SOURCES[index % len(CORRUPT_SOURCES)]
+        original = (MEDIA / source).read_bytes()
+        data = path.read_bytes()
+        if "truncated" in path.name:
+            assert 256 <= len(data) < len(original)
+            assert data == original[:len(data)]
+        elif "flipped" in path.name:
+            assert len(data) == len(original)
+            assert data[:256] == original[:256]
+            assert data != original
+        else:
+            assert path.suffix == f".{wrong_ext}"
+            assert data == original
+    generate_corrupt(tmp_path)
+    assert {path.name: path.read_bytes() for path in files} == first_run
+    generate_corrupt(tmp_path, seed=1)
+    assert any(path.read_bytes() != first_run[path.name] for path in files)

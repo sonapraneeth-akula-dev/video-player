@@ -186,7 +186,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 1.3.2.1.1 | Task | `make_test_media.py --corrupt` — ≥ 50 seeded truncated, byte-flipped and wrong-extension files | 01:30 | 00:15 | Same corpus regenerated from the same seed \|\| |  |
+| 1.3.2.1.1 | Task | [x] `make_test_media.py --corrupt` — ≥ 50 seeded truncated, byte-flipped and wrong-extension files | 01:30 | 00:15 | Same corpus regenerated from the same seed \|\| | 50 deterministic files; regression test checks mutations and seed |
 | 1.3.2.1.2 | Task | `tests/test_corrupt.py` — open each corrupt file in one app, play 5 s or to end; assert process alive and event loop responsive | 02:00 | 00:20 | 0 crashes over the corpus on both OSes | NFR-004 |
 | 1.3.2.1.3 | Debug | Time-boxed triage of any corpus crash (mpv log, `demuxer-lavf-o`, event-thread handling) | 02:00 | 00:20 | Each crash fixed with its file kept as a regression case, or an upstream issue documented | Only if the corpus finds crashes |
 
