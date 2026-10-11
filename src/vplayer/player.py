@@ -1,6 +1,7 @@
 """Qt-facing facade for one libmpv playback core."""
 
 import logging
+import math
 from pathlib import Path
 
 import mpv
@@ -82,6 +83,20 @@ class Player(QObject):
 
     def play_pause(self) -> None:
         self.mpv.pause = not self.mpv.pause
+
+    def seek(self, seconds: float, relative: bool = False) -> None:
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds):
+            self.error.emit("Seek position must be finite")
+            return
+        duration = self.mpv.duration
+        if duration is None:
+            self.error.emit("Cannot seek before a file is loaded")
+            return
+        fps = self.mpv.container_fps or self.mpv.estimated_vf_fps
+        last_frame = max(0.0, duration - (1.0 / fps if fps else 1e-6))
+        target = seconds + (self.mpv.time_pos or 0.0) if relative else seconds
+        target = max(0.0, min(target, last_frame))
+        self.mpv.seek(target, reference="absolute", precision="exact" if target == last_frame else "keyframes")
 
     def state(self) -> dict[str, object]:
         return {

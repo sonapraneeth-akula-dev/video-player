@@ -18,3 +18,8 @@ built-in `tar`.
 On Ubuntu 22.04, run `sudo apt install libmpv1 libxcb-cursor0` instead.
 
 Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
+
+Generate the media fixtures with `python scripts/make_test_media.py`, then
+run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
+the pinned Windows libmpv emits LuaJIT exceptions that can crash the test
+process when the handler is installed.

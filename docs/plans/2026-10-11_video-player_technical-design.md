@@ -807,14 +807,22 @@ responsibility in §3; split a module only when it passes ~600 lines.
 
 ## 13. Risks & Open Questions
 - [ ] **Windows libmpv embedding risk (2026-10-11)**: the pinned shinchiro
-  `libmpv-2.dll` sometimes emits first-chance `0xe24c4a02` during the `Player`
-  tests even with `load_scripts=False`. The Windows OpenGL render test passes
-  with the stock binary; it does not currently reproduce a process crash.
-  Recheck when moving tabs across windows and during extended playback.
+  `libmpv-2.dll` emits LuaJIT's `0xe24c4a02` SEH exception even with
+  `load_scripts=False`. With pytest's fault handler enabled, the full suite
+  intermittently exits with `0xC0000005` (`-1073741819`). Disabling that
+  pytest hook yielded 12 consecutive full-suite passes with the native Qt
+  backend, but does not establish that the DLL is safe in every host process.
+  The same tests run with Qt's `offscreen` backend failed the frame checks.
   [python-mpv #305](https://github.com/jaseg/python-mpv/issues/305) documents the
   failure and a no-Lua build; [shinchiro #811](https://github.com/shinchiro/mpv-winbuild-cmake/issues/811)
-  confirms the stock release does not include that variant. If a crash is
-  reproduced, switch to a pinned, tested no-Lua build before release.
+  confirms the stock release does not include that variant. A pinned MSYS2
+  0.41.0 Lua 5.1 DLL (`mingw-w64-ucrt-x86_64-mpv-0.41.0-6`) was also tested:
+  it did not crash but intermittently produced a black frame on this host's
+  Hyper-V virtual GPU, despite decoding and repaint callbacks. The test
+  installation brought in roughly 147 MSYS2 packages, so it cannot replace
+  the self-contained build without further packaging work. Verify sustained
+  playback on the owner's physical GPU before release; use a reproducible
+  no-Lua build if the native exception remains an issue outside pytest.
 - [ ] **Spike — hwdec with render API on Windows**: desktop OpenGL lacks direct D3D11
   interop → mpv may use `d3d11va-copy`/`dxva2` (WGL_NV_DX_interop). Measure CPU and RSS for 4K
   HEVC on the owner's GPU. If copy-back blows NFR-001 or the CPU budget: accept `d3d11va-copy`,

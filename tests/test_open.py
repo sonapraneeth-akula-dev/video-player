@@ -7,13 +7,14 @@ from time import perf_counter
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 from vplayer import __main__ as entry
+from vplayer.settings import Settings
 from vplayer.ui.main_window import MainWindow
 
 MEDIA = Path(__file__).resolve().parent / "media" / "h264_25.mp4"
 
 
 def test_file_menu_opens_frame_and_errors_are_nonblocking(qtbot, monkeypatch, tmp_path):
-    window = MainWindow()
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
     qtbot.addWidget(window)
     window.show()
     try:
@@ -44,6 +45,7 @@ def test_entrypoint_creates_rotating_log(qtbot, monkeypatch, tmp_path):
     monkeypatch.setenv("PATH", os.environ["PATH"])
     monkeypatch.setattr(entry, "QApplication", lambda argv: app)
     monkeypatch.setattr(entry.QStandardPaths, "writableLocation", lambda location: str(tmp_path))
+    monkeypatch.setattr("vplayer.ui.main_window.Settings", lambda: Settings(tmp_path / "settings.ini"))
 
     def exit_after_show(self):
         windows = [w for w in self.topLevelWidgets() if isinstance(w, MainWindow) and w.isVisible()]
@@ -62,3 +64,23 @@ def test_entrypoint_creates_rotating_log(qtbot, monkeypatch, tmp_path):
             if handler not in old_handlers:
                 logger.removeHandler(handler)
                 handler.close()
+
+
+def test_seek_actions_use_configured_short_and_long_steps(qtbot, tmp_path, monkeypatch):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.store.setValue("playback/seek_short_s", 9)
+    settings.store.setValue("playback/seek_long_s", 75)
+    window = MainWindow(settings)
+    qtbot.addWidget(window)
+    calls = []
+    monkeypatch.setattr(window.player, "seek", lambda seconds, relative: calls.append((seconds, relative)))
+    try:
+        actions = window.playback_menu.actions()
+        assert [action.shortcut().toString() for action in actions] == [
+            "Right", "Left", "Shift+Right", "Shift+Left",
+        ]
+        for action in actions:
+            action.trigger()
+        assert calls == [(9, True), (-9, True), (75, True), (-75, True)]
+    finally:
+        window.close()

@@ -8,13 +8,16 @@ from PySide6.QtWidgets import QFileDialog, QLabel, QMainWindow, QVBoxLayout, QWi
 from vplayer import APP_NAME
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
+from vplayer.settings import Settings
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, settings: Settings | None = None):
         super().__init__()
         self.setWindowTitle(APP_NAME)
         self.resize(960, 600)
+        self.settings = settings or Settings()
+        self.settings.load()
         self.player = Player(self)
 
         content = QWidget(self)
@@ -34,6 +37,17 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self.choose_file)
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu.addAction(open_action)
+        self.playback_menu = self.menuBar().addMenu("&Playback")
+        for label, key, amount in (
+            ("Seek forward", "Right", self.settings.seek_short_s),
+            ("Seek back", "Left", -self.settings.seek_short_s),
+            ("Seek forward 60s", "Shift+Right", self.settings.seek_long_s),
+            ("Seek back 60s", "Shift+Left", -self.settings.seek_long_s),
+        ):
+            action = QAction(label, self)
+            action.setShortcut(key)
+            action.triggered.connect(lambda checked=False, delta=amount: self.player.seek(delta, relative=True))
+            self.playback_menu.addAction(action)
         self.player.error.connect(self.show_error)
         self.player.file_loaded.connect(self.banner.hide)
 

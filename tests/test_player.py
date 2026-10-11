@@ -49,3 +49,22 @@ def test_unplayable_file_reports_mpv_error(qtbot, tmp_path):
             player.load(broken)
     finally:
         player.close()
+
+
+def test_seek_clamps_to_first_and_last_frame(qtbot):
+    player = Player(video_output="null")
+    try:
+        with qtbot.waitSignal(player.error):
+            player.seek(1)
+        with qtbot.waitSignal(player.file_loaded, timeout=10000):
+            player.mpv.pause = True
+            player.load(MEDIA)
+        last_frame = player.state()["duration"] - 1 / player.mpv.container_fps
+        player.seek(1000)
+        qtbot.waitUntil(lambda: abs(player.state()["time-pos"] - last_frame) < 0.05)
+        player.seek(-1000, relative=True)
+        qtbot.waitUntil(lambda: player.state()["time-pos"] < 0.05)
+        with qtbot.waitSignal(player.error):
+            player.seek(float("nan"))
+    finally:
+        player.close()
