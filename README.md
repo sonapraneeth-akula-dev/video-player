@@ -26,6 +26,8 @@ You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
 `vplayer --version` to print the version, or `vplayer --new-window FILE`. Until
 tabs and single-instance routing are added, each CLI file opens in its own
 window; every launch already creates a new window.
+Use **Ctrl+B** to show or hide the local file browser; **All files** reveals
+files outside the media extension filter.
 
 Generate the media fixtures with `python scripts/make_test_media.py`, then
 run `python -m pytest -q`. Pytest's fault handler is disabled in this project:

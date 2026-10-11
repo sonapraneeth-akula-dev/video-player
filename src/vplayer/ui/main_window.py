@@ -19,6 +19,7 @@ from vplayer import APP_NAME
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
 from vplayer.settings import Settings
+from vplayer.ui.browser import BrowserDock
 
 
 class SeekBar(QSlider):
@@ -99,11 +100,17 @@ class MainWindow(QMainWindow):
 
         self.controls = ControlBar(self.player, self)
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.controls)
+        self.browser = BrowserDock(self)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.browser)
         open_action = QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.choose_file)
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu.addAction(open_action)
+        self.view_menu = self.menuBar().addMenu("&View")
+        browser_action = self.browser.toggleViewAction()
+        browser_action.setShortcut("Ctrl+B")
+        self.view_menu.addAction(browser_action)
         self.playback_menu = self.menuBar().addMenu("&Playback")
         self.playback_menu.addAction(self.controls.play_action)
         for label, key, amount in (

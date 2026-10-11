@@ -147,7 +147,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 1.2.1.1.1 | Task | `ui/browser.py` — dock with `QTreeView` over `QFileSystemModel`, name filters from shared `MEDIA_EXTS`, `setNameFilterDisables(False)` (hide, not grey), "All files" toggle; `toggle_browser` (Ctrl+B) | 02:00 | 00:25 | `tests/test_browser.py`: `.txt` hidden; toggle shows it | FR-001 |
+| 1.2.1.1.1 | Task | [x] `ui/browser.py` — dock with `QTreeView` over `QFileSystemModel`, name filters from shared `MEDIA_EXTS`, `setNameFilterDisables(False)` (hide, not grey), "All files" toggle; `toggle_browser` (Ctrl+B) | 02:00 | 00:25 | `tests/test_browser.py`: `.txt` hidden; toggle shows it | FR-001; file activation follows in 1.2.1.2.1 |
 
 ##### User Story 1.2.1.2 (US-007): Open a file from the browser by double-click or Enter
 - **Est. Manual**: 02:00 | **Est. AI**: 00:25
