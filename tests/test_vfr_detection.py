@@ -14,9 +14,6 @@ def test_vfr_mark_sets_after_one_second_and_resets_for_next_file(qtbot, tmp_path
             player.load(vfr)
         assert player.variable_frame_rate
         assert player._vfr_checked
-        with qtbot.waitSignal(player.error) as signal:
-            player.skip_frames(10)
-        assert "single-step fallback" in signal.args[0]
         monkeypatch.setattr(player, "_fps_values", lambda: (60.0, 60.0))
         player._deliver("time-pos", 1.5)
         assert player.variable_frame_rate

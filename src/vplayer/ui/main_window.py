@@ -88,6 +88,7 @@ class MainWindow(QMainWindow):
         self.speed_label.setAccessibleName("Playback speed")
         self.statusBar().addPermanentWidget(self.speed_label)
         self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
+        self.player.skip_status.connect(self.statusBar().showMessage)
 
         content = QWidget(self)
         layout = QVBoxLayout(content)

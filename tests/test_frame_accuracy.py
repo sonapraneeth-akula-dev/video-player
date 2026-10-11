@@ -107,10 +107,12 @@ def test_forward_step_is_exact_from_playing_or_paused(qtbot, paused_video, playi
 
 @pytest.mark.parametrize("name", [case[0] for case in CASES])
 def test_back_step_is_exact_across_cfr_matrix(qtbot, paused_video, name):
-    player, _widget = paused_video
+    player, widget = paused_video
+    qtbot.waitUntil(lambda: widget._render is not None, timeout=10000)
     player.mpv.pause = True
     with qtbot.waitSignal(player.file_loaded, timeout=10000):
         player.load(MEDIA / name)
+    qtbot.waitUntil(lambda: widget.grabFramebuffer().pixelColor(128, 72).red() > 35, timeout=10000)
     qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
     for index in range(1, 11):
         player.frame_step()

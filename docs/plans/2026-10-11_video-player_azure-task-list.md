@@ -399,7 +399,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 3.2.2.1.1 | Task | [x] `Player.skip_frames(n)` — pause, k = round(time-pos × fps), one exact seek to clamp(k ± n)/fps; `skip_frames` setting (10, 2–1000); `skip_n_fwd` / `skip_n_back` (Ctrl+. / Ctrl+,) | 02:00 | 00:20 | Frame-accuracy: ±10 exact; back from frame < n → 0; past end → last frame | AD-008; 7/7 CFR clips and playing pause covered; VFR/unknown fps fail explicitly until queued fallback task 3.2.2.2.3; v0.20.0 |
+| 3.2.2.1.1 | Task | [x] `Player.skip_frames(n)` — pause, k = round(time-pos × fps), one exact seek to clamp(k ± n)/fps; `skip_frames` setting (10, 2–1000); `skip_n_fwd` / `skip_n_back` (Ctrl+. / Ctrl+,) | 02:00 | 00:20 | Frame-accuracy: ±10 exact; back from frame < n → 0; past end → last frame | AD-008; 7/7 CFR clips and playing pause covered; VFR/unknown-fps fallback added in 3.2.2.2.3; v0.20.0 |
 
 ##### User Story 3.2.2.2 (US-026): Skips to stay exact when the frame rate is unknown or variable
 - **Est. Manual**: 05:15 | **Est. AI**: 00:55
@@ -408,7 +408,7 @@
 |---|------|------|-------------|---------|--------------|-------|
 | 3.2.2.2.1 | Task | [x] Extend `make_test_media.py` — VFR MKV alternating 1/30 s and 1/60 s frame durations, index burned in | 00:45 | 00:10 | `ffprobe` shows alternating durations \|\| | `test_vfr_media.py` verifies 90 alternating PTS intervals and decoded frame indices; fixture tooling only, version unchanged |
 | 3.2.2.2.2 | Task | [x] VFR / unknown-fps detection — once per load after ≥ 1 s media time; mark never cleared; test hook forcing unknown fps | 02:00 | 00:20 | VFR clip sets the mark; CFR clips don't | Design §4.3; nominal vs estimated fps > 1% marks VFR; shared fps accessor allows forced-unknown tests; v0.19.0 |
-| 3.2.2.2.3 | Task | Single-step queue — n queued `frame-step`s with "Skipping i/n"; any other command cancels; early end when `time-pos` doesn't change or after 2 s → "Skipped i/n" | 02:30 | 00:25 | `tests/test_vfr.py` cases (a)–(c) green | FR-013/014 |
+| 3.2.2.2.3 | Task | [x] Single-step queue — n queued `frame-step`s with "Skipping i/n"; any other command cancels; early end when `time-pos` doesn't change or after 2 s → "Skipped i/n" | 02:30 | 00:25 | `tests/test_vfr_queue.py`: VFR, forced-unknown fps, cancel, stall and boundaries green | FR-013/014; waits for pause and back-step restart; status bar progress; v0.22.0 |
 
 #### Feature 3.2.3 (FEAT-003.2.3): Position display
 - **Est. Manual**: 01:30 | **Est. AI**: 00:20

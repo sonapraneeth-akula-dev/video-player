@@ -28,6 +28,8 @@ def test_position_formats_milliseconds_frame_number_and_unknown_fps(qtbot, tmp_p
         assert not window.time_label.isVisible()
         action.trigger()
         assert window.time_label.isVisible()
+        window.player.skip_status.emit("Skipping 2/10")
+        assert window.statusBar().currentMessage() == "Skipping 2/10"
     finally:
         window.close()
 
