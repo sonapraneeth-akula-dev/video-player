@@ -269,7 +269,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.2.1.1.1 | Task | `ui/browser.py` `SftpDirModel` — lazy `listdir_attr` on a worker thread, same media filter and "All files" toggle, inline error row for permission denied / missing | 02:30 | 00:25 | Container test: lists `/media`; denied folder shows inline error; browser still navigable | FR-003 |
+| 2.2.1.1.1 | Task | [x] `ui/browser.py` `SftpDirModel` — lazy `listdir_attr` on a worker thread, same media filter and "All files" toggle, inline error row for permission denied / missing | 02:30 | 00:25 | Container test: lists `/media`; denied folder shows inline error; browser still navigable | FR-003; model + QTreeView navigation tested, main-window integration pending; v0.13.0 |
 
 #### Feature 2.2.2 (FEAT-002.2.2): In-memory SFTP stream
 - **Est. Manual**: 14:30 | **Est. AI**: 02:30

@@ -56,3 +56,6 @@ exposed through the main window.
 `SftpStream` reads remote files into one in-memory 4 MiB block using bounded
 SFTP requests. Reads may stop at a block boundary; the mpv stream callback
 integration needed for remote playback is still pending.
+The lazy `SftpDirModel` lists remote folders on a worker thread and displays
+permission or missing-folder errors inline. It is not yet attached to the
+main-window browser.
