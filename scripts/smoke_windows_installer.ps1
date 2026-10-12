@@ -8,6 +8,7 @@ $installer = (Resolve-Path $InstallerPath).Path
 $installDir = Join-Path $env:TEMP "vplayer-installer-smoke-$PID"
 $markerKey = 'HKCU:\Software\VPlayer'
 $environmentKey = 'HKCU:\Environment'
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'VPlayer\VPlayer.lnk'
 $originalProcessPath = $env:Path
 $registry = Get-Item $environmentKey
 $originalUserPath = $registry.GetValue('Path', $null, 'DoNotExpandEnvironmentNames')
@@ -43,6 +44,43 @@ function Assert-PathState([bool]$expectedEntry, [bool]$expectedMarker) {
     }
 }
 
+function Assert-Associations([bool]$installed) {
+    $classes = 'HKCU:\Software\Classes'
+    $progId = Join-Path $classes 'VPlayer.Media'
+    if ((Test-Path $progId) -ne $installed) { throw "Unexpected VPlayer.Media registration." }
+    if ($installed) {
+        $command = (Get-Item (Join-Path $progId 'shell\open\command')).GetValue('')
+        if ($command -cne ('"{0}" "%1"' -f (Join-Path $installDir 'vplayer.exe'))) {
+            throw "Incorrect VPlayer.Media open command: $command"
+        }
+    }
+    foreach ($extension in 'mp4', 'mkv', 'webm', 'mov', 'avi', 'ts', 'm4v', 'wmv', 'flv', 'mpg', 'mpeg') {
+        $openWith = Join-Path $classes ".$extension\OpenWithProgids"
+        $registered = (Test-Path $openWith) -and (
+            (Get-Item $openWith).GetValueNames() -contains 'VPlayer.Media'
+        )
+        if ($registered -ne $installed) { throw "Unexpected Open With registration for .$extension." }
+        $verb = Join-Path $classes "SystemFileAssociations\.$extension\shell\VPlayer.NewWindow"
+        if ((Test-Path $verb) -ne $installed) { throw "Unexpected new-window verb for .$extension." }
+        if ($installed) {
+            $command = (Get-Item (Join-Path $verb 'command')).GetValue('')
+            if ($command -cne ('"{0}" --new-window "%1"' -f (Join-Path $installDir 'vplayer.exe'))) {
+                throw "Incorrect new-window command for .$extension`: $command"
+            }
+        }
+    }
+}
+
+function Assert-InstallArtifacts([bool]$installed) {
+    if ((Test-Path $shortcut) -ne $installed) { throw 'Unexpected VPlayer Start menu shortcut.' }
+    if ((Test-Path (Join-Path $installDir 'vplayer.exe')) -ne $installed) {
+        throw 'Unexpected installed executable state.'
+    }
+    if (-not $installed -and (Test-Path $markerKey)) {
+        throw 'Uninstall left the VPlayer registry key behind.'
+    }
+}
+
 function Install([string[]]$options) {
     $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") + $options
     $process = Start-Process $installer -ArgumentList $arguments -Wait -PassThru
@@ -63,6 +101,8 @@ function Uninstall {
 try {
     Install @()
     Assert-PathState $true $true
+    Assert-Associations $true
+    Assert-InstallArtifacts $true
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
         [Environment]::GetEnvironmentVariable('Path', 'User')
     $pythonDirectory = if ($env:pythonLocation) {
@@ -85,11 +125,17 @@ try {
     }
     Uninstall
     Assert-PathState $false $false
+    Assert-Associations $false
+    Assert-InstallArtifacts $false
 
     Install @('/MERGETASKS=!addtopath')
     Assert-PathState $false $false
+    Assert-Associations $true
+    Assert-InstallArtifacts $true
     Uninstall
     Assert-PathState $false $false
+    Assert-Associations $false
+    Assert-InstallArtifacts $false
 
     Install @()
     Assert-PathState $true $true
@@ -97,6 +143,31 @@ try {
     Assert-PathState $false $false
     Uninstall
     Assert-PathState $false $false
+    Assert-InstallArtifacts $false
+
+    $preexisting = if ($originalUserPath -and -not $originalUserPath.EndsWith(';')) {
+        "$originalUserPath;$installDir"
+    } else {
+        "$originalUserPath$installDir"
+    }
+    New-ItemProperty $environmentKey -Name Path -Value $preexisting -PropertyType ExpandString -Force |
+        Out-Null
+    try {
+        Install @()
+        Assert-PathState $true $false
+        Assert-Associations $true
+        Uninstall
+        Assert-PathState $true $false
+        Assert-Associations $false
+        Assert-InstallArtifacts $false
+    } finally {
+        if ($null -eq $originalUserPath) {
+            Remove-ItemProperty $environmentKey -Name Path
+        } else {
+            New-ItemProperty $environmentKey -Name Path -Value $originalUserPath `
+                -PropertyType $originalPathKind -Force | Out-Null
+        }
+    }
 
     $currentUserPath = (Get-Item $environmentKey).GetValue('Path', $null, 'DoNotExpandEnvironmentNames')
     if ($currentUserPath -cne $originalUserPath -or
@@ -104,7 +175,7 @@ try {
         $currentPathKind = if ($null -ne $currentUserPath) { (Get-Item $environmentKey).GetValueKind('Path') }
         throw "Uninstall changed user PATH: before present=$($null -ne $originalUserPath) kind=$originalPathKind length=$($originalUserPath.Length); after present=$($null -ne $currentUserPath) kind=$currentPathKind length=$($currentUserPath.Length)"
     }
-    Write-Host 'Fresh install PATH on/off, upgrade PATH on to off, and uninstall passed.'
+    Write-Host 'Fresh install PATH on/off, associations, upgrade, and clean uninstall passed.'
 } finally {
     Uninstall
     $env:Path = $originalProcessPath

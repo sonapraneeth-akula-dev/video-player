@@ -737,7 +737,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 8.1.1.3.1 | Task | Uninstall — `uninsdeletekey` / `uninsdeletevalue` on app keys; `usPostUninstall` removes only the `PathAdded` entry and deletes `HKCU\Software\VPlayer` | 01:30 | 00:15 | Smoke: associations, shortcuts and own PATH entry gone; other PATH entries and a pre-existing entry intact | FR-031 |
+| 8.1.1.3.1 | Task | [x] Uninstall — `uninsdeletekey` / `uninsdeletevalue` on app keys; `usPostUninstall` removes only the `PathAdded` entry and deletes `HKCU\Software\VPlayer` | 01:30 | 00:15 | Smoke: associations, shortcuts and own PATH entry gone; other PATH entries and a pre-existing entry intact | FR-031; real local 0.26.0 install/uninstall verifies all 11 associations, ProgID, Start menu shortcut, executable, marker, and PATH cleanup; pre-existing PATH entry remains untouched. Hosted 0.27.0 verification pending |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Manual / UAT**: Windows packaging smoke checklist on Windows 10 22H2 and Windows 11

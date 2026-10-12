@@ -139,6 +139,9 @@ Set `VPLAYER_LIBMPV` to override which libmpv file the bundle includes.
 The installer smoke test changes the current user's PATH temporarily and refuses
 to run if VPlayer is already installed. Uninstall and a PATH-off upgrade remove
 only the installer-managed entry and preserve existing PATH separators.
+The smoke test checks the Open With ProgID and new-window verbs for all 11
+video extensions, Start menu shortcut removal, and preservation of a
+pre-existing PATH entry.
 Packages are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first
 launch. Settings and logs stay in the user profile, also for the portable build.
 Only the Windows packages have been built and tested so far (installer
