@@ -24,7 +24,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg libmpv1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0 xvfb
       - name: Install Windows FFmpeg
         if: runner.os == 'Windows'
-        run: choco install ffmpeg --yes --no-progress
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            choco install ffmpeg --yes --no-progress
+            if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+              ffmpeg -version | Select-Object -First 1
+              break
+            }
+            if ($attempt -eq 3) { throw "FFmpeg is unavailable after $attempt Chocolatey attempts" }
+            Start-Sleep -Seconds (10 * $attempt)
+          }
       - run: python -m pip install -e ".[dev]"
       - name: Verify Ubuntu Qt xcb dependencies
         if: runner.os == 'Linux'
