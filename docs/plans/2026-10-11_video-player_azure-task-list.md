@@ -766,7 +766,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 8.2.1.2.1 | Task | `install.sh --uninstall` — remove exactly the installed files and refresh desktop / icon caches | 01:00 | 00:10 | Before/after file listing shows only VPlayer files removed | FR-031 |
+| 8.2.1.2.1 | Task | [x] `install.sh --uninstall` — remove exactly the installed files and refresh desktop / icon caches | 01:00 | 00:10 | Before/after file listing shows only VPlayer files removed | FR-031; ownership marker prevents removal/replacement of unmanaged files; install/upgrade/uninstall, unrelated-file and cache refresh tests pass in Ubuntu 22.04 container; ShellCheck clean; v0.30.1. Actual AppImage/X11/Wayland UAT remains open |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Manual / UAT**: Ubuntu packaging smoke on X11 and Wayland — install, Open With (both

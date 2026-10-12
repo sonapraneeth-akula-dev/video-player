@@ -1,6 +1,6 @@
 # Development setup and build
 
-VPlayer `0.30.0` can be run from source or built as a portable Windows bundle;
+VPlayer `0.30.1` can be run from source or built as a portable Windows bundle;
 the Windows installer passes hosted install/upgrade/uninstall smoke tests,
 but full release/UAT and the Linux AppImage are not yet verified. Run commands from the
 repository root. The supported development target is Windows 10/11 x64 or
@@ -125,7 +125,7 @@ passed all of these checks for version `0.27.0`.
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
 | Windows | `scripts\fetch_libmpv.py`; [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup --scope user`) | `VPlayer-<v>-windows-x64-portable.zip`: unzip, run `vplayer\vplayer.exe` | `VPlayer-<v>-windows-x64-setup.exe`: per-user, no admin; Start menu, optional PATH, "Open with" and "Open in new VPlayer window"; clean uninstall |
-| Linux | `libmpv1` (bundled from the build machine; build on Ubuntu 22.04 for widest reach), [appimagetool](https://github.com/AppImage/appimagetool/releases) on `PATH` | `VPlayer-<v>-linux-<arch>.AppImage`: `chmod +x`, run | `VPlayer-<v>-linux-<arch>.tar.gz`: extract, `./install.sh` (`--uninstall` to remove) |
+| Linux | `libmpv1` (bundled from the build machine; build on Ubuntu 22.04 for widest reach), [appimagetool](https://github.com/AppImage/appimagetool/releases) on `PATH` | `VPlayer-<v>-linux-<arch>.AppImage`: `chmod +x`, run | `VPlayer-<v>-linux-<arch>.tar.gz`: extract, `./install.sh` (`--uninstall` to remove only files managed by that installer) |
 | macOS | `brew install mpv` (libmpv is bundled into the app) | `VPlayer-<v>-macos-<arch>.zip`: unzipped `VPlayer.app` | `VPlayer-<v>-macos-<arch>.dmg` |
 
 ```powershell
@@ -145,5 +145,9 @@ pre-existing PATH entry.
 Packages are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first
 launch. Settings and logs stay in the user profile, also for the portable build.
 Only the Windows packages have been built and tested so far (installer
-install/uninstall, PATH and registry cleanup, and the packaged codec matrix);
-the Linux and macOS paths are untested.
+install/uninstall, PATH and registry cleanup, and the packaged codec matrix).
+The Linux installer script passed install/upgrade/uninstall and ownership checks
+in an Ubuntu 22.04 container using a dummy AppImage; the actual AppImage and
+desktop UAT, and all macOS packaging, remain untested. The Linux installer
+refuses to overwrite an unmanaged VPlayer path; remove any earlier unmanaged
+installation explicitly before using it.
