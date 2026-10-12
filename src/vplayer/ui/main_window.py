@@ -109,6 +109,9 @@ class ControlBar(QToolBar):
         self.play_action.setEnabled(False)
         self.play_action.triggered.connect(player.play_pause)
         self.addAction(self.play_action)
+        self.play_button = self.widgetForAction(self.play_action)
+        self.play_button.setAccessibleName("Play or pause")
+        self.play_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         player.file_loaded.connect(lambda: self.play_action.setEnabled(True))
         player.paused.connect(lambda paused: self.play_action.setText("Play" if paused else "Pause"))
 
@@ -171,6 +174,8 @@ class MainWindow(QMainWindow):
         QWidget.setTabOrder(self.browser.all_files, self.browser.tree)
         QWidget.setTabOrder(self.browser.tree, self.video)
         QWidget.setTabOrder(self.video, self.seek_bar)
+        QWidget.setTabOrder(self.seek_bar, self.controls.play_button)
+        QWidget.setTabOrder(self.controls.play_button, self.browser.all_files)
         open_action = QAction("&Open...", self)
         open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self.choose_file)

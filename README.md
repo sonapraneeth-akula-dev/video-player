@@ -33,8 +33,10 @@ window; every launch already creates a new window.
 Use **Ctrl+B** to show or hide the local file browser; **All files** reveals
 files outside the media extension filter. Double-click or press **Enter** on a
 folder to open it, or on a video to play it.
-The browser, video surface, and seek bar are reachable with **Tab** and
-**Shift+Tab**; the focused video has a visible outline.
+The browser, video surface, seek bar, and Play/Pause toolbar button are
+reachable with **Tab** and **Shift+Tab**; the focused video has a visible
+outline. Preferences and SSH connection/host-key prompts also support
+keyboard navigation with named controls.
 Use **Alt+1** through **Alt+6** for playback speeds 0.25×, 0.5×, 0.67×, 1×, 2× and 4×;
 the current speed appears in the status bar.
 Use **]** / **[** to adjust speed by the configured step (default 0.05×), or

@@ -485,7 +485,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 5.1.1.2.1 | Task | Accessible names / descriptions on every control, tab order and visible focus style across `ui/` | 01:30 | 00:20 | Test: every focusable widget has a non-empty `accessibleName()`; keyboard-only checklist passes | NFR-011 |
+| 5.1.1.2.1 | Task | [x] Accessible names / descriptions on every control, tab order and visible focus style across `ui/` | 01:30 | 00:20 | Test: every focusable widget has a non-empty `accessibleName()`; keyboard-only checklist passes | NFR-011; visible focusable controls in main window, Preferences, SSH connection and host-key dialogs named; Play/Pause toolbar button tabbable, video focus outline retained; pytest-qt keyboard traversal and activation covered in `tests/test_accessibility.py`; v0.31.0. Full action-registry walkthrough remains open |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: registry parity check (action ↔ control ↔ shortcut) passes (US-030)

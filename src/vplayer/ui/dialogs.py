@@ -42,6 +42,7 @@ class PreferencesDialog(QDialog):
         self.setWindowTitle("Preferences")
         layout = QVBoxLayout(self)
         self.pitch_correction = QCheckBox("Preserve audio pitch when changing speed", self)
+        self.pitch_correction.setAccessibleName("Preserve audio pitch")
         self.pitch_correction.setChecked(pitch_correction)
         layout.addWidget(self.pitch_correction)
         buttons = QDialogButtonBox(
@@ -49,6 +50,8 @@ class PreferencesDialog(QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        for button in buttons.buttons():
+            button.setAccessibleName(button.text())
         layout.addWidget(buttons)
 
 
@@ -102,6 +105,7 @@ class ConnectDialog(QDialog):
         self.port.setRange(1, 65535)
         self.port.setValue(22)
         self.port.setAccessibleName("SSH port")
+        self.port.lineEdit().setAccessibleName("SSH port value")
         form.addRow("Port", self.port)
         self.port.textChanged.connect(lambda _: setattr(self, "_port_explicit", True))
         self.user = QLineEdit(self)
@@ -120,6 +124,7 @@ class ConnectDialog(QDialog):
         self.password.setAccessibleName("Password or key passphrase")
         form.addRow("Password or passphrase", self.password)
         self.save_secret = QCheckBox("Save secret in OS keyring", self)
+        self.save_secret.setAccessibleName("Save secret in OS keyring")
         form.addRow(self.save_secret)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -132,6 +137,8 @@ class ConnectDialog(QDialog):
         cancel = QPushButton("Cancel", self)
         self.save_profile = QPushButton("Save profile", self)
         self.delete_profile = QPushButton("Delete profile", self)
+        for button in (connect, cancel, self.save_profile, self.delete_profile):
+            button.setAccessibleName(button.text())
         connect.clicked.connect(self.accept)
         cancel.clicked.connect(self.reject)
         self.save_profile.clicked.connect(self._save_profile)
@@ -402,6 +409,7 @@ class HostKeyDialog(QDialog):
         self.accept_once.clicked.connect(self.accept)
         self.remember_button.clicked.connect(self._remember)
         for button in (self.reject_button, self.accept_once, self.remember_button):
+            button.setAccessibleName(button.text())
             buttons.addWidget(button)
         layout.addLayout(buttons)
 
