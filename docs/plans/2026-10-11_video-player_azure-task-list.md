@@ -478,7 +478,7 @@
 |---|------|------|-------------|---------|--------------|-------|
 | 5.1.1.1.1 | Task | `src/vplayer/actions.py` — `ACTIONS` table (id, label, icon, default shortcut, handler, toolbar/menu placement) for every design §6 action ID; `QAction`s created per window | 03:00 | 00:30 | Every §6 action ID present | FR-022 |
 | 5.1.1.1.2 | Task | `tests/test_actions.py` parity check — each action has a visible control and an effective shortcut after settings load; no duplicate keys; invalid stored value → default | 01:30 | 00:15 | Fails when any action lacks a control or shortcut \|\| |  |
-| 5.1.1.1.3 | Task | Input-latency test — action → painted acknowledgement measured with pytest-qt | 01:30 | 00:15 | p95 < 100 ms reported | NFR-009 |
+| 5.1.1.1.3 | Task | [x] Input-latency test — action → painted acknowledgement measured with pytest-qt | 01:30 | 00:15 | p95 < 100 ms reported | NFR-009; 50 speed actions measured after status-label paint, nearest-rank p95 13.5 ms on Windows; Windows and Ubuntu CI gate <100 ms |
 
 ##### User Story 5.1.1.2 (US-031): Full keyboard operation and accessible names
 - **Est. Manual**: 01:30 | **Est. AI**: 00:20

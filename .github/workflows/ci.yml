@@ -51,6 +51,9 @@ jobs:
       - name: Test on Windows
         if: runner.os == 'Windows'
         run: python -m pytest -q --cov=src/vplayer --cov=scripts --cov-report=term-missing --cov-fail-under=80
+      - name: Report painted action latency on Windows
+        if: runner.os == 'Windows'
+        run: python -m pytest -q -s tests/test_speed.py::test_action_to_painted_acknowledgement_p95
       - name: Test on Ubuntu
         if: runner.os == 'Linux'
         run: xvfb-run -a python -u -X faulthandler -m pytest -x -vv -s --cov=src/vplayer --cov=scripts --cov-report=term-missing --cov-fail-under=80
