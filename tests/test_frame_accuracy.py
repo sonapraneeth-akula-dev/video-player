@@ -76,6 +76,22 @@ def test_frame_index_harness_reads_decoded_video(qtbot, paused_video, name, code
             qtbot.waitUntil(lambda: frame_index(player) == gop, timeout=10000)
 
 
+@pytest.mark.parametrize(("name", "fps"), [(name, fps) for name, _codec, fps, _gop, _start in CASES])
+def test_exact_seek_rounding_lands_on_requested_frame(qtbot, paused_video, name, fps):
+    player, widget = paused_video
+    qtbot.waitUntil(lambda: widget._render is not None, timeout=10000)
+    player.mpv.pause = True
+    with qtbot.waitSignal(player.file_loaded, timeout=10000):
+        player.load(MEDIA / name)
+    qtbot.waitUntil(lambda: frame_index(player) == 0, timeout=10000)
+    for target in (1, 10, 19):
+        player.mpv.seek(target / fps, reference="absolute", precision="exact")
+        qtbot.waitUntil(lambda target=target: frame_index(player) == target, timeout=5000)
+    if name == "h264_25.mp4":
+        player.mpv.seek(250 / fps, reference="absolute", precision="exact")
+        qtbot.waitUntil(lambda: frame_index(player) == 250, timeout=5000)
+
+
 @pytest.mark.parametrize("playing", (False, True))
 def test_forward_step_is_exact_from_playing_or_paused(qtbot, paused_video, playing):
     player, _widget = paused_video

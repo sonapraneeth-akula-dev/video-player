@@ -851,9 +851,12 @@ responsibility in §3; split a module only when it passes ~600 lines.
   uses copy-back. Verify on the owner's GPU (Intel/AMD/NVIDIA differ).
 - [ ] **Spike — Paramiko throughput**: measure MB/s for one and two streams over the owner's
   VPN. Need ≥ 2 × 4K bitrate (~25 MB/s worst case). Below that → AD-018 trigger.
-- [ ] **hr-seek rounding**: confirm that an exact seek to `k/fps` shows frame *k* (not *k−1*) on
-  mpv 0.34 (Ubuntu) and the current Windows build, using the frame-accuracy test; if not, aim
-  at the middle of the frame, `(k + 0.5)/fps`.
+- [x] **hr-seek rounding**: `k/fps` lands on frame *k* without a half-frame
+  offset. Windows: `test_exact_seek_rounding_lands_on_requested_frame` checks
+  1, 10 and 19 across all seven codec/fps/start-PTS fixtures, plus GOP boundary
+  250. Ubuntu 22.04/libmpv 0.34: the existing `test_skip_frames_is_exact_and_clamps_to_file_bounds`
+  verifies exact seeks to 10/fps, 0 and the final frame across the same seven
+  fixtures (CI run 38247248799). No seek-formula change needed.
 - [ ] **Spike — tab move between windows (AD-009)**: confirm that freeing and recreating the mpv
   render context on reparent keeps position/pause/cache, and which call re-enables video on
   mpv 0.34 and the Windows build (`video-reload` vs resetting `vid`). If neither works, fall
