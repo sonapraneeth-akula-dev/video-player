@@ -25,7 +25,10 @@ the fetcher now extracts beside its destination. Ubuntu run `38233993707`
 then identified a missing `libxkbcommon-x11.so.0` before the first Qt test.
 The XCB dependency preflight subsequently identified missing
 `libxcb-icccm.so.4` and `libxcb-keysyms.so.1`; CI now installs all three
-packages. A successful CI run on both operating systems remains pending.
+packages. Run `38244292254` passed on both OSes: 269 Windows and 292 Ubuntu
+tests passed with 83.16% and 85.04% coverage, respectively. The Ubuntu netem
+latency test passed twice in that run, though earlier runs narrowly exceeded
+its 2-second seek limit; performance is not yet consistently within budget.
 Rendered-frame tests need a real display/OpenGL context: Qt's `offscreen`
 backend has not passed their frame checks.
 
