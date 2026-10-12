@@ -39,6 +39,8 @@ Use **Alt+1** through **Alt+6** for playback speeds 0.25×, 0.5×, 0.67×, 1×, 
 the current speed appears in the status bar.
 Use **]** / **[** to adjust speed by the configured step (default 0.05×), or
 **Backspace** to return to 1×.
+Choose an audio or embedded subtitle track from the **Audio** or
+**Subtitles** menu; **A** and **J** cycle through their tracks and Off.
 Press **.** to pause and advance one video frame.
 Press **S** to save a native-resolution PNG named for the source, timestamp and
 frame (when known); **Ctrl+Shift+S** opens Save As for PNG or JPEG. Snapshot

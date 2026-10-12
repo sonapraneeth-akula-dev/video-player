@@ -3,6 +3,7 @@
 import math
 from pathlib import Path
 
+import mpv
 import shiboken6
 from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices
@@ -153,6 +154,18 @@ class MainWindow(QMainWindow):
         self.view_menu.addAction(browser_action)
         self.playback_menu = self.menuBar().addMenu("&Playback")
         self.playback_menu.addAction(self.controls.play_action)
+        self.audio_menu = self.menuBar().addMenu("&Audio")
+        self.subtitle_menu = self.menuBar().addMenu("S&ubtitles")
+        self.cycle_audio = QAction("Next audio track", self)
+        self.cycle_audio.setShortcut("A")
+        self.cycle_audio.triggered.connect(lambda: self._cycle_track("audio", "aid"))
+        self.cycle_sub = QAction("Next subtitle track", self)
+        self.cycle_sub.setShortcut("J")
+        self.cycle_sub.triggered.connect(lambda: self._cycle_track("sub", "sid"))
+        self.audio_menu.aboutToShow.connect(self._refresh_tracks)
+        self.subtitle_menu.aboutToShow.connect(self._refresh_tracks)
+        self.player.file_loaded.connect(self._refresh_tracks)
+        self._refresh_tracks()
         overlay_action = QAction("Show position overlay", self)
         overlay_action.setObjectName("toggle_overlay")
         overlay_action.setShortcut("I")
@@ -284,6 +297,58 @@ class MainWindow(QMainWindow):
     def open_file(self, path: str | Path):
         self.banner.hide()
         self.player.load(path)
+
+    def _refresh_tracks(self):
+        tracks = self.player.mpv.track_list
+        for menu, kind, prop, cycle in (
+            (self.audio_menu, "audio", "aid", self.cycle_audio),
+            (self.subtitle_menu, "sub", "sid", self.cycle_sub),
+        ):
+            menu.clear()
+            menu.addAction(cycle)
+            menu.addSeparator()
+            available = [track for track in tracks if track["type"] == kind]
+            cycle.setEnabled(bool(available))
+            selected = getattr(self.player.mpv, prop)
+            off = menu.addAction("Off")
+            off.setEnabled(bool(available))
+            off.setCheckable(True)
+            off.setChecked(selected is False)
+            off.setData("no")
+            off.triggered.connect(lambda checked=False, name=prop: self._select_track(name, "no"))
+            for track in available:
+                track_id = track["id"]
+                detail = track.get("title") or track.get("lang")
+                label = f"Track {track_id}"
+                if detail:
+                    label += f" ({''.join(c for c in str(detail) if c.isprintable())[:80].replace('&', '&&')})"
+                action = menu.addAction(label)
+                action.setCheckable(True)
+                action.setChecked(selected == track_id)
+                action.setData(track_id)
+                action.triggered.connect(
+                    lambda checked=False, name=prop, number=track_id: self._select_track(name, number),
+                )
+
+    def _select_track(self, prop: str, track_id: int | str):
+        try:
+            setattr(self.player.mpv, prop, track_id)
+        except (ValueError, RuntimeError, SystemError, mpv.PropertyUnavailableError) as error:
+            self.show_error(f"Could not select track: {error}")
+            return
+        selected = getattr(self.player.mpv, prop)
+        menu = self.audio_menu if prop == "aid" else self.subtitle_menu
+        for action in menu.actions():
+            if action.isCheckable():
+                action.setChecked(action.data() == ("no" if selected is False else selected))
+
+    def _cycle_track(self, kind: str, prop: str):
+        ids = [track["id"] for track in self.player.mpv.track_list if track["type"] == kind]
+        if not ids:
+            return
+        selected = getattr(self.player.mpv, prop)
+        next_index = ids.index(selected) + 1 if selected in ids else 0
+        self._select_track(prop, ids[next_index] if next_index < len(ids) else "no")
 
     def snapshot(self):
         self._save_snapshot()

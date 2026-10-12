@@ -864,7 +864,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 10.2.1.1.1 | Task | [x] Extend `make_test_media.py` — MKV with 2 audio and 2 subtitle tracks, plus an external `.srt` | 00:30 | 00:10 | `ffprobe` lists 4 tracks \|\| | FFprobe verifies two language-tagged audio and two language-tagged subtitle streams (plus video) in `tracks_multi.mkv`; `tracks_external.srt` generated and checked |
-| 10.2.1.1.2 | Task | Audio / Subtitle menus from mpv `track-list`; `cycle_audio` (A), `cycle_sub` (J) | 01:30 | 00:20 | Test: selecting sets `aid` / `sid` | FR-027 |
+| 10.2.1.1.2 | Task | [x] Audio / Subtitle menus from mpv `track-list`; `cycle_audio` (A), `cycle_sub` (J) | 01:30 | 00:20 | Test: selecting sets `aid` / `sid` | FR-027; menu selection, shortcut cycling through Off, and media-change refresh covered in `tests/test_tracks.py`; v0.28.0 |
 | 10.2.1.1.3 | Task | `load_sub` (Ctrl+J) — local file or same-server SFTP via `vpsftp://`; kept in tab state and re-added on resume | 01:30 | 00:20 | Test: subtitle loads and survives suspend/resume \|\| |  |
 
 #### Feature 10.2.2 (FEAT-010.2.2): Pitch correction
