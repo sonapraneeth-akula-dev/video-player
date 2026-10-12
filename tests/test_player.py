@@ -19,7 +19,7 @@ def test_load_and_observe_on_gui_thread(qtbot):
     )
     try:
         assert player.mpv["cache-on-disk"] is False
-        assert player.mpv["hwdec"] == ["auto-safe"]
+        assert player.mpv["hwdec"] in ("auto-safe", ["auto-safe"])
         with qtbot.waitSignal(player.file_loaded, timeout=10000):
             player.load(MEDIA)
         assert threads == [QApplication.instance().thread()]

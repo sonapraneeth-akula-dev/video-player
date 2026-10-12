@@ -4,6 +4,7 @@ import subprocess
 import sys
 from io import StringIO
 from pathlib import Path
+from shutil import copyfile
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -103,7 +104,9 @@ def test_cli_opens_relative_file_and_reports_missing_file(qtbot, monkeypatch, tm
     monkeypatch.setattr(entry, "QApplication", lambda argv: app)
     monkeypatch.setattr(entry.QStandardPaths, "writableLocation", lambda location: str(tmp_path))
     monkeypatch.setattr("vplayer.ui.main_window.Settings", lambda: Settings(tmp_path / "settings.ini"))
-    relative = os.path.relpath(MEDIA, tmp_path)
+    media = tmp_path / MEDIA.name
+    copyfile(MEDIA, media)
+    relative = os.path.relpath(media, tmp_path)
     missing = "missing.mp4"
 
     def exit_after_show(self):
@@ -112,7 +115,7 @@ def test_cli_opens_relative_file_and_reports_missing_file(qtbot, monkeypatch, tm
         qtbot.waitUntil(lambda: any(w.player.state()["duration"] for w in windows), timeout=10000)
         playing = next(w for w in windows if w.player.state()["duration"])
         failed = next(w for w in windows if w is not playing)
-        assert playing.player._uri == str(MEDIA)
+        assert playing.player._uri == str(media)
         assert failed.banner.isVisible()
         assert "File not found" in failed.banner.text()
         for window in windows:
