@@ -5,9 +5,10 @@ from pathlib import Path
 
 import mpv
 import shiboken6
-from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QPainter, QPen
 from PySide6.QtWidgets import (
+    QApplication,
     QFileDialog,
     QFocusFrame,
     QLabel,
@@ -159,7 +160,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.video, 1)
         self.video_focus = QFocusFrame(content)
         self.video_focus.hide()
-        self.video.installEventFilter(self)
+        QApplication.instance().focusChanged.connect(self._focus_changed)
         self.seek_bar = SeekBar(content)
         layout.addWidget(self.seek_bar)
         self.time_label = QLabel("00:00:00.000 / 00:00:00.000 · f —", content)
@@ -341,15 +342,13 @@ class MainWindow(QMainWindow):
         if self._duration:
             self.player.seek(value / self.seek_bar.maximum() * self._duration)
 
-    def eventFilter(self, watched, event):
-        if watched is self.video:
-            if event.type() == QEvent.Type.FocusIn:
-                self.video_focus.setWidget(self.video)
-                self.video_focus.show()
-            elif event.type() == QEvent.Type.FocusOut:
-                self.video_focus.setWidget(None)
-                self.video_focus.hide()
-        return super().eventFilter(watched, event)
+    def _focus_changed(self, _previous, current):
+        if current is self.video:
+            self.video_focus.setWidget(self.video)
+            self.video_focus.show()
+        else:
+            self.video_focus.setWidget(None)
+            self.video_focus.hide()
 
     def choose_file(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open Video")
