@@ -68,7 +68,8 @@ def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
             if expected is window.controls.play_button:
                 assert not window.video_focus.isVisible()
         preferences = PreferencesDialog(True, window)
-        preferences.show()
+        preferences.open()
+        assert preferences.isModal()
         preferences.activateWindow()
         qtbot.waitUntil(preferences.isActiveWindow)
         preferences.pitch_correction.setFocus()
