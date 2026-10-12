@@ -28,7 +28,7 @@ def main() -> None:
         raise SystemExit("Windows only; on Ubuntu install libmpv1 from apt")
 
     DESTINATION.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as temp:
+    with tempfile.TemporaryDirectory(dir=DESTINATION.parent) as temp:
         archive = Path(temp) / ARCHIVE
         with urllib.request.urlopen(URL, timeout=60) as response, archive.open("wb") as output:
             shutil.copyfileobj(response, output)
@@ -42,4 +42,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -16,10 +16,12 @@ is still in progress.
 | SFTP tests | Docker with a running **Linux-container** engine | Docker with a running Linux-container engine; the netem test runs `tc` in the test container via privileged `docker exec` |
 
 Check `python --version`, `ffmpeg -version`, `ffprobe -version`, and, for SFTP
-tests, `docker info` before running setup. The first published Ubuntu CI run
-(`38191869176`) stopped at media generation because its FFmpeg lacked
-`-fps_mode`; the generator now uses `-vsync 0` on older builds. A successful
-Ubuntu CI rerun is still pending.
+tests, `docker info` before running setup. The first published Ubuntu CI run (`38191869176`) stopped at media generation
+because its FFmpeg lacked `-fps_mode`; the generator now uses `-vsync 0` on
+older builds. The next run (`38232464757`) stopped at Windows DLL fetch because
+the runner's temporary directory and workspace were on different drives;
+the fetcher now extracts beside its destination. A successful CI run on both
+operating systems remains pending.
 Rendered-frame tests need a real display/OpenGL context: Qt's `offscreen`
 backend has not passed their frame checks.
 

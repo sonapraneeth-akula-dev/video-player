@@ -21,9 +21,18 @@ def test_fetch_installs_only_verified_dll(tmp_path, monkeypatch):
     monkeypatch.setattr(fetch_libmpv, "ARCHIVE_SHA256", hashlib.sha256(contents).hexdigest())
     monkeypatch.setattr(fetch_libmpv, "DLL_SHA256", hashlib.sha256(dll).hexdigest())
     monkeypatch.setattr(fetch_libmpv.urllib.request, "urlopen", lambda *args, **kwargs: io.BytesIO(contents))
+    temporary_directory = fetch_libmpv.tempfile.TemporaryDirectory
+    temp_roots = []
+
+    def record_temp_root(*args, **kwargs):
+        temp_roots.append(kwargs.get("dir"))
+        return temporary_directory(*args, **kwargs)
+
+    monkeypatch.setattr(fetch_libmpv.tempfile, "TemporaryDirectory", record_temp_root)
 
     fetch_libmpv.main()
     assert destination.read_bytes() == dll
+    assert temp_roots == [destination.parent]
 
     monkeypatch.setattr(fetch_libmpv, "ARCHIVE_SHA256", "0" * 64)
     with pytest.raises(ValueError, match="SHA-256 mismatch"):
