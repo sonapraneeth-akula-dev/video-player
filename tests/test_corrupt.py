@@ -26,6 +26,22 @@ def test_corrupt_corpus_keeps_process_and_event_loop_alive():
     )
 
 
+def test_undecodable_video_with_hwdec_keeps_core_responsive():
+    # Both hwdec and software fail to open this HEVC stream; libmpv used to retry forever and block every API call.
+    script = (
+        "import time; from PySide6.QtWidgets import QApplication; from vplayer.player import Player\n"
+        "app = QApplication([]); player = Player(video_output='null'); player.mpv.ao = 'null'\n"
+        f"player.load({str(CORPUS / 'corrupt_16_flipped.mkv')!r})\n"
+        "deadline = time.monotonic() + 3\n"
+        "while time.monotonic() < deadline: app.processEvents(); player.state(); time.sleep(0.05)\n"
+        "player.close()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], env=os.environ.copy(), capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+
+
 @pytest.mark.skipif(os.environ.get("VPLAYER_CORRUPT_WORKER") != "1", reason="run in a separate process")
 def test_corrupt_worker(qtbot, tmp_path):
     files = sorted(CORPUS.glob("corrupt_*"))

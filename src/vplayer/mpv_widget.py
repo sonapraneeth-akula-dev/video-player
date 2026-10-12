@@ -55,7 +55,7 @@ class MpvWidget(QOpenGLWidget):
     def release(self):
         if self._render:
             self.makeCurrent()
-            self._render.update_cb = None
+            # Never reassign update_cb: python-mpv frees the old thunk while mpv's render thread may call it.
             self._render.free()
             self._render = None
             self.doneCurrent()

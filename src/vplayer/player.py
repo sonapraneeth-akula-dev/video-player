@@ -18,6 +18,7 @@ from vplayer.sftp import SftpStream
 
 log = logging.getLogger(__name__)
 OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "speed", "hwdec-current")
+PROBE_TITLE = "vplayer-software-probe"
 
 
 class Player(QObject):
@@ -46,6 +47,7 @@ class Player(QObject):
         if type(jpeg_quality) is not int or not 50 <= jpeg_quality <= 100:
             raise ValueError("JPEG quality must be between 50 and 100")
         self._closed = False
+        self._loaded_pending = False
         self._uri = ""
         self._pending_frame_steps: list[int] = []
         self._pending_skip: int | None = None
@@ -96,8 +98,16 @@ class Player(QObject):
 
     def _on_event(self, event: mpv.MpvEvent) -> None:
         if event.event_id.value == mpv.MpvEventID.FILE_LOADED:
-            self._update.emit("file-loaded", None)
+            if self.mpv.__getitem__("force-media-title", file_local=True) == PROBE_TITLE:
+                # Software probe finished: reload for real, with hwdec only if software could open the video.
+                self.mpv.loadfile(self.mpv.path, hwdec="auto-safe" if self.mpv.video_codec else "no")
+                return
+            # A hwdec attempt can fail mid-stream and fall back; announce the file once decoding has settled.
+            self._loaded_pending = True
         elif event.event_id.value == mpv.MpvEventID.PLAYBACK_RESTART:
+            if self._loaded_pending:
+                self._loaded_pending = False
+                self._update.emit("file-loaded", None)
             self._update.emit("playback-restart", None)
         elif event.event_id.value == mpv.MpvEventID.END_FILE and event.data.reason == mpv.MpvEventEndFile.ERROR:
             self._update.emit("error", f"Could not play {self._uri}: mpv error {event.data.error}")
@@ -308,7 +318,7 @@ class Player(QObject):
             self.variable_frame_rate = False
             self._vfr_checked = False
             self._pending_skip = None
-            self.mpv.loadfile(self._uri)
+            self._loadfile()
             return
         file = Path(path)
         if not file.is_file():
@@ -322,7 +332,11 @@ class Player(QObject):
         self.variable_frame_rate = False
         self._vfr_checked = False
         self._pending_skip = None
-        self.mpv.loadfile(self._uri)
+        self._loadfile()
+
+    def _loadfile(self) -> None:
+        # libmpv retries forever on the core thread if hwdec and software both fail to open a stream.
+        self.mpv.loadfile(self._uri, hwdec="no", mute="yes", force_media_title=PROBE_TITLE)
 
     def play_pause(self) -> None:
         self._stop_skip()

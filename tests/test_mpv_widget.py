@@ -77,6 +77,29 @@ def test_closing_window_destroys_render_surface_on_gui_thread(qtbot, tmp_path):
     window.close()
 
 
+def test_release_frees_render_context_without_swapping_update_callback(qtbot, monkeypatch):
+    # python-mpv frees the old ctypes thunk before registering a new one; mpv's render thread can call it.
+    player = Player()
+    widget = MpvWidget(player)
+    widget.show()
+    try:
+        qtbot.waitUntil(lambda: widget._render is not None, timeout=10000)
+        render = widget._render
+        events = []
+        original_setattr = type(render).__setattr__
+        monkeypatch.setattr(
+            type(render), "__setattr__",
+            lambda self, name, value: events.append(name) or original_setattr(self, name, value),
+        )
+        monkeypatch.setattr(type(render), "free", lambda self, free=type(render).free: events.append("free") or free(self))
+        widget.release()
+        assert events[0] == "free"
+        assert "update_cb" not in events
+    finally:
+        widget.dispose()
+        player.close()
+
+
 def test_dispose_rejects_background_thread(qtbot):
     player = Player()
     widget = MpvWidget(player)
