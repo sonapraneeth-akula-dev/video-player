@@ -13,6 +13,16 @@ $originalProcessPath = $env:Path
 $registry = Get-Item $environmentKey
 $originalUserPath = $registry.GetValue('Path', $null, 'DoNotExpandEnvironmentNames')
 $originalPathKind = if ($null -ne $originalUserPath) { $registry.GetValueKind('Path') }
+$extensions = 'mp4', 'mkv', 'webm', 'mov', 'avi', 'ts', 'm4v', 'wmv', 'flv', 'mpg', 'mpeg'
+$originalDefaults = @{}
+foreach ($extension in $extensions) {
+    $class = "HKCU:\Software\Classes\.$extension"
+    $choice = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.$extension\UserChoice"
+    $originalDefaults[$extension] = @{
+        Class = if (Test-Path $class) { (Get-Item $class).GetValue('') } else { $null }
+        Choice = if (Test-Path $choice) { (Get-Item $choice).GetValue('ProgId') } else { $null }
+    }
+}
 
 if (Test-Path $markerKey) {
     throw 'VPlayer PATH marker already exists; refusing to modify an existing installation.'
@@ -54,12 +64,20 @@ function Assert-Associations([bool]$installed) {
             throw "Incorrect VPlayer.Media open command: $command"
         }
     }
-    foreach ($extension in 'mp4', 'mkv', 'webm', 'mov', 'avi', 'ts', 'm4v', 'wmv', 'flv', 'mpg', 'mpeg') {
+    foreach ($extension in $extensions) {
         $openWith = Join-Path $classes ".$extension\OpenWithProgids"
         $registered = (Test-Path $openWith) -and (
             (Get-Item $openWith).GetValueNames() -contains 'VPlayer.Media'
         )
         if ($registered -ne $installed) { throw "Unexpected Open With registration for .$extension." }
+        $class = Join-Path $classes ".$extension"
+        $choice = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.$extension\UserChoice"
+        $classDefault = if (Test-Path $class) { (Get-Item $class).GetValue('') } else { $null }
+        $userChoice = if (Test-Path $choice) { (Get-Item $choice).GetValue('ProgId') } else { $null }
+        if ($classDefault -cne $originalDefaults[$extension].Class -or
+            $userChoice -cne $originalDefaults[$extension].Choice) {
+            throw "Installer changed the default app for .$extension."
+        }
         $verb = Join-Path $classes "SystemFileAssociations\.$extension\shell\VPlayer.NewWindow"
         if ((Test-Path $verb) -ne $installed) { throw "Unexpected new-window verb for .$extension." }
         if ($installed) {

@@ -730,7 +730,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 8.1.1.2.1 | Task | ProgID `VPlayer.Media`, `OpenWithProgids` for mp4, mkv, webm, mov, avi, ts, m4v, wmv, flv, mpg, mpeg, and `SystemFileAssociations\.<ext>\shell\VPlayer.NewWindow` verb; `ChangesAssociations=yes` | 01:30 | 00:20 | Explorer right-click `.mp4` → "Open with → VPlayer" and "Open in new VPlayer window" both work; default app unchanged | FR-030/043 |
+| 8.1.1.2.1 | Task | [x] ProgID `VPlayer.Media`, `OpenWithProgids` for mp4, mkv, webm, mov, avi, ts, m4v, wmv, flv, mpg, mpeg, and `SystemFileAssociations\.<ext>\shell\VPlayer.NewWindow` verb; `ChangesAssociations=yes` | 01:30 | 00:20 | Explorer right-click `.mp4` → "Open with → VPlayer" and "Open in new VPlayer window" both work; default app unchanged | FR-030/043; local 0.26.0 installer smoke verifies all 11 ProgID/open/new-window commands, defaults unchanged across fresh/upgrade/uninstall, and clean removal. Actual Explorer right-click UAT remains in M-008.1 |
 
 ##### User Story 8.1.1.3 (US-050): A clean uninstall
 - **Est. Manual**: 01:30 | **Est. AI**: 00:15
