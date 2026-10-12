@@ -1,0 +1,40 @@
+name: Windows package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install FFmpeg
+        run: choco install ffmpeg --yes --no-progress
+      - run: python -m pip install -e ".[dev,package]"
+      - run: python scripts/fetch_libmpv.py
+      - run: python scripts/make_test_media.py
+      - name: Build portable ZIP and installer
+        run: python scripts/package.py
+      - name: Test packaged codec matrix and installer size
+        shell: pwsh
+        run: |
+          $env:VPLAYER_BIN = Join-Path $PWD 'dist\vplayer\vplayer.exe'
+          python -m pytest -q tests\test_codecs.py -k test_packaged_build_decodes_codec
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installer = Get-Item dist\VPlayer-*-windows-x64-setup.exe
+          if ($installer.Length -ge 120MB) { throw "Installer is $($installer.Length) bytes; limit is 120 MiB" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-packages
+          path: |
+            dist/VPlayer-*-windows-x64-portable.zip
+            dist/VPlayer-*-windows-x64-setup.exe
+          if-no-files-found: error

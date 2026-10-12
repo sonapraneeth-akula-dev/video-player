@@ -111,6 +111,9 @@ is **not** bundled into the wheel. `build\` and `dist\` are ignored by Git.
 `scripts/package.py` builds a self-contained PyInstaller one-folder bundle
 (app, Python, Qt and libmpv) and then both package kinds **for the OS it runs
 on**. PyInstaller cannot cross-compile, so run it once per OS.
+The manually triggered **Windows package** GitHub Actions workflow builds
+both Windows artifacts, checks the installer size, runs the packaged
+codec/container matrix, and uploads the results.
 
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
