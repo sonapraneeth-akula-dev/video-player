@@ -1,6 +1,6 @@
 # Development setup and build
 
-VPlayer `0.32.1` can be run from source or built as a portable Windows bundle;
+VPlayer `0.32.2` can be run from source or built as a portable Windows bundle;
 the Windows installer passes hosted install/upgrade/uninstall smoke tests,
 but full release/UAT and the Linux AppImage are not yet verified. Run commands from the
 repository root. The supported development target is Windows 10/11 x64 or

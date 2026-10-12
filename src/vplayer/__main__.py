@@ -12,23 +12,34 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import shiboken6
-from PySide6.QtCore import QObject, QStandardPaths, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, QStandardPaths, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtWidgets import QApplication
 
 from vplayer import APP_NAME, __version__
 
 
 class _ErrorReporter(QObject):
-    message = Signal(str)
+    message = Signal(str, object)
 
     def __init__(self, windows):
         super().__init__()
         self.windows = windows
         self.message.connect(self._show, Qt.ConnectionType.QueuedConnection)
 
-    @Slot(str)
-    def _show(self, message):
-        active = QApplication.activeWindow()
+    def report(self, message):
+        active = None
+        if QThread.currentThread() == self.thread():
+            active = QApplication.activeWindow()
+            if active is None:
+                active = next(
+                    (window for window in reversed(self.windows) if shiboken6.isValid(window) and window.isVisible()),
+                    None,
+                )
+        self.message.emit(message, active)
+
+    @Slot(str, object)
+    def _show(self, message, origin):
+        active = origin if origin is not None and shiboken6.isValid(origin) else QApplication.activeWindow()
         visible = [window for window in self.windows if shiboken6.isValid(window) and window.isVisible()]
         target = next(
             (window for window in visible if active is window or (active and window.isAncestorOf(active))),
@@ -46,7 +57,7 @@ def _install_exception_handlers(windows):
 
     def report(exc_type, error, traceback):
         log.error("Unhandled application exception", exc_info=(exc_type, error, traceback))
-        reporter.message.emit(f"Unexpected error: {exc_type.__name__}: {error}")
+        reporter.report(f"Unexpected error: {exc_type.__name__}: {error}")
 
     sys.excepthook = report
     threading.excepthook = lambda args: report(args.exc_type, args.exc_value, args.exc_traceback)

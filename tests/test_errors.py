@@ -4,7 +4,7 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from vplayer import __main__ as entry
 from vplayer.settings import Settings
@@ -73,10 +73,14 @@ def test_uncaught_error_targets_active_window(qtbot, tmp_path: Path):
     qtbot.waitUntil(windows[0].isActiveWindow)
     restore = entry._install_exception_handlers(windows)
     try:
+        active = QApplication.activeWindow()
         sys.excepthook(ValueError, ValueError("active window failed"), None)
-        qtbot.waitUntil(lambda: "active window failed" in windows[0].banner.text())
-        assert windows[0].banner.isVisible()
-        assert not windows[1].banner.isVisible()
+        if active is windows[0]:
+            windows[1].activateWindow()
+        qtbot.waitUntil(lambda: any("active window failed" in window.banner.text() for window in windows))
+        target = active if active in windows else windows[-1]
+        assert target.banner.isVisible()
+        assert not next(window for window in windows if window is not target).banner.isVisible()
     finally:
         restore()
         for window in windows:
