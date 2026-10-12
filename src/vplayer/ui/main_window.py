@@ -6,7 +6,7 @@ from pathlib import Path
 import mpv
 import shiboken6
 from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtGui import QAction, QDesktopServices, QPainter, QPen
 from PySide6.QtWidgets import (
     QFileDialog,
     QFocusFrame,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSlider,
     QStyle,
+    QStyleOptionSlider,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -36,6 +37,40 @@ class SeekBar(QSlider):
         self.setRange(0, 1_000_000)
         self.setEnabled(False)
         self.setAccessibleName("Seek")
+        self.loop_a = None
+        self.loop_b = None
+        self.loop_duration = 0.0
+
+    def set_loop_points(self, a, b, duration):
+        self.loop_a = a if isinstance(a, (float, int)) and not isinstance(a, bool) and math.isfinite(a) else None
+        self.loop_b = b if isinstance(b, (float, int)) and not isinstance(b, bool) and math.isfinite(b) else None
+        self.loop_duration = duration if isinstance(duration, (float, int)) and math.isfinite(duration) and duration > 0 else 0
+        marks = [f"{label}: {point:.3f}s" for label, point in (("A", self.loop_a), ("B", self.loop_b)) if point is not None]
+        self.setAccessibleDescription(", ".join(marks))
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self.loop_duration:
+            return
+        option = QStyleOptionSlider()
+        self.initStyleOption(option)
+        groove = self.style().subControlRect(
+            QStyle.ComplexControl.CC_Slider, option, QStyle.SubControl.SC_SliderGroove, self,
+        )
+        handle = self.style().subControlRect(
+            QStyle.ComplexControl.CC_Slider, option, QStyle.SubControl.SC_SliderHandle, self,
+        )
+        span = max(0, groove.width() - handle.width())
+        painter = QPainter(self)
+        painter.setPen(QPen(self.palette().highlight().color(), 2))
+        for point in (self.loop_a, self.loop_b):
+            if point is not None:
+                value = round(max(0, min(point / self.loop_duration, 1)) * self.maximum())
+                x = groove.x() + handle.width() // 2 + QStyle.sliderPositionFromValue(
+                    self.minimum(), self.maximum(), value, span, option.upsideDown,
+                )
+                painter.drawLine(x, 0, x, self.height())
 
     def _move_to(self, x):
         self.setValue(QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), round(x), self.width()))
@@ -250,9 +285,20 @@ class MainWindow(QMainWindow):
         self._duration = 0.0
         self._position = 0.0
         self.player.duration.connect(self._duration_changed)
+        self.player.loop_points_changed.connect(self._update_loop_markers)
         self.player.position.connect(self._position_changed)
         self.player.vfr_detected.connect(self._update_time)
         self.seek_bar.seek_requested.connect(self._seek_from_bar)
+        for name, label, shortcut, callback in (
+            ("ab_set_a", "Set loop start (A)", "Ctrl+Alt+1", lambda: self.player.set_ab_point("a")),
+            ("ab_set_b", "Set loop end (B)", "Ctrl+Alt+2", lambda: self.player.set_ab_point("b")),
+            ("ab_clear", "Clear A-B loop", "Ctrl+Alt+0", self.player.clear_ab_loop),
+        ):
+            action = QAction(label, self)
+            action.setObjectName(name)
+            action.setShortcut(shortcut)
+            action.triggered.connect(callback)
+            self.playback_menu.addAction(action)
 
     @staticmethod
     def _clock(seconds: float) -> str:
@@ -274,6 +320,10 @@ class MainWindow(QMainWindow):
         self._duration = duration or 0.0
         self.seek_bar.setEnabled(self._duration > 0)
         self._update_time()
+        self._update_loop_markers()
+
+    def _update_loop_markers(self, *_args):
+        self.seek_bar.set_loop_points(self.player.mpv.ab_loop_a, self.player.mpv.ab_loop_b, self._duration)
 
     def _position_changed(self, position):
         self._position = position or 0.0

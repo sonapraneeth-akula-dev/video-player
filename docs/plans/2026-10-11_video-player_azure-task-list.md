@@ -1024,7 +1024,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 15.1.1.1.1 | Task | `ab_set_a` / `ab_set_b` / `ab_clear` actions (new IDs, design §6 to be extended) → mpv `ab-loop-a` / `ab-loop-b`; markers on the seek bar | 01:30 | 00:20 | Test: playback loops A→B; clear stops looping | FR-033; post-v1 |
+| 15.1.1.1.1 | Task | [x] `ab_set_a` / `ab_set_b` / `ab_clear` actions (new IDs, design §6 to be extended) → mpv `ab-loop-a` / `ab-loop-b`; markers on the seek bar | 01:30 | 00:20 | Test: playback loops A→B; clear stops looping | FR-033; native loop, painted markers, clear, shortcut and new-file reset covered in `tests/test_ab_loop.py`; v0.30.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: playback loops between A and B; clear stops looping (US-066)

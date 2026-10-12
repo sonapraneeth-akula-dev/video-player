@@ -94,8 +94,8 @@ graph TD
   played (`end-file` with error, missing file, unsupported format) shows a non-blocking banner in
   its tab with the reason; the tab stays open and the app keeps running.
 
-**Not in v1** (per discovery): FR-032 resume position, FR-033 A-B loop (Could), FR-034 other
-protocols (Won't). Nothing in this design blocks adding them later.
+**Initially deferred from v1** (per discovery): FR-032 resume position and FR-034 other
+protocols (Won't). FR-033 A-B loop (Could) was implemented early in v0.30.0.
 
 **mpv configuration** (applied to every `Player`; fixed, not user-editable unless noted):
 
@@ -564,6 +564,7 @@ Signals: `position(float, int frame)`, `duration`, `paused`, `speed`, `fps`, `ca
 | `copy_position` | Ctrl+Shift+C | `toggle_debug_overlay` | Shift+I |
 | `compare_switch_side` | Ctrl+; | `move_tab_new_window` | Ctrl+Shift+N |
 | `open_file_new_window` | Ctrl+Alt+O | | |
+| `ab_set_a` / `ab_set_b` / `ab_clear` | Ctrl+Alt+1 / Ctrl+Alt+2 / Ctrl+Alt+0 | | |
 
 **Tabs and files**: a window with no file open has 0 tabs and shows an "Open file / Connect to
 server" placeholder; no empty tab is ever created. `open_file` (Ctrl+O) opens a local file

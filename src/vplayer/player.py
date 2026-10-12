@@ -57,6 +57,7 @@ class Player(QObject):
     duration = Signal(object)
     paused = Signal(object)
     speed_changed = Signal(object)
+    loop_points_changed = Signal(object, object)
     hwdec_current = Signal(object)
     vfr_detected = Signal()
     skip_status = Signal(str)
@@ -370,6 +371,7 @@ class Player(QObject):
             self.variable_frame_rate = False
             self._vfr_checked = False
             self._pending_skip = None
+            self.clear_ab_loop()
             self._loadfile()
             return
         file = Path(path)
@@ -384,12 +386,29 @@ class Player(QObject):
         self.variable_frame_rate = False
         self._vfr_checked = False
         self._pending_skip = None
+        self.clear_ab_loop()
         self._loadfile()
 
     def _loadfile(self) -> None:
         # libmpv retries forever on the core thread if hwdec and software both fail to open a stream.
         # Null outputs keep the probe off the GUI render thread.
         self.mpv.loadfile(self._uri, hwdec="no", ao="null", vo="null", force_media_title=PROBE_TITLE)
+
+    def set_ab_point(self, point: str) -> None:
+        if point not in ("a", "b"):
+            raise ValueError("Loop point must be A or B")
+        position = self.mpv.time_pos
+        duration = self.mpv.duration
+        if duration is None or not math.isfinite(duration) or position is None or not math.isfinite(position):
+            self.error.emit("Cannot set a loop point before a file is playing")
+            return
+        setattr(self.mpv, f"ab_loop_{point}", position)
+        self.loop_points_changed.emit(self.mpv.ab_loop_a, self.mpv.ab_loop_b)
+
+    def clear_ab_loop(self) -> None:
+        self.mpv.ab_loop_a = "no"
+        self.mpv.ab_loop_b = "no"
+        self.loop_points_changed.emit(self.mpv.ab_loop_a, self.mpv.ab_loop_b)
 
     def play_pause(self) -> None:
         self._stop_skip()

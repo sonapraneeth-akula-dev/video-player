@@ -44,6 +44,9 @@ Audio pitch stays corrected at non-1× speed by default; uncheck
 correction off. The choice persists across launches.
 Choose an audio or embedded subtitle track from the **Audio** or
 **Subtitles** menu; **A** and **J** cycle through their tracks and Off.
+Set an A-B repeat segment from **Playback > Set loop start/end** at the current
+position (**Ctrl+Alt+1/2**); **Ctrl+Alt+0** clears the loop. The seek bar marks
+both points, and opening another file clears them.
 Press **.** to pause and advance one video frame.
 Press **S** to save a native-resolution PNG named for the source, timestamp and
 frame (when known); **Ctrl+Shift+S** opens Save As for PNG or JPEG. Snapshot
