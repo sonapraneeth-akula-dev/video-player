@@ -16,8 +16,9 @@ $originalPathKind = if ($null -ne $originalUserPath) { $registry.GetValueKind('P
 if (Test-Path $markerKey) {
     throw 'VPlayer PATH marker already exists; refusing to modify an existing installation.'
 }
-if (Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' |
-    Get-ItemProperty | Where-Object DisplayName -eq 'VPlayer') {
+$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+if ((Test-Path $uninstallKey) -and
+    (Get-ChildItem $uninstallKey | Get-ItemProperty | Where-Object DisplayName -eq 'VPlayer')) {
     throw 'VPlayer is already installed; refusing to replace it.'
 }
 
