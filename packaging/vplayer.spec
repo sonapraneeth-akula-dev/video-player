@@ -19,9 +19,16 @@ a = Analysis(
     [str(root / "src" / "vplayer" / "__main__.py")],
     pathex=[str(root / "src")],
     binaries=[(libmpv, ".")],
+    excludes=[
+        "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets",
+        "PySide6.Qt3DCore", "PySide6.QtQuick",
+    ],
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="vplayer", console=False)
+exe = EXE(
+    pyz, a.scripts, [], exclude_binaries=True, name="vplayer", console=False,
+    icon=str(root / "packaging" / "windows" / "vplayer.ico") if sys.platform == "win32" else None,
+)
 coll = COLLECT(exe, a.binaries, a.datas, name="vplayer")
 if sys.platform == "darwin":
     app = BUNDLE(coll, name="VPlayer.app", bundle_identifier="local.vplayer")

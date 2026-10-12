@@ -1,7 +1,7 @@
 # Development setup and build
 
-VPlayer `0.25.0` is a source-installed desktop application, not yet a
-distributable Windows installer or Linux AppImage. Run commands from the
+VPlayer `0.26.0` can be run from source or built as a portable Windows bundle;
+the Windows installer and Linux AppImage are not yet release-verified. Run commands from the
 repository root. The supported development target is Windows 10/11 x64 or
 Ubuntu 22.04 with a desktop display; release testing on both operating systems
 is still in progress.
