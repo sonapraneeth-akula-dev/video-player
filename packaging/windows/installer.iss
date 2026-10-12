@@ -91,7 +91,10 @@ var
   Found: Boolean;
 begin
   if not RegQueryStringValue(HKCU, EnvKey, 'Path', Path) then
+  begin
     Path := '';
+    RegWriteStringValue(HKCU, MarkerKey, 'PathWasAbsent', '1');
+  end;
   StripDir(Path, ExpandConstant('{app}'), Found);
   if Found then
     Exit;
@@ -104,7 +107,7 @@ end;
 { Removes only the entry this installer added; a pre-existing entry is left alone. }
 procedure RemoveFromPath;
 var
-  Path, Marker: String;
+  Path, Marker, WasAbsent: String;
   Found: Boolean;
 begin
   if not RegQueryStringValue(HKCU, MarkerKey, 'PathAdded', Marker) or (Marker <> '1') then
@@ -113,9 +116,14 @@ begin
   begin
     Path := StripDir(Path, ExpandConstant('{app}'), Found);
     if Found then
-      RegWriteExpandStringValue(HKCU, EnvKey, 'Path', Path);
+      if (Path = '') and RegQueryStringValue(HKCU, MarkerKey, 'PathWasAbsent', WasAbsent)
+         and (WasAbsent = '1') then
+        RegDeleteValue(HKCU, EnvKey, 'Path')
+      else
+        RegWriteExpandStringValue(HKCU, EnvKey, 'Path', Path);
   end;
   RegDeleteValue(HKCU, MarkerKey, 'PathAdded');
+  RegDeleteValue(HKCU, MarkerKey, 'PathWasAbsent');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
