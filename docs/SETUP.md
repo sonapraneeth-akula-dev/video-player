@@ -114,7 +114,8 @@ is **not** bundled into the wheel. `build\` and `dist\` are ignored by Git.
 on**. PyInstaller cannot cross-compile, so run it once per OS.
 The manually triggered **Windows package** GitHub Actions workflow builds
 both Windows artifacts, checks the installer size, runs the packaged
-codec/container matrix, and uploads the results.
+codec/container matrix, smoke-tests fresh installs with PATH on/off and
+uninstall, and uploads the results.
 
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
@@ -126,9 +127,12 @@ codec/container matrix, and uploads the results.
 .\.venv\Scripts\python.exe -m pip install -e ".[package]"
 .\.venv\Scripts\python.exe scripts\package.py
 $env:VPLAYER_BIN = "$PWD\dist\vplayer\vplayer.exe"; .\.venv\Scripts\python.exe -m pytest tests\test_codecs.py -k packaged
+.\scripts\smoke_windows_installer.ps1 -InstallerPath (Get-Item dist\VPlayer-*-windows-x64-setup.exe).FullName
 ```
 
 Set `VPLAYER_LIBMPV` to override which libmpv file the bundle includes.
+The installer smoke test changes the current user's PATH temporarily and refuses
+to run if VPlayer is already installed.
 Packages are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first
 launch. Settings and logs stay in the user profile, also for the portable build.
 Only the Windows packages have been built and tested so far (installer
