@@ -40,6 +40,9 @@ the current speed appears in the status bar.
 Use **]** / **[** to adjust speed by the configured step (default 0.05×), or
 **Backspace** to return to 1×.
 Press **.** to pause and advance one video frame.
+Press **S** to save a native-resolution PNG named for the source, timestamp and
+frame (when known); **Ctrl+Shift+S** opens Save As for PNG or JPEG. Snapshot
+names are limited to 120 characters; repeated captures receive `_2`, `_3`, etc.
 
 Generate the frame-indexed and codec/container media fixtures with
 `python scripts/make_test_media.py` (requires FFmpeg and ffprobe), then

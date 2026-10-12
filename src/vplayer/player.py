@@ -22,6 +22,35 @@ OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "speed", "hwdec-current"
 PROBE_TITLE = "vplayer-software-probe"
 
 
+def snapshot_name(source: str, time_s: float, fps: float | None = None, collision: int = 1) -> str:
+    if not isinstance(source, str) or not source:
+        raise ValueError("Snapshot source must be a nonempty path")
+    if isinstance(time_s, bool) or not isinstance(time_s, (int, float)) or not math.isfinite(time_s):
+        raise ValueError("Snapshot time must be finite")
+    if fps is not None and (
+        isinstance(fps, bool) or not isinstance(fps, (int, float)) or not math.isfinite(fps) or fps <= 0
+    ):
+        raise ValueError("Snapshot frame rate must be positive and finite")
+    if isinstance(collision, bool) or not isinstance(collision, int) or collision < 1:
+        raise ValueError("Snapshot collision index must be positive")
+
+    millis_total = max(0, round(time_s * 1000))
+    seconds, millis = divmod(millis_total, 1000)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, second = divmod(remainder, 60)
+    stem = Path(source.replace("\\", "/").rsplit("/", 1)[-1]).stem
+    safe_stem = re.sub(r"[^\w.-]", "_", stem).strip(".") or "snapshot"
+    suffix = f"_{hours:02}-{minutes:02}-{second:02}.{millis:03}"
+    if fps is not None:
+        suffix += f"_f{round(millis_total / 1000 * fps)}"
+    if collision > 1:
+        suffix += f"_{collision}"
+    suffix += ".png"
+    if len(suffix) >= 120:
+        raise ValueError("Snapshot metadata exceeds the filename limit")
+    return f"{safe_stem[:120 - len(suffix)].rstrip('.') or 'snapshot'}{suffix}"
+
+
 class Player(QObject):
     file_loaded = Signal()
     position = Signal(object)
@@ -453,17 +482,8 @@ class Player(QObject):
         self._stop_skip()
         if path is None:
             self.snapshot_dir.mkdir(parents=True, exist_ok=True)
-            position = max(0, round((self.mpv.time_pos or 0) * 1000))
-            seconds, millis = divmod(position, 1000)
-            hours, remainder = divmod(seconds, 3600)
-            minutes, second = divmod(remainder, 60)
-            stem = re.sub(r"[^\w.-]", "_", Path(self._uri).stem)
-            name = f"{stem}_{hours:02}-{minutes:02}-{second:02}.{millis:03}"
-            fps = self.frame_rate()
-            if fps is not None:
-                name += f"_f{round(position / 1000 * fps)}"
             candidates = (
-                self.snapshot_dir / f"{name}{'' if index == 1 else f'_{index}'}.png"
+                self.snapshot_dir / snapshot_name(self._uri, self.mpv.time_pos or 0, self.frame_rate(), index)
                 for index in itertools.count(1)
             )
         else:

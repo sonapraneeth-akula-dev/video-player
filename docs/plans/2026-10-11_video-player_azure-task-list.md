@@ -835,7 +835,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 10.1.1.1.1 | Task | `snapshot_name()` — `<stem>_<HH-MM-SS.mmm>_f<frame>.png`, `_f` omitted when fps unknown; sanitize (no separators/control chars, ≤ 120 chars); SFTP uses the remote basename | 01:00 | 00:15 | Unit: naming table incl. unknown fps, unsafe/long names, `_2` collision | FR-020 |
+| 10.1.1.1.1 | Task | [x] `snapshot_name()` — `<stem>_<HH-MM-SS.mmm>_f<frame>.png`, `_f` omitted when fps unknown; sanitize (no separators/control chars, ≤ 120 chars); SFTP uses the remote basename | 01:00 | 00:15 | Unit: naming table incl. unknown fps, unsafe/long names, `_2` collision | FR-020; local and SFTP source names, timestamp/frame, unsafe characters, long names, collisions, and snapshot integration tested; v0.27.0 |
 
 #### Feature 10.1.2 (FEAT-010.1.2): Copy position
 - **Est. Manual**: 00:45 | **Est. AI**: 00:10

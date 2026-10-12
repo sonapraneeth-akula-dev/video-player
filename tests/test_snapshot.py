@@ -4,11 +4,35 @@ import pytest
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QImage
 
-from vplayer.player import Player
+from vplayer.player import Player, snapshot_name
 from vplayer.settings import Settings
 from vplayer.ui.main_window import MainWindow
 
 MEDIA = Path(__file__).parent / "media" / "h264_25.mp4"
+
+
+@pytest.mark.parametrize(
+    ("source", "position", "fps", "collision", "expected"),
+    (
+        ("scene.mp4", 1.234, 25, 1, "scene_00-00-01.234_f31.png"),
+        ("/media/scene.mp4", 3723.125, None, 1, "scene_01-02-03.125.png"),
+        ("vpsftp://token/my clip.mkv", 2, 24, 2, "my_clip_00-00-02.000_f48_2.png"),
+        (r"C:\videos\unsafe\x<y>.mp4", 0, None, 1, "x_y__00-00-00.000.png"),
+        ("...\x00\x1f.mp4", -2, None, 1, "___00-00-00.000.png"),
+    ),
+)
+def test_snapshot_name_source_time_sanitization_and_collision(source, position, fps, collision, expected):
+    assert snapshot_name(source, position, fps, collision) == expected
+
+
+def test_snapshot_name_limits_long_sources_and_rejects_invalid_metadata():
+    for collision in (1, 2):
+        name = snapshot_name("vpsftp://token/" + "a" * 200 + ".mp4", 1.5, 30, collision)
+        assert len(name) == 120
+        assert name.endswith(f"_00-00-01.500_f45{'' if collision == 1 else '_2'}.png")
+    for arguments in (("", 0), ("scene.mp4", float("nan")), ("scene.mp4", 1, 0), ("scene.mp4", 1, 25, 0)):
+        with pytest.raises(ValueError):
+            snapshot_name(*arguments)
 
 
 def test_snapshot_saves_native_video_without_overlay_and_never_overwrites(qtbot, tmp_path, monkeypatch):
