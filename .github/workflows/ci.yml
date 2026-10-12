@@ -10,6 +10,7 @@ permissions:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
@@ -36,6 +37,7 @@ jobs:
         run: python scripts/fetch_libmpv.py
       - run: ruff check src scripts tests
       - run: python scripts/make_test_media.py
+      - run: python scripts/make_test_media.py --corrupt
       - name: Test on Windows
         if: runner.os == 'Windows'
         run: python -m pytest -q --cov=src/vplayer --cov=scripts --cov-report=term-missing --cov-fail-under=80

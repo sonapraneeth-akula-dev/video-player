@@ -28,8 +28,14 @@ def sftp_server(tmp_path_factory):
             raise RuntimeError(f"docker {arguments[0]} failed: {result.stderr.strip()}")
         return result.stdout.strip()
 
-    if subprocess.run(["docker", "info"], capture_output=True, check=False).returncode:
+    info = subprocess.run(
+        ["docker", "info", "--format", "{{.OSType}}"],
+        capture_output=True, text=True, check=False,
+    )
+    if info.returncode:
         pytest.skip("The Docker daemon is unavailable")
+    if info.stdout.strip() != "linux":
+        pytest.skip("A Linux-container Docker daemon is required for SFTP integration tests")
     keys = tmp_path_factory.mktemp("sshd-keys")
     password = secrets.token_urlsafe(24)
     (keys / "password").write_text(password, encoding="utf-8")

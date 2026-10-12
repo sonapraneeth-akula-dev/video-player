@@ -83,8 +83,9 @@ docker info
 ```
 
 The SFTP fixture builds and later removes a disposable OpenSSH container.
-If Docker is missing or its daemon is unavailable, pytest **skips** those
-tests; check `docker info` first when SFTP coverage matters. The performance
+If Docker is missing, its daemon is unavailable, or it is running Windows
+containers, pytest **skips** those tests; check `docker info --format '{{.OSType}}'`
+for `linux` when SFTP coverage matters. The performance
 test prints first-frame and completed-seek timings under 50 ms / 50 Mbit
 network shaping. Pytest disables its fault-handler plugin by project config;
 do not mistake a printed test summary followed by a native nonzero process

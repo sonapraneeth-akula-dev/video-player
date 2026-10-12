@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import conftest
 import paramiko
 import pytest
 
@@ -25,6 +26,16 @@ class FakeRemoteFile:
 
     def close(self):
         self.closes += 1
+
+
+def test_sftp_fixture_skips_windows_container_docker(tmp_path_factory, monkeypatch):
+    monkeypatch.setattr(conftest.shutil, "which", lambda _: "docker")
+    monkeypatch.setattr(
+        conftest.subprocess, "run",
+        lambda *_, **__: SimpleNamespace(returncode=0, stdout="windows\n"),
+    )
+    with pytest.raises(pytest.skip.Exception, match="Linux-container"):
+        next(conftest.sftp_server.__wrapped__(tmp_path_factory))
 
 
 def test_block_cache_boundary_seek_and_eof():
