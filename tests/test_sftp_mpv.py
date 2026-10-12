@@ -9,6 +9,7 @@ from test_sftp_stream import FakeRemoteFile
 
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
+from vplayer.sftp import SftpStream
 
 
 def test_native_stream_callbacks_copy_seek_cancel_and_close(qtbot, monkeypatch):
@@ -34,13 +35,57 @@ def test_native_stream_callbacks_copy_seek_cancel_and_close(qtbot, monkeypatch):
         assert player._sftp_read(cookie, buffer, 4) == 0
         with qtbot.waitSignal(player.error):
             assert player._sftp_seek(cookie, -1) == mpv.ErrorCode.GENERIC
+        errors = []
+        player.error.connect(errors.append)
         player._sftp_cancel(cookie)
-        with qtbot.waitSignal(player.error):
-            assert player._sftp_read(cookie, buffer, 1) == -1
+        assert player._sftp_read(cookie, buffer, 1) == -1
+        assert player._sftp_seek(cookie, 0) == mpv.ErrorCode.GENERIC
+        qtbot.wait(50)
+        assert not errors
         player._sftp_close(cookie)
         assert remote.closes == 1
         client.close.assert_called_once_with()
         assert not player._sftp_streams
+    finally:
+        player.close()
+
+
+def test_cancelled_read_does_not_report_expected_channel_close(qtbot):
+    player = Player(video_output="null")
+    remote = FakeRemoteFile(b"abc")
+    client = Mock()
+    stream = SftpStream(remote)
+    cookie = id(stream)
+    player._sftp_streams[cookie] = (stream, client)
+    errors = []
+    player.error.connect(errors.append)
+
+    def failed_read(*_args, **_kwargs):
+        raise OSError("link disconnected")
+
+    def interrupted_close():
+        remote.closes += 1
+        raise paramiko.SFTPError("Garbage packet received")
+
+    def interrupted_read(*_args, **_kwargs):
+        player._sftp_cancel(cookie)
+        raise ValueError("File is closed")
+
+    try:
+        remote.readv = failed_read
+        with qtbot.waitSignal(player.error) as signal:
+            assert player._sftp_read(cookie, ctypes.create_string_buffer(4), 4) == -1
+        assert "link disconnected" in signal.args[0]
+        errors.clear()
+
+        remote.close = interrupted_close
+        remote.readv = interrupted_read
+        assert player._sftp_read(cookie, ctypes.create_string_buffer(4), 4) == -1
+        qtbot.wait(50)
+        assert stream.cancelled
+        assert not errors
+        player._sftp_close(cookie)
+        client.close.assert_called_once_with()
     finally:
         player.close()
 

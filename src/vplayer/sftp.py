@@ -324,6 +324,10 @@ class SftpStream:
     def size(self) -> int:
         return self._size
 
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
+
     def read(self, count: int) -> bytes:
         if self._cancelled:
             raise OSError("SFTP stream cancelled")
@@ -340,9 +344,14 @@ class SftpStream:
                 (offset + start, min(self.CHUNK_SIZE, length - start))
                 for start in range(0, length, self.CHUNK_SIZE)
             ]
-            block = b"".join(
-                self.remote_file.readv(chunks, max_concurrent_prefetch_requests=64)
-            )
+            try:
+                block = b"".join(
+                    self.remote_file.readv(chunks, max_concurrent_prefetch_requests=64)
+                )
+            except Exception as error:
+                if self._cancelled:
+                    raise OSError("SFTP stream cancelled") from error
+                raise
             if self._cancelled:
                 raise OSError("SFTP stream cancelled")
             if self._closed:

@@ -205,19 +205,29 @@ class Player(QObject):
             return mpv.ErrorCode.LOADING_FAILED
 
     def _sftp_read(self, cookie, buffer, count) -> int:
+        stream = None
         try:
-            data = self._sftp_streams[cookie][0].read(count)
+            stream = self._sftp_streams[cookie][0]
+            data = stream.read(count)
             ctypes.memmove(buffer, data, len(data))
             return len(data)
         except Exception as error:
+            if stream is not None and stream.cancelled:
+                log.debug("Interrupted cancelled SFTP read: %s", error)
+                return -1
             log.exception("Could not read SFTP stream")
             self._update.emit("error", f"Could not read remote file: {error}")
             return -1
 
     def _sftp_seek(self, cookie, offset) -> int:
+        stream = None
         try:
-            return self._sftp_streams[cookie][0].seek(offset)
+            stream = self._sftp_streams[cookie][0]
+            return stream.seek(offset)
         except Exception as error:
+            if stream is not None and stream.cancelled:
+                log.debug("Interrupted cancelled SFTP seek: %s", error)
+                return mpv.ErrorCode.GENERIC
             log.exception("Could not seek SFTP stream")
             self._update.emit("error", f"Could not seek remote file: {error}")
             return mpv.ErrorCode.GENERIC
@@ -242,9 +252,14 @@ class Player(QObject):
             self._update.emit("error", f"Could not close remote file: {error}")
 
     def _sftp_cancel(self, cookie) -> None:
+        stream = None
         try:
-            self._sftp_streams[cookie][0].cancel()
+            stream = self._sftp_streams[cookie][0]
+            stream.cancel()
         except Exception as error:
+            if stream is not None and stream.cancelled:
+                log.warning("SFTP close interrupted during cancellation: %s", error)
+                return
             log.exception("Could not cancel SFTP stream")
             self._update.emit("error", f"Could not cancel remote file: {error}")
 
