@@ -47,8 +47,10 @@ names are limited to 120 characters; repeated captures receive `_2`, `_3`, etc.
 Generate the frame-indexed and codec/container media fixtures with
 `python scripts/make_test_media.py` (requires FFmpeg and ffprobe), then
 `python scripts/make_test_media.py --corrupt` for the deterministic 50-file
-damaged-media corpus. The corrupt option uses the previously generated codec
-fixtures as inputs. Run `python -m pytest -q`. Pytest's fault handler is disabled in this project:
+damaged-media corpus. The main generator also writes `tracks_multi.mkv` with
+two audio and two subtitle tracks, plus `tracks_external.srt`. The corrupt
+option uses the previously generated codec fixtures as inputs. Run
+`python -m pytest -q`. Pytest's fault handler is disabled in this project:
 the pinned Windows libmpv emits LuaJIT exceptions that can crash the test
 process when the handler is installed.
 For the SSH integration fixtures, start a local Docker Linux daemon and run

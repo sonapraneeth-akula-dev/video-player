@@ -11,6 +11,7 @@ from scripts.make_test_media import (
     SIZE,
     generate,
     generate_corrupt,
+    generate_multitrack,
     passthrough_sync,
 )
 
@@ -105,3 +106,16 @@ def test_corrupt_corpus_is_seeded_and_covers_three_mutations(tmp_path):
     assert {path.name: path.read_bytes() for path in files} == first_run
     generate_corrupt(tmp_path, seed=1)
     assert any(path.read_bytes() != first_run[path.name] for path in files)
+
+
+def test_multitrack_fixture_has_two_audio_and_subtitle_tracks(tmp_path):
+    target = generate_multitrack(tmp_path)
+    tracks = json.loads(subprocess.check_output([
+        "ffprobe", "-v", "error", "-show_entries", "stream=codec_type:stream_tags=language",
+        "-of", "json", str(target),
+    ], text=True))["streams"]
+    assert [(track["codec_type"], track.get("tags", {}).get("language")) for track in tracks] == [
+        ("video", None), ("audio", "eng"), ("audio", "fra"),
+        ("subtitle", "eng"), ("subtitle", "fra"),
+    ]
+    assert "External subtitle" in (tmp_path / "tracks_external.srt").read_text(encoding="utf-8")

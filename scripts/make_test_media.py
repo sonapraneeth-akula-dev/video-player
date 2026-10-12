@@ -3,6 +3,7 @@
 import argparse
 import random
 import subprocess
+import tempfile
 from pathlib import Path
 
 MEDIA = Path(__file__).resolve().parents[1] / "tests" / "media"
@@ -72,6 +73,7 @@ def generate(directory: Path = MEDIA) -> None:
         )
 
     generate_vfr(directory)
+    generate_multitrack(directory)
 
     for codec, containers in VIDEO_CONTAINERS.items():
         for ext in containers:
@@ -119,6 +121,38 @@ def generate_vfr(directory: Path = MEDIA) -> Path:
         ],
         check=True,
     )
+    return target
+
+
+def generate_multitrack(directory: Path = MEDIA) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    external = directory / "tracks_external.srt"
+    external.write_text(
+        "1\n00:00:00,300 --> 00:00:02,200\nExternal subtitle\n",
+        encoding="utf-8",
+    )
+    target = directory / "tracks_multi.mkv"
+    with tempfile.TemporaryDirectory() as temporary:
+        alternate = Path(temporary) / "alternate.srt"
+        alternate.write_text(
+            "1\n00:00:00,500 --> 00:00:02,400\nAlternate subtitle\n",
+            encoding="utf-8",
+        )
+        subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "testsrc2=s=256x144:r=25:d=3",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:d=3",
+                "-f", "lavfi", "-i", "sine=frequency=660:sample_rate=48000:d=3",
+                "-i", str(external), "-i", str(alternate),
+                "-map", "0:v", "-map", "1:a", "-map", "2:a", "-map", "3:s", "-map", "4:s",
+                "-metadata:s:a:0", "language=eng", "-metadata:s:a:1", "language=fra",
+                "-metadata:s:s:0", "language=eng", "-metadata:s:s:1", "language=fra",
+                "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-c:s", "srt", "-shortest", str(target),
+            ],
+            check=True,
+        )
     return target
 
 
