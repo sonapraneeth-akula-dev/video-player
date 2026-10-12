@@ -66,6 +66,8 @@ def test_volume_mute_and_fullscreen_shortcuts(qtbot, tmp_path):
         with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
             window.open_file(MEDIA)
         window.player.mpv.volume = 40
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
         QTest.keyClick(window, Qt.Key.Key_Up)
         qtbot.waitUntil(lambda: window.player.mpv.volume == 45)
         QTest.keyClick(window, Qt.Key.Key_Down)
