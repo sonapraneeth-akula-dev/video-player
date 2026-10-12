@@ -11,7 +11,7 @@ is still in progress.
 | Requirement | Windows | Ubuntu 22.04 |
 |---|---|---|
 | Python | Python **3.12.x** with `venv` and `pip`; the project requires `>=3.12,<3.13` | Install Python **3.12.x** and its `venv`/`pip` support separately; Ubuntu's default Python is not the project's interpreter |
-| Video runtime | `scripts\fetch_libmpv.py` downloads and SHA-256-verifies the pinned `libmpv-2.dll` into ignored `vendor\`; requires internet access and `tar` on `PATH` | `sudo apt-get install libmpv1 libxcb-cursor0 libxkbcommon-x11-0`; requires a working desktop/OpenGL display |
+| Video runtime | `scripts\fetch_libmpv.py` downloads and SHA-256-verifies the pinned `libmpv-2.dll` into ignored `vendor\`; requires internet access and `tar` on `PATH` | `sudo apt-get install libmpv1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0`; requires a working desktop/OpenGL display |
 | Test media | `ffmpeg` and `ffprobe` on `PATH`, with H.264, HEVC, VP9, and AV1 encoders | Same; the generator uses `-fps_mode` when available and legacy `-vsync 0` otherwise |
 | SFTP tests | Docker with a running **Linux-container** engine | Docker with a running Linux-container engine; the netem test runs `tc` in the test container via privileged `docker exec` |
 
@@ -21,9 +21,10 @@ because its FFmpeg lacked `-fps_mode`; the generator now uses `-vsync 0` on
 older builds. The next run (`38232464757`) stopped at Windows DLL fetch because
 the runner's temporary directory and workspace were on different drives;
 the fetcher now extracts beside its destination. Ubuntu run `38233993707`
-then identified a missing `libxkbcommon-x11.so.0` before the first Qt test;
-CI now installs the corresponding package. A successful CI run on both
-operating systems remains pending.
+then identified a missing `libxkbcommon-x11.so.0` before the first Qt test.
+The XCB dependency preflight subsequently identified missing
+`libxcb-icccm.so.4` and `libxcb-keysyms.so.1`; CI now installs all three
+packages. A successful CI run on both operating systems remains pending.
 Rendered-frame tests need a real display/OpenGL context: Qt's `offscreen`
 backend has not passed their frame checks.
 
@@ -54,7 +55,7 @@ The following installs the desktop runtime and development dependencies:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y ffmpeg libmpv1 libxcb-cursor0 libxkbcommon-x11-0 xvfb
+sudo apt-get install -y ffmpeg libmpv1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0 xvfb
 python3.12 -m venv .venv
 ./.venv/bin/python -m pip install -e '.[dev]'
 ./.venv/bin/python scripts/make_test_media.py

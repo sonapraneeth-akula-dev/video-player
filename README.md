@@ -15,7 +15,7 @@ On Windows, run `python scripts/fetch_libmpv.py` to download the pinned,
 SHA-256-verified `libmpv-2.dll` into `vendor/`. The script needs Windows'
 built-in `tar`.
 
-On Ubuntu 22.04, run `sudo apt install libmpv1 libxcb-cursor0 libxkbcommon-x11-0` instead.
+On Ubuntu 22.04, run `sudo apt install libmpv1 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0` instead.
 For complete prerequisites, Windows/Ubuntu setup, test commands, build
 artifacts, and known CI limitations, see [Setup and build](docs/SETUP.md).
 For the native crash history and remaining investigation, see
