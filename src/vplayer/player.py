@@ -281,12 +281,15 @@ class Player(QObject):
             self._update.emit("error", f"Could not close remote file: {error}")
 
     def _sftp_cancel(self, cookie) -> None:
-        stream = None
+        entry = self._sftp_streams.get(cookie)
+        if entry is None:
+            log.debug("SFTP cancel after close: %s", cookie)
+            return
+        stream = entry[0]
         try:
-            stream = self._sftp_streams[cookie][0]
             stream.cancel()
         except Exception as error:
-            if stream is not None and stream.cancelled:
+            if stream.cancelled:
                 log.warning("SFTP close interrupted during cancellation: %s", error)
                 return
             log.exception("Could not cancel SFTP stream")

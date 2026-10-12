@@ -46,6 +46,9 @@ def test_native_stream_callbacks_copy_seek_cancel_and_close(qtbot, monkeypatch):
         assert remote.closes == 1
         client.close.assert_called_once_with()
         assert not player._sftp_streams
+        player._sftp_cancel(cookie)
+        qtbot.wait(50)
+        assert not errors
     finally:
         player.close()
 
