@@ -103,6 +103,7 @@ def test_forward_step_is_exact_from_playing_or_paused(qtbot, paused_video, playi
     if playing:
         player.mpv.pause = False
         assert player.mpv.pause is False
+        qtbot.waitUntil(lambda: frame_index(player) >= 2, timeout=10000)
         def record_pause(value):
             if value and not paused_frames:
                 paused_frames.append(frame_index(player))
