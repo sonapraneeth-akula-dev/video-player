@@ -914,7 +914,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 11.1.1.1.1 | Task | [x] Recent files — `recent/items`, max 20 newest first, local paths or `sftp://user@host:port/path`; File → Recent menu | 01:00 | 00:15 | Unit: dedupe, cap 20, no secrets | FR-028; records successfully loaded files, rejects credential-bearing URIs, repairs invalid stored entries without logging secrets, and opens SFTP URIs through host-key-checked authentication. Local and Docker-backed remote menu playback, replacement cleanup, persistence, and cancellation covered in `tests/test_recent.py`; v0.33.0 |
+| 11.1.1.1.1 | Task | [x] Recent files — `recent/items`, max 20 newest first, local paths or `sftp://user@host:port/path`; File → Recent menu | 01:00 | 00:15 | Unit: dedupe, cap 20, no secrets | FR-028; records successfully loaded files, rejects credential-bearing URIs, repairs invalid stored entries without logging secrets, and opens SFTP URIs through host-key-checked authentication. Local and Docker-backed remote menu playback, replacement cleanup, persistence, and cancellation covered in `tests/test_recent.py`; v0.33.0; failed remote opens release their transports in v0.33.1 |
 | 11.1.1.1.2 | Task | [x] Connection profiles — `connections/<uuid>/…` CRUD in `ConnectDialog`; secrets only in keyring (`vplayer`, `<uuid>/<auth>`) | 02:00 | 00:25 | Saving a profile leaves no secret in the INI (grep); reconnect from profile without retyping | NFR-010; CRUD and Docker-backed reconnect covered; main-window dialog entry pending; v0.14.0 |
 
 #### Feature 11.1.2 (FEAT-011.1.2): `~/.ssh/config` aliases

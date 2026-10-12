@@ -142,6 +142,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.speed_label)
         self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
         self.player.file_loaded.connect(self._file_opened)
+        self.player.sftp_open_failed.connect(self._remote_open_failed)
         self.player.skip_status.connect(self.statusBar().showMessage)
         self.snapshot_button = QPushButton("Open folder", self)
         self.snapshot_button.setAccessibleName("Open snapshot folder")
@@ -449,6 +450,18 @@ class MainWindow(QMainWindow):
             except OSError as error:
                 self.show_error(str(error))
             self._pending_recent = None
+
+    def _remote_open_failed(self, failed_uri: str):
+        if (
+            self._active_transport is not None
+            and self._pending_recent is not None
+            and self._pending_recent[0] == failed_uri
+        ):
+            transport = self._active_transport
+            self._active_transport = None
+            self._pending_recent = None
+            transport.close()
+            self._transports.remove(transport)
 
     def _refresh_recent_menu(self):
         self.recent_menu.clear()

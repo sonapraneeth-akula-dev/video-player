@@ -62,6 +62,7 @@ class Player(QObject):
     vfr_detected = Signal()
     skip_status = Signal(str)
     error = Signal(str)
+    sftp_open_failed = Signal(str)
     _update = Signal(str, object)
 
     def __init__(
@@ -216,6 +217,8 @@ class Player(QObject):
             self.hwdec_current.emit(value)
         elif name == "error":
             self.error.emit(value)
+        elif name == "sftp-open-failed":
+            self.sftp_open_failed.emit(value)
 
     def _register_sftp(self) -> None:
         callbacks = (
@@ -254,6 +257,7 @@ class Player(QObject):
                 except Exception:
                     log.exception("Could not close failed SFTP connection")
             log.exception("Could not open SFTP stream")
+            self._update.emit("sftp-open-failed", uri.decode("utf-8", errors="replace"))
             self._update.emit("error", f"Could not open remote file: {error}")
             return mpv.ErrorCode.LOADING_FAILED
 
