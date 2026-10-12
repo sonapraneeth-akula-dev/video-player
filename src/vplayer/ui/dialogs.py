@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
     QInputDialog,
@@ -33,6 +34,22 @@ from vplayer.sftp import (
     parse_sftp_uri,
     resolve_alias,
 )
+
+
+class PreferencesDialog(QDialog):
+    def __init__(self, pitch_correction: bool, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Preferences")
+        layout = QVBoxLayout(self)
+        self.pitch_correction = QCheckBox("Preserve audio pitch when changing speed", self)
+        self.pitch_correction.setChecked(pitch_correction)
+        layout.addWidget(self.pitch_correction)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
 
 
 class ConnectDialog(QDialog):

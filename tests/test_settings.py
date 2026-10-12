@@ -60,6 +60,28 @@ def test_speed_step_validation_and_custom_value(tmp_path, caplog):
     assert "Invalid playback/speed_step" in caplog.text
 
 
+def test_pitch_correction_setting_is_validated_and_persists(tmp_path, caplog):
+    path = tmp_path / "settings.ini"
+    settings = Settings(path)
+    settings.load()
+    assert settings.pitch_correction is True
+    settings.set_pitch_correction(False)
+    reopened = Settings(path)
+    reopened.load()
+    assert reopened.pitch_correction is False
+    reopened.set_pitch_correction(True)
+    assert Settings(path).store.value("playback/pitch_correction") in (True, "true")
+    with pytest.raises(TypeError, match="boolean"):
+        reopened.set_pitch_correction("false")
+    for invalid in ("maybe", 2):
+        settings.store.setValue("playback/pitch_correction", invalid)
+        with caplog.at_level(logging.WARNING):
+            settings.load()
+        assert settings.pitch_correction is True
+        assert settings.store.value("playback/pitch_correction") in (True, "true")
+    assert "Invalid playback/pitch_correction" in caplog.text
+
+
 def test_remote_buffer_settings_are_bounded(tmp_path, caplog):
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("network/readahead_mb", 16)

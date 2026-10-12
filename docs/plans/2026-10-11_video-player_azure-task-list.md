@@ -875,7 +875,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 10.2.2.1.1 | Task | `pitch_correction` setting → mpv `audio-pitch-correction`; Preferences checkbox | 00:45 | 00:10 | Test: toggle changes the mpv property | FR-010 |
+| 10.2.2.1.1 | Task | [x] `pitch_correction` setting → mpv `audio-pitch-correction`; Preferences checkbox | 00:45 | 00:10 | Test: toggle changes the mpv property | FR-010; Preferences Save/Cancel, mpv property, validation and restart persistence covered in `tests/test_preferences.py` and `tests/test_settings.py`; v0.29.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: track selection, external subtitle load and re-add after resume,

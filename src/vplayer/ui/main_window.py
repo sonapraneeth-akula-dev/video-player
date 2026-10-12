@@ -25,6 +25,7 @@ from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
 from vplayer.settings import Settings
 from vplayer.ui.browser import BrowserDock
+from vplayer.ui.dialogs import PreferencesDialog
 
 
 class SeekBar(QSlider):
@@ -88,6 +89,8 @@ class MainWindow(QMainWindow):
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
             snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
         )
+        if self.player.mpv.audio_pitch_correction != self.settings.pitch_correction:
+            self.player.mpv.audio_pitch_correction = self.settings.pitch_correction
         self.speed_label = QLabel("1×", self)
         self.speed_label.setAccessibleName("Playback speed")
         self.statusBar().addPermanentWidget(self.speed_label)
@@ -138,6 +141,9 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self.choose_file)
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu.addAction(open_action)
+        preferences_action = QAction("Preferences...", self)
+        preferences_action.triggered.connect(self.show_preferences)
+        self.file_menu.addAction(preferences_action)
         snapshot_action = QAction("Snapshot", self)
         snapshot_action.setObjectName("snapshot")
         snapshot_action.setShortcut("S")
@@ -293,6 +299,24 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Open Video")
         if path:
             self.open_file(path)
+
+    def show_preferences(self):
+        dialog = self.findChild(PreferencesDialog)
+        if dialog is not None and dialog.isVisible():
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+        dialog = PreferencesDialog(self.settings.pitch_correction, self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.accepted.connect(lambda: self._save_pitch_preference(dialog.pitch_correction.isChecked()))
+        dialog.open()
+
+    def _save_pitch_preference(self, enabled: bool):
+        try:
+            self.player.mpv.audio_pitch_correction = enabled
+            self.settings.set_pitch_correction(enabled)
+        except (OSError, RuntimeError, SystemError, mpv.PropertyUnavailableError) as error:
+            self.show_error(f"Could not save pitch correction: {error}")
 
     def open_file(self, path: str | Path):
         self.banner.hide()

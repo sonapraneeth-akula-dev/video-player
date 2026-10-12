@@ -48,6 +48,7 @@ class Settings:
         self.seek_short_s = 5
         self.seek_long_s = 60
         self.speed_step = 0.05
+        self.pitch_correction = True
         self.skip_frames = 10
         self.readahead_mb = 64
         self.backbuffer_mb = 256
@@ -101,9 +102,27 @@ class Settings:
             step = 0.05
             self.store.setValue("playback/speed_step", step)
         self.speed_step = step
+        value = self.store.value("playback/pitch_correction", True)
+        if isinstance(value, bool):
+            self.pitch_correction = value
+        elif isinstance(value, str) and value.lower() in ("true", "false"):
+            self.pitch_correction = value.lower() == "true"
+        else:
+            log.warning("Invalid playback/pitch_correction setting %r; using True", value)
+            self.pitch_correction = True
+            self.store.setValue("playback/pitch_correction", True)
         self.store.sync()
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not read/write settings: {self.store.fileName()}")
+
+    def set_pitch_correction(self, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
+            raise TypeError("Pitch correction must be a boolean")
+        self.store.setValue("playback/pitch_correction", enabled)
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not save pitch correction: {self.store.fileName()}")
+        self.pitch_correction = enabled
 
     def connection_profiles(self) -> list[ConnectionProfile]:
         profiles = []
