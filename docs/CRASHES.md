@@ -128,21 +128,25 @@ close, `MainWindow.closeEvent()` disposes the video surface **before**
 `Player.close()` terminates mpv. Standalone rendered-widget tests use the
 same ordering. `tests/test_mpv_widget.py` checks repeated playback/teardown,
 the destruction thread, and rejection of off-thread disposal. These changes
-address the *identified* `0xC0000409` lifetime defect; they do not resolve or
-explain the separate intermittent access violation.
+addressed the *identified* `0xC0000409` lifetime defect. At the time, the
+separate intermittent access violation remained; `d8185c2` subsequently
+identified and fixed the render-callback use-after-free (described above).
+`cc95725` added the probe-reload close lock and reduced its first-frame cost.
 
 The deterministic 50-file corrupt-media test passed four fresh Windows GUI
-processes. Three full runs under ProcDump also exited cleanly, but
-instrumentation affects timing, and subsequent uninstrumented broader suites
-still failed. Targeted codec and SFTP passes likewise do not establish
-full-suite stability. No physical-GPU Windows or Ubuntu crash validation has
-been completed.
+processes. Before the callback fix, three full runs under ProcDump exited
+cleanly, but subsequent uninstrumented broader suites still failed. After
+both fixes, an uninstrumented full run exited 0 with 256 passing tests and no
+warnings. Later Windows and Ubuntu CI suites progressed through hundreds of
+tests without a native crash; remaining failures concern test isolation or
+performance, not a reproduced access violation. Non-RDP Windows and
+physical-GPU/Wayland crash validation remain open.
 
 The first published GitHub Actions run (`38191869176`) failed **before**
 Ubuntu tests: Ubuntu's FFmpeg did not recognize `-fps_mode` in
-`scripts/make_test_media.py`; the Windows job was canceled. This is a
-separate fixture-generation/CI problem, not evidence of a native crash or
-its absence.
+`scripts/make_test_media.py`; the Windows job was canceled. That fixture
+compatibility problem has since been fixed; it was not evidence of a native
+crash or its absence.
 
 ## Reproduction and next evidence
 
@@ -156,13 +160,13 @@ $LASTEXITCODE
 ```
 
 Record the **process exit code**, not only pytest's last printed summary.
-Repeat uninstrumented full runs under both RDP and a non-RDP desktop with the
-same Python, libmpv DLL, media, and audio settings. Compare native exception
-codes and stacks; capture a new dump if `0xC0000005` reproduces, and identify
-the faulting thread and operation before changing playback code. Keep dumps,
+For remaining release validation, repeat uninstrumented full runs under both
+RDP and a non-RDP desktop with the same Python, libmpv DLL, media, and audio
+settings. If `0xC0000005` reappears, compare exception codes and stacks and
+identify the faulting thread before changing playback code. Keep dumps,
 logs containing private paths, SSH material, and process memory **outside
-Git**. A fix needs a focused regression and repeated clean full-process
-exits on the affected setup, followed by Windows and Ubuntu validation.
+Git**. The fixed defects have focused regressions, but passing CI does not
+replace validation on the affected non-RDP and physical-GPU setups.
 
 Further technical history and upstream alternatives are tracked in the
 [technical design](plans/2026-10-11_video-player_technical-design.md#13-risks--open-questions).
