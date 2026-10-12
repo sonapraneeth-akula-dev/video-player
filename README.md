@@ -83,7 +83,9 @@ without reloading the file, reauthenticating against the originally approved
 host key. A status indicator shows the retry attempt or cache buffering in
 the current single-player window; tab-specific placement awaits tabs.
 Retry count defaults to 6 (`network/retry_max`, 0–20); cancellation interrupts
-connection attempts. SFTP browsing is not yet exposed through the main window.
+connection attempts. Exhausted retries show the last playback time and a
+**Retry** button; Retry reauthenticates and resumes from that time. SFTP
+browsing is not yet exposed through the main window.
 `SftpStream` reads remote files into one in-memory 4 MiB block using bounded
 SFTP requests. Reads may stop at a block boundary; the mpv stream callback
 supports remote playback in the `Player` facade.

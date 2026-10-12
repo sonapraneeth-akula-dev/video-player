@@ -67,6 +67,7 @@ class Player(QObject):
     sftp_reconnecting = Signal(str, int)
     sftp_reconnected = Signal(str)
     sftp_retry_failed = Signal(str)
+    connection_failed = Signal(float)
     sftp_transport_changed = Signal(str, object, object)
     cache_paused = Signal(object)
     _update = Signal(str, object)
@@ -91,6 +92,7 @@ class Player(QObject):
         self._loaded_pending = False
         self._uri = ""
         self._start_position: float | None = None
+        self._last_position = 0.0
         self._pending_frame_steps: list[int] = []
         self._pending_skip: int | None = None
         self._skip_total = 0
@@ -193,6 +195,8 @@ class Player(QObject):
         if name == "file-loaded":
             self.file_loaded.emit()
         elif name == "time-pos":
+            if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
+                self._last_position = float(value)
             self.position.emit(value)
             self._skip_step_changed(value)
             if not self._vfr_checked and isinstance(value, (int, float)) and value >= 1:
@@ -244,6 +248,12 @@ class Player(QObject):
         elif name == "sftp-retry-failed":
             if value == self._uri:
                 self.sftp_retry_failed.emit(value)
+        elif name == "sftp-connection-failed":
+            if value == self._uri:
+                position = self.mpv.time_pos
+                if isinstance(position, (int, float)) and math.isfinite(position) and position >= 0:
+                    self._last_position = float(position)
+                self.connection_failed.emit(self._last_position)
         elif name == "sftp-transport":
             self.sftp_transport_changed.emit(*value)
         elif name == "paused-for-cache":
@@ -321,6 +331,9 @@ class Player(QObject):
                 lambda attempt: self._update.emit("sftp-reconnecting", (source_uri, attempt)),
             )
             stream.reconnected.connect(lambda: self._update.emit("sftp-reconnected", source_uri))
+            stream.connection_failed.connect(
+                lambda _offset: self._update.emit("sftp-connection-failed", source_uri),
+            )
             cookie = id(stream)
             self._sftp_streams[cookie] = (stream, client)
             info.contents.cookie = cookie
@@ -356,7 +369,8 @@ class Player(QObject):
                 return -1
             log.exception("Could not read SFTP stream")
             self._update.emit("sftp-retry-failed", self._uri)
-            self._update.emit("error", f"Could not read remote file: {error}")
+            if stream is None or not stream.failed or not self._uri.startswith("vpsftp://"):
+                self._update.emit("error", f"Could not read remote file: {error}")
             return -1
 
     def _sftp_seek(self, cookie, offset) -> int:
@@ -477,8 +491,6 @@ class Player(QObject):
         ):
             raise ValueError("Start position must be a nonnegative finite number")
         if transport is not None:
-            if start_position is not None:
-                raise ValueError("Resume position is only supported for local files")
             if not isinstance(transport, paramiko.Transport) or not transport.is_authenticated():
                 self.error.emit("An authenticated SSH connection is required")
                 return
@@ -492,7 +504,8 @@ class Player(QObject):
             self.mpv["demuxer-max-back-bytes"] = max(0, self.backbuffer_mb - 1) * 1024 * 1024
             self._sftp_sources.clear()
             self._uri = f"vpsftp://{uuid.uuid4().hex}/{posixpath.basename(path)}"
-            self._start_position = None
+            self._start_position = start_position
+            self._last_position = float(start_position or 0)
             self._sftp_sources[self._uri] = (transport, path, reconnect)
             self.variable_frame_rate = False
             self._vfr_checked = False
@@ -510,6 +523,7 @@ class Player(QObject):
         self.mpv["demuxer-max-back-bytes"] = 32 * 1024 * 1024
         self._uri = str(file.resolve())
         self._start_position = start_position
+        self._last_position = float(start_position or 0)
         self.variable_frame_rate = False
         self._vfr_checked = False
         self._pending_skip = None

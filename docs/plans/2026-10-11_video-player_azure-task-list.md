@@ -330,7 +330,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.3.1.2.1 | Task | Exhausted retries — `SftpStream` emits `connection_failed(last_pos)` before `read` returns −1; `Player` re-emits; banner "Connection lost at <time>" with Retry → `load(uri, start=last_pos)`; normal EOF shows nothing | 02:00 | 00:20 | Unit: emit-before-EOF order; container: outage beyond retries → banner ≤ 4 min, Retry resumes at banner position | mpv 0.34 treats −1 as EOF |
+| 2.3.1.2.1 | Task | [x] Exhausted retries — `SftpStream` emits `connection_failed(last_pos)` before `read` returns −1; `Player` re-emits; banner "Connection lost at <time>" with Retry → `load(uri, start=last_pos)`; normal EOF shows nothing | 02:00 | 00:20 | Unit: emit-before-EOF order; container: outage beyond retries → banner ≤ 4 min, Retry resumes at banner position | mpv 0.34 treats −1 as EOF; unit checks signal before native −1 and normal EOF stays silent; Docker pause with `retry_max=0` shows banner within seconds and Retry reauthenticates/resumes without blocking the UI. v0.35.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: backoff schedule (incl. 30 s for attempts > 5), cancel, exhausted retries

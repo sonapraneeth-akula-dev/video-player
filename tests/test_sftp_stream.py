@@ -170,12 +170,16 @@ def test_reconnect_backoff_saturates_at_30_seconds_without_advancing(monkeypatch
     failed.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
     stream = SftpStream(failed, reopen=lambda cancel: (_ for _ in ()).throw(OSError("still offline")), retry_max=8)
     delays, attempts = [], []
+    failures = []
     stream.reconnecting.connect(attempts.append)
+    stream.connection_failed.connect(failures.append)
     monkeypatch.setattr(stream._cancel_event, "wait", lambda delay: delays.append(delay) or False)
     with pytest.raises(OSError, match="still offline"):
         stream.read(2)
     assert attempts == list(range(1, 9))
     assert delays == [1, 2, 4, 8, 16, 30, 30, 30]
+    assert failures == [0]
+    assert stream.failed
     assert stream.seek(0, 1) == 0
 
 

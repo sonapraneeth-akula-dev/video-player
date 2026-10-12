@@ -1,6 +1,7 @@
 """Main window for local and remote playback."""
 
 import math
+import threading
 from pathlib import Path
 
 import mpv
@@ -120,6 +121,8 @@ class ControlBar(QToolBar):
 
 
 class MainWindow(QMainWindow):
+    _retry_completed = Signal(object, object, object)
+
     def __init__(self, settings: Settings | None = None):
         super().__init__()
         self.setWindowTitle(APP_NAME)
@@ -131,6 +134,10 @@ class MainWindow(QMainWindow):
         self._transports = []
         self._pending_recent: tuple[str, str] | None = None
         self._connect_dialog = None
+        self._remote_details = None
+        self._failed_position = None
+        self._retry_cancel = None
+        self._closing = False
         self._reconnect_attempt = None
         self._cache_paused = False
         self.player = Player(
@@ -149,7 +156,9 @@ class MainWindow(QMainWindow):
         self.player.sftp_reconnecting.connect(self._remote_reconnecting)
         self.player.sftp_reconnected.connect(self._remote_reconnected)
         self.player.sftp_retry_failed.connect(self._remote_retry_failed)
+        self.player.connection_failed.connect(self._connection_failed)
         self.player.sftp_transport_changed.connect(self._transport_reconnected)
+        self._retry_completed.connect(self._finish_remote_retry)
         self.player.cache_paused.connect(self._cache_pause_changed)
         self.player.skip_status.connect(self.statusBar().showMessage)
         self.connection_status = QLabel(self)
@@ -174,6 +183,11 @@ class MainWindow(QMainWindow):
         self.banner.setWordWrap(True)
         self.banner.hide()
         layout.addWidget(self.banner)
+        self.retry_button = QPushButton("Retry", content)
+        self.retry_button.setAccessibleName("Retry remote connection")
+        self.retry_button.clicked.connect(self._retry_remote)
+        self.retry_button.hide()
+        layout.addWidget(self.retry_button)
         self.video = MpvWidget(self.player, content)
         self.video.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.video.setAccessibleName("Video playback")
@@ -414,6 +428,7 @@ class MainWindow(QMainWindow):
 
     def open_file(self, path: str | Path):
         self.banner.hide()
+        self.retry_button.hide()
         if isinstance(path, str) and path.lower().startswith("sftp://"):
             if self._connect_dialog is not None and self._connect_dialog.isVisible():
                 self._connect_dialog.raise_()
@@ -438,6 +453,10 @@ class MainWindow(QMainWindow):
             self.player.load(path)
             return
         self._save_position()
+        if self._retry_cancel is not None:
+            self._retry_cancel.set()
+        self._remote_details = None
+        self._failed_position = None
         self._current_file = file.resolve()
         self._active_transport = None
         self._reconnect_attempt = None
@@ -447,16 +466,80 @@ class MainWindow(QMainWindow):
         self.player.load(self._current_file, start_position=start)
         self._pending_recent = (self.player._uri, str(self._current_file))
 
-    def _open_remote(self, uri: str, remote_path: str, transport, pool: SshPool):
+    def _open_remote(
+        self, uri: str, remote_path: str, transport, pool: SshPool,
+        start_position: float | None = None,
+    ):
         self._save_position()
+        if self._retry_cancel is not None:
+            self._retry_cancel.set()
+            self._retry_cancel = None
         self._current_file = None
+        self._remote_details = (uri, remote_path, pool)
+        self._failed_position = None
+        self.retry_button.hide()
         self._active_transport = transport
         self._reconnect_attempt = None
         self._cache_paused = False
         self.connection_status.hide()
         self._transports.append(transport)
-        self.player.load(remote_path, transport=transport, reconnect=pool.reopen_transport)
+        self.player.load(
+            remote_path, transport=transport, reconnect=pool.reopen_transport,
+            start_position=start_position,
+        )
         self._pending_recent = (self.player._uri, uri)
+
+    def _connection_failed(self, position: float):
+        if self._remote_details is None:
+            return
+        self._failed_position = position
+        self.banner.setText(f"Connection lost at {self._clock(position)}")
+        self.banner.show()
+        self.retry_button.setEnabled(True)
+        self.retry_button.show()
+
+    def _retry_remote(self):
+        if self._remote_details is None or self._failed_position is None or self._active_transport is None:
+            self.show_error("No remote playback is available to retry")
+            return
+        if self._retry_cancel is not None:
+            return
+        details = (*self._remote_details, self._failed_position)
+        previous = self._active_transport
+        cancel = threading.Event()
+        self._retry_cancel = cancel
+        self.retry_button.setEnabled(False)
+
+        def worker():
+            try:
+                result = details[2].reopen_transport(previous, cancel)
+            except Exception as error:  # noqa: BLE001 - surface worker failure on the GUI thread
+                result = error
+            if self._closing:
+                if isinstance(result, paramiko.Transport):
+                    result.close()
+                return
+            self._retry_completed.emit(details, result, cancel)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_remote_retry(self, details, result, cancel):
+        if self._closing or self._retry_cancel is not cancel or cancel.is_set() or (
+            self._remote_details != details[:3]
+        ):
+            if isinstance(result, paramiko.Transport):
+                result.close()
+            return
+        self._retry_cancel = None
+        if isinstance(result, Exception):
+            self.show_error(f"Connection lost at {self._clock(details[3])}: Retry failed: {result}")
+            self.retry_button.setEnabled(True)
+            return
+        if not isinstance(result, paramiko.Transport):
+            self.show_error("Retry failed: No authenticated SSH transport was returned")
+            self.retry_button.setEnabled(True)
+            return
+        self._open_remote(details[0], details[1], result, details[2], start_position=details[3])
 
     def _update_connection_status(self):
         if self._active_transport is None:
@@ -640,6 +723,9 @@ class MainWindow(QMainWindow):
             self.showNormal()
 
     def closeEvent(self, event):
+        self._closing = True
+        if self._retry_cancel is not None:
+            self._retry_cancel.set()
         if self._connect_dialog is not None:
             self._connect_dialog.reject()
         self._save_position()

@@ -368,6 +368,7 @@ class SshPool:
 class SftpStream(QObject):
     reconnecting = Signal(int)
     reconnected = Signal()
+    connection_failed = Signal(int)
     BLOCK_SIZE = 4 * 1024 * 1024
     CHUNK_SIZE = 32 * 1024
 
@@ -394,6 +395,7 @@ class SftpStream(QObject):
         self._block = b""
         self._closed = False
         self._cancelled = False
+        self.failed = False
 
     def size(self) -> int:
         return self._size
@@ -465,6 +467,8 @@ class SftpStream(QObject):
                     if self._cancelled:
                         raise OSError("SFTP stream cancelled") from last_error
                     if attempt == self.retry_max:
+                        self.failed = True
+                        self.connection_failed.emit(self._position)
                         raise
                     continue
             try:
@@ -478,6 +482,8 @@ class SftpStream(QObject):
                     raise
                 last_error = error
                 if self.reopen is None or attempt == self.retry_max:
+                    self.failed = True
+                    self.connection_failed.emit(self._position)
                     raise
                 continue
             if self._cancelled:
