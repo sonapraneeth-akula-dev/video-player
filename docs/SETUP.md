@@ -1,7 +1,8 @@
 # Development setup and build
 
 VPlayer `0.27.0` can be run from source or built as a portable Windows bundle;
-the Windows installer and Linux AppImage are not yet release-verified. Run commands from the
+the Windows installer passes hosted install/upgrade/uninstall smoke tests,
+but full release/UAT and the Linux AppImage are not yet verified. Run commands from the
 repository root. The supported development target is Windows 10/11 x64 or
 Ubuntu 22.04 with a desktop display; release testing on both operating systems
 is still in progress.
@@ -115,7 +116,8 @@ on**. PyInstaller cannot cross-compile, so run it once per OS.
 The manually triggered **Windows package** GitHub Actions workflow builds
 both Windows artifacts, checks the installer size, runs the packaged
 codec/container matrix, smoke-tests fresh installs with PATH on/off, an upgrade
-from PATH on to off, and uninstall, and uploads the results.
+from PATH on to off, and uninstall, and uploads the results. Run `38243446517`
+passed all of these checks for version `0.27.0`.
 
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
