@@ -52,35 +52,36 @@ const
   EnvKey = 'Environment';
   MarkerKey = 'Software\VPlayer';
 
-{ Returns Path without entries equal to Dir (case-insensitive, trailing backslash ignored). }
+{ Removes entries equal to Dir without rewriting unrelated PATH separators. }
 function StripDir(Path, Dir: String; var Found: Boolean): String;
 var
-  Rest, Item: String;
-  P: Integer;
+  Item: String;
+  StartIndex, EndIndex, P: Integer;
 begin
-  Result := '';
+  Result := Path;
   Found := False;
-  Rest := Path;
-  while Rest <> '' do
+  StartIndex := 1;
+  while StartIndex <= Length(Result) do
   begin
-    P := Pos(';', Rest);
+    P := Pos(';', Copy(Result, StartIndex, Length(Result)));
     if P = 0 then
+      EndIndex := Length(Result) + 1
+    else
+      EndIndex := StartIndex + P - 1;
+    Item := Copy(Result, StartIndex, EndIndex - StartIndex);
+    if CompareText(RemoveBackslash(Trim(Item)), RemoveBackslash(Dir)) = 0 then
     begin
-      Item := Rest;
-      Rest := '';
+      Found := True;
+      if EndIndex <= Length(Result) then
+        Delete(Result, StartIndex, EndIndex - StartIndex + 1)
+      else if StartIndex > 1 then
+        Delete(Result, StartIndex - 1, EndIndex - StartIndex + 1)
+      else
+        Result := '';
     end
     else
     begin
-      Item := Copy(Rest, 1, P - 1);
-      Delete(Rest, 1, P);
-    end;
-    if CompareText(RemoveBackslash(Trim(Item)), RemoveBackslash(Dir)) = 0 then
-      Found := True
-    else if Item <> '' then
-    begin
-      if Result <> '' then
-        Result := Result + ';';
-      Result := Result + Item;
+      StartIndex := EndIndex + 1;
     end;
   end;
 end;
@@ -98,6 +99,8 @@ begin
   StripDir(Path, ExpandConstant('{app}'), Found);
   if Found then
     Exit;
+  if (Path <> '') and (Path[Length(Path)] = ';') then
+    RegWriteStringValue(HKCU, MarkerKey, 'PathHadTrailingSeparator', '1');
   if (Path <> '') and (Path[Length(Path)] <> ';') then
     Path := Path + ';';
   RegWriteExpandStringValue(HKCU, EnvKey, 'Path', Path + ExpandConstant('{app}'));
@@ -107,7 +110,7 @@ end;
 { Removes only the entry this installer added; a pre-existing entry is left alone. }
 procedure RemoveFromPath;
 var
-  Path, Marker, WasAbsent: String;
+  Path, Marker, WasAbsent, HadTrailingSeparator: String;
   Found: Boolean;
 begin
   if not RegQueryStringValue(HKCU, MarkerKey, 'PathAdded', Marker) or (Marker <> '1') then
@@ -116,14 +119,20 @@ begin
   begin
     Path := StripDir(Path, ExpandConstant('{app}'), Found);
     if Found then
+    begin
+      if RegQueryStringValue(HKCU, MarkerKey, 'PathHadTrailingSeparator', HadTrailingSeparator)
+         and (HadTrailingSeparator = '1') and (Path <> '') and (Path[Length(Path)] <> ';') then
+        Path := Path + ';';
       if (Path = '') and RegQueryStringValue(HKCU, MarkerKey, 'PathWasAbsent', WasAbsent)
          and (WasAbsent = '1') then
         RegDeleteValue(HKCU, EnvKey, 'Path')
       else
         RegWriteExpandStringValue(HKCU, EnvKey, 'Path', Path);
+    end;
   end;
   RegDeleteValue(HKCU, MarkerKey, 'PathAdded');
   RegDeleteValue(HKCU, MarkerKey, 'PathWasAbsent');
+  RegDeleteValue(HKCU, MarkerKey, 'PathHadTrailingSeparator');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

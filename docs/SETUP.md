@@ -132,7 +132,8 @@ $env:VPLAYER_BIN = "$PWD\dist\vplayer\vplayer.exe"; .\.venv\Scripts\python.exe -
 
 Set `VPLAYER_LIBMPV` to override which libmpv file the bundle includes.
 The installer smoke test changes the current user's PATH temporarily and refuses
-to run if VPlayer is already installed.
+to run if VPlayer is already installed. Uninstall and a PATH-off upgrade remove
+only the installer-managed entry and preserve existing PATH separators.
 Packages are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first
 launch. Settings and logs stay in the user profile, also for the portable build.
 Only the Windows packages have been built and tested so far (installer
