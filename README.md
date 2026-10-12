@@ -78,8 +78,12 @@ container automatically.
 The SFTP connection dialog verifies unknown and changed SSH host keys before
 authentication. Trust once applies only to the current connection; trust and
 remember updates the application's known-hosts file without editing
-`~/.ssh/known_hosts`. Automatic reconnection after a network drop is not yet
-implemented. SFTP browsing is not yet exposed through the main window.
+`~/.ssh/known_hosts`. Remote playback retries socket errors and timeouts
+without reloading the file, reauthenticating against the originally approved
+host key. A status indicator shows the retry attempt or cache buffering in
+the current single-player window; tab-specific placement awaits tabs.
+Retry count defaults to 6 (`network/retry_max`, 0–20); cancellation interrupts
+connection attempts. SFTP browsing is not yet exposed through the main window.
 `SftpStream` reads remote files into one in-memory 4 MiB block using bounded
 SFTP requests. Reads may stop at a block boundary; the mpv stream callback
 supports remote playback in the `Player` facade.

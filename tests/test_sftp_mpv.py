@@ -21,7 +21,7 @@ def test_native_stream_callbacks_copy_seek_cancel_and_close(qtbot, monkeypatch):
     buffer = ctypes.create_string_buffer(4)
     try:
         player._register_sftp()
-        player._sftp_sources["vpsftp://fixture/test.mp4"] = (Mock(), "/test.mp4")
+        player._sftp_sources["vpsftp://fixture/test.mp4"] = (Mock(), "/test.mp4", None)
         info = mpv.StreamCallbackInfo()
         assert player._sftp_open(None, b"vpsftp://fixture/test.mp4", ctypes.pointer(info)) == 0
         client.open.assert_called_once_with("/test.mp4", "rb")

@@ -8,6 +8,7 @@ import posixpath
 import re
 import threading
 import uuid
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from PySide6.QtCore import QObject, QStandardPaths, Qt, QTimer, Signal, Slot
 from vplayer.sftp import SftpStream
 
 log = logging.getLogger(__name__)
-OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "speed", "hwdec-current")
+OBSERVED_PROPERTIES = ("time-pos", "duration", "pause", "speed", "hwdec-current", "paused-for-cache")
 PROBE_TITLE = "vplayer-software-probe"
 
 
@@ -63,6 +64,11 @@ class Player(QObject):
     skip_status = Signal(str)
     error = Signal(str)
     sftp_open_failed = Signal(str)
+    sftp_reconnecting = Signal(str, int)
+    sftp_reconnected = Signal(str)
+    sftp_retry_failed = Signal(str)
+    sftp_transport_changed = Signal(str, object, object)
+    cache_paused = Signal(object)
     _update = Signal(str, object)
 
     def __init__(
@@ -105,8 +111,14 @@ class Player(QObject):
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
         ) / "vplayer"
         self.jpeg_quality = jpeg_quality
-        self._sftp_sources: dict[str, tuple[paramiko.Transport, str]] = {}
+        self._sftp_sources: dict[
+            str, tuple[
+                paramiko.Transport, str,
+                Callable[[paramiko.Transport, threading.Event], paramiko.Transport] | None,
+            ],
+        ] = {}
         self._sftp_streams: dict[int, tuple[SftpStream, paramiko.SFTPClient]] = {}
+        self._sftp_reconnect_lock = threading.Lock()
         self._sftp_callbacks = None
         self._update.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
         self.mpv = mpv.MPV(
@@ -222,6 +234,20 @@ class Player(QObject):
             self.error.emit(value)
         elif name == "sftp-open-failed":
             self.sftp_open_failed.emit(value)
+        elif name == "sftp-reconnecting":
+            uri, attempt = value
+            if uri == self._uri:
+                self.sftp_reconnecting.emit(uri, attempt)
+        elif name == "sftp-reconnected":
+            if value == self._uri:
+                self.sftp_reconnected.emit(value)
+        elif name == "sftp-retry-failed":
+            if value == self._uri:
+                self.sftp_retry_failed.emit(value)
+        elif name == "sftp-transport":
+            self.sftp_transport_changed.emit(*value)
+        elif name == "paused-for-cache":
+            self.cache_paused.emit(value)
 
     def _register_sftp(self) -> None:
         callbacks = (
@@ -239,9 +265,62 @@ class Player(QObject):
         client = None
         cookie = None
         try:
-            transport, path = self._sftp_sources[uri.decode("utf-8")]
+            source_uri = uri.decode("utf-8")
+            transport, path, reconnect = self._sftp_sources[source_uri]
             client = paramiko.SFTPClient.from_transport(transport)
-            stream = SftpStream(client.open(path, "rb"), retry_max=self.retry_max)
+            if reconnect is not None:
+                client.get_channel().settimeout(3)
+            current = [transport, client]
+
+            def reopen(cancel):
+                while not self._sftp_reconnect_lock.acquire(timeout=0.05):
+                    if cancel.is_set():
+                        raise OSError("SFTP stream cancelled")
+                try:
+                    previous = current[0]
+                    source = self._sftp_sources.get(source_uri)
+                    if cancel.is_set() or source is None or source_uri != self._uri:
+                        raise OSError("SFTP stream cancelled")
+                    shared = source[0] is not previous and source[0].is_active()
+                    replacement = source[0] if shared else reconnect(previous, cancel)
+                    new_client = None
+                    try:
+                        new_client = paramiko.SFTPClient.from_transport(replacement)
+                        new_client.get_channel().settimeout(3)
+                        new_file = new_client.open(path, "rb")
+                        if new_file.stat().st_size != stream.size():
+                            raise ValueError("Remote file changed during reconnect")
+                        if cancel.is_set() or source_uri != self._uri:
+                            raise OSError("SFTP stream cancelled")
+                    except Exception:
+                        if new_client is not None:
+                            new_client.close()
+                        if not shared:
+                            replacement.close()
+                        raise
+                    old_client = current[1]
+                    current[0], current[1] = replacement, new_client
+                    self._sftp_streams[cookie] = (stream, new_client)
+                    if not shared:
+                        self._sftp_sources[source_uri] = (replacement, path, reconnect)
+                    try:
+                        old_client.close()
+                    except (OSError, EOFError, ValueError, paramiko.SSHException) as error:
+                        log.warning("Could not close disconnected SFTP client: %s", error)
+                    if not shared:
+                        self._update.emit("sftp-transport", (source_uri, previous, replacement))
+                    return new_file
+                finally:
+                    self._sftp_reconnect_lock.release()
+
+            stream = SftpStream(
+                client.open(path, "rb"), reopen=reopen if reconnect is not None else None,
+                retry_max=self.retry_max,
+            )
+            stream.reconnecting.connect(
+                lambda attempt: self._update.emit("sftp-reconnecting", (source_uri, attempt)),
+            )
+            stream.reconnected.connect(lambda: self._update.emit("sftp-reconnected", source_uri))
             cookie = id(stream)
             self._sftp_streams[cookie] = (stream, client)
             info.contents.cookie = cookie
@@ -276,6 +355,7 @@ class Player(QObject):
                 log.debug("Interrupted cancelled SFTP read: %s", error)
                 return -1
             log.exception("Could not read SFTP stream")
+            self._update.emit("sftp-retry-failed", self._uri)
             self._update.emit("error", f"Could not read remote file: {error}")
             return -1
 
@@ -385,7 +465,10 @@ class Player(QObject):
     def load(
         self, path: str | Path, *, transport: paramiko.Transport | None = None,
         start_position: float | None = None,
+        reconnect: Callable[[paramiko.Transport, threading.Event], paramiko.Transport] | None = None,
     ) -> None:
+        if reconnect is not None and (transport is None or not callable(reconnect)):
+            raise ValueError("Remote reconnect requires a transport and a callable")
         if start_position is not None and (
             isinstance(start_position, bool)
             or not isinstance(start_position, (float, int))
@@ -410,7 +493,7 @@ class Player(QObject):
             self._sftp_sources.clear()
             self._uri = f"vpsftp://{uuid.uuid4().hex}/{posixpath.basename(path)}"
             self._start_position = None
-            self._sftp_sources[self._uri] = (transport, path)
+            self._sftp_sources[self._uri] = (transport, path, reconnect)
             self.variable_frame_rate = False
             self._vfr_checked = False
             self._pending_skip = None

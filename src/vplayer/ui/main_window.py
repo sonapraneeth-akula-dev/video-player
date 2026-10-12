@@ -131,6 +131,8 @@ class MainWindow(QMainWindow):
         self._transports = []
         self._pending_recent: tuple[str, str] | None = None
         self._connect_dialog = None
+        self._reconnect_attempt = None
+        self._cache_paused = False
         self.player = Player(
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
             retry_max=self.settings.retry_max,
@@ -144,7 +146,16 @@ class MainWindow(QMainWindow):
         self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
         self.player.file_loaded.connect(self._file_opened)
         self.player.sftp_open_failed.connect(self._remote_open_failed)
+        self.player.sftp_reconnecting.connect(self._remote_reconnecting)
+        self.player.sftp_reconnected.connect(self._remote_reconnected)
+        self.player.sftp_retry_failed.connect(self._remote_retry_failed)
+        self.player.sftp_transport_changed.connect(self._transport_reconnected)
+        self.player.cache_paused.connect(self._cache_pause_changed)
         self.player.skip_status.connect(self.statusBar().showMessage)
+        self.connection_status = QLabel(self)
+        self.connection_status.setAccessibleName("Remote connection status")
+        self.connection_status.hide()
+        self.statusBar().addPermanentWidget(self.connection_status)
         self.snapshot_button = QPushButton("Open folder", self)
         self.snapshot_button.setAccessibleName("Open snapshot folder")
         self.snapshot_button.hide()
@@ -416,7 +427,9 @@ class MainWindow(QMainWindow):
                 self.show_error(f"Could not open SFTP file: {error}")
                 return
             self._connect_dialog = dialog
-            dialog.connected.connect(lambda transport: self._open_remote(path, dialog.remote_path, transport))
+            dialog.connected.connect(
+                lambda transport: self._open_remote(path, dialog.remote_path, transport, dialog.pool),
+            )
             dialog.finished.connect(lambda: setattr(self, "_connect_dialog", None))
             dialog.open()
             return
@@ -427,17 +440,66 @@ class MainWindow(QMainWindow):
         self._save_position()
         self._current_file = file.resolve()
         self._active_transport = None
+        self._reconnect_attempt = None
+        self._cache_paused = False
+        self.connection_status.hide()
         start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
         self.player.load(self._current_file, start_position=start)
         self._pending_recent = (self.player._uri, str(self._current_file))
 
-    def _open_remote(self, uri: str, remote_path: str, transport):
+    def _open_remote(self, uri: str, remote_path: str, transport, pool: SshPool):
         self._save_position()
         self._current_file = None
         self._active_transport = transport
+        self._reconnect_attempt = None
+        self._cache_paused = False
+        self.connection_status.hide()
         self._transports.append(transport)
-        self.player.load(remote_path, transport=transport)
+        self.player.load(remote_path, transport=transport, reconnect=pool.reopen_transport)
         self._pending_recent = (self.player._uri, uri)
+
+    def _update_connection_status(self):
+        if self._active_transport is None:
+            self.connection_status.hide()
+        elif self._reconnect_attempt is not None:
+            self.connection_status.setText(f"Reconnecting… (attempt {self._reconnect_attempt})")
+            self.connection_status.show()
+        elif self._cache_paused:
+            self.connection_status.setText("Buffering…")
+            self.connection_status.show()
+        else:
+            self.connection_status.hide()
+
+    def _remote_reconnecting(self, uri: str, attempt: int):
+        if uri == self.player._uri:
+            self._reconnect_attempt = attempt
+            self._update_connection_status()
+
+    def _remote_reconnected(self, uri: str):
+        if uri == self.player._uri:
+            self._reconnect_attempt = None
+            self._update_connection_status()
+
+    def _remote_retry_failed(self, uri: str):
+        if uri == self.player._uri:
+            self._reconnect_attempt = None
+            self._cache_paused = False
+            self.connection_status.hide()
+
+    def _cache_pause_changed(self, paused):
+        self._cache_paused = bool(paused)
+        self._update_connection_status()
+
+    def _transport_reconnected(self, uri: str, previous, replacement):
+        if uri == self.player._uri and self._active_transport is replacement:
+            return
+        if uri != self.player._uri or self._active_transport is not previous:
+            replacement.close()
+            return
+        self._transports.append(replacement)
+        self._active_transport = replacement
+        self._transports.remove(previous)
+        previous.close()
 
     def _file_opened(self):
         for transport in self._transports[:]:
@@ -460,6 +522,8 @@ class MainWindow(QMainWindow):
         ):
             transport = self._active_transport
             self._active_transport = None
+            self._reconnect_attempt = None
+            self._update_connection_status()
             self._pending_recent = None
             transport.close()
             self._transports.remove(transport)

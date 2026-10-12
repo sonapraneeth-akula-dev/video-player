@@ -6,6 +6,7 @@ import re
 import shlex
 import tempfile
 import threading
+import weakref
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -203,6 +204,7 @@ class SshPool:
     def __init__(self, known_hosts: KnownHosts):
         self.known_hosts = known_hosts
         self.workers = QThreadPool()
+        self._sessions: weakref.WeakKeyDictionary[paramiko.Transport, tuple] = weakref.WeakKeyDictionary()
         self._signals = _PoolSignals()
         self.connected = self._signals.connected
         self.error = self._signals.error
@@ -245,10 +247,13 @@ class SshPool:
         auth: Literal["password", "key", "agent"], key_path: str | Path | None,
         passphrase: str | None, keepalive_s: int, approved_key: paramiko.PKey | None,
         reconnect: bool,
-    ) -> None:
+        *, notify: bool = True, on_transport: Callable[[paramiko.Transport], None] | None = None,
+    ) -> paramiko.Transport | None:
         transport = None
         try:
             transport = paramiko.Transport((host, port))
+            if on_transport is not None:
+                on_transport(transport)
             transport.start_client(timeout=10)
             key = transport.get_remote_server_key()
             trust = self.known_hosts.classify(host, port, key)
@@ -296,17 +301,68 @@ class SshPool:
             if not transport.is_authenticated():
                 raise paramiko.AuthenticationException("Authentication failed")
             transport.set_keepalive(keepalive_s)
-        except paramiko.PasswordRequiredException:
+        except paramiko.PasswordRequiredException as error:
             if transport is not None:
                 transport.close()
+            if not notify:
+                raise paramiko.SSHException("Private key requires a passphrase") from error
             self.passphrase_required.emit(str(key_path))
             return
         except (OSError, EOFError, paramiko.SSHException) as error:
             if transport is not None:
                 transport.close()
+            if not notify:
+                raise
             self.error.emit(f"Could not connect to {host}:{port}: {error}")
             return
-        self.connected.emit(transport)
+        if notify:
+            self._sessions[transport] = (
+                host, port, user, password, auth, key_path, passphrase, keepalive_s, key,
+            )
+            self.connected.emit(transport)
+        return transport
+
+    def reopen_transport(self, previous: paramiko.Transport, cancel: threading.Event) -> paramiko.Transport:
+        session = self._sessions.get(previous)
+        if session is None:
+            raise OSError("No authenticated SSH session available for reconnect")
+        done = threading.Event()
+        result: list[paramiko.Transport | BaseException] = []
+        opening: list[paramiko.Transport] = []
+
+        def track(transport: paramiko.Transport) -> None:
+            opening.append(transport)
+            if cancel.is_set():
+                transport.close()
+
+        def worker() -> None:
+            try:
+                transport = self._connect(*session, reconnect=True, notify=False, on_transport=track)
+                if transport is None:
+                    raise OSError("SSH reconnect did not return a transport")
+                if cancel.is_set():
+                    transport.close()
+                else:
+                    result.append(transport)
+            except Exception as error:  # noqa: BLE001 - propagate worker failure to the reader
+                result.append(error)
+            finally:
+                done.set()
+
+        self.workers.start(worker)
+        while not done.wait(0.05):
+            if cancel.is_set():
+                if opening:
+                    opening[0].close()
+                raise OSError("SFTP stream cancelled")
+        if cancel.is_set():
+            if result and isinstance(result[0], paramiko.Transport):
+                result[0].close()
+            raise OSError("SFTP stream cancelled")
+        if isinstance(result[0], BaseException):
+            raise result[0]
+        self._sessions[result[0]] = session
+        return result[0]
 
 
 class SftpStream(QObject):
