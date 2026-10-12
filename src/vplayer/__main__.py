@@ -7,13 +7,55 @@ import locale
 import logging
 import os
 import sys
+import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths, Qt, QTimer
+import shiboken6
+from PySide6.QtCore import QObject, QStandardPaths, Qt, QTimer, Signal, Slot
 from PySide6.QtWidgets import QApplication
 
 from vplayer import APP_NAME, __version__
+
+
+class _ErrorReporter(QObject):
+    message = Signal(str)
+
+    def __init__(self, windows):
+        super().__init__()
+        self.windows = windows
+        self.message.connect(self._show, Qt.ConnectionType.QueuedConnection)
+
+    @Slot(str)
+    def _show(self, message):
+        active = QApplication.activeWindow()
+        visible = [window for window in self.windows if shiboken6.isValid(window) and window.isVisible()]
+        target = next(
+            (window for window in visible if active is window or (active and window.isAncestorOf(active))),
+            visible[-1] if visible else None,
+        )
+        if target is not None:
+            target.show_error(message)
+
+
+def _install_exception_handlers(windows):
+    reporter = _ErrorReporter(windows)
+    previous_sys = sys.excepthook
+    previous_thread = threading.excepthook
+    log = logging.getLogger("vplayer")
+
+    def report(exc_type, error, traceback):
+        log.error("Unhandled application exception", exc_info=(exc_type, error, traceback))
+        reporter.message.emit(f"Unexpected error: {exc_type.__name__}: {error}")
+
+    sys.excepthook = report
+    threading.excepthook = lambda args: report(args.exc_type, args.exc_value, args.exc_traceback)
+
+    def restore():
+        sys.excepthook = previous_sys
+        threading.excepthook = previous_thread
+
+    return restore
 
 
 def _attach_parent_console() -> None:
@@ -121,20 +163,24 @@ def main(argv: list[str] | None = None) -> int:
     from vplayer.ui.main_window import MainWindow
 
     windows = []
-    for file in args.files or [None]:
-        window = MainWindow()
-        if file is not None:
-            path = file if file.startswith("sftp://") else os.path.abspath(file)
-            window.video.ready.connect(
-                lambda window=window, path=path: window.open_file(path),
-                Qt.ConnectionType.SingleShotConnection,
-            )
-        if args.codec_probe:
-            return _probe_codec(app, window, args.codec_probe)
-        window.show()
-        windows.append(window)
-    # ponytail: until tabs/IPC exist, separate windows keep every CLI file reachable.
-    return app.exec()
+    restore = _install_exception_handlers(windows)
+    try:
+        for file in args.files or [None]:
+            window = MainWindow()
+            windows.append(window)
+            if file is not None:
+                path = file if file.startswith("sftp://") else os.path.abspath(file)
+                window.video.ready.connect(
+                    lambda window=window, path=path: window.open_file(path),
+                    Qt.ConnectionType.SingleShotConnection,
+                )
+            if args.codec_probe:
+                return _probe_codec(app, window, args.codec_probe)
+            window.show()
+        # ponytail: until tabs/IPC exist, separate windows keep every CLI file reachable.
+        return app.exec()
+    finally:
+        restore()
 
 
 if __name__ == "__main__":

@@ -126,9 +126,28 @@ class Player(QObject):
         self.mpv.register_event_callback(self._on_event)
 
     def _on_property(self, name: str, value: object) -> None:
-        self._update.emit(name, value)
+        try:
+            self._update.emit(name, value)
+        except Exception as error:  # noqa: BLE001 - exceptions must not escape libmpv callbacks
+            self._report_callback_error("property", error)
 
     def _on_event(self, event: mpv.MpvEvent) -> None:
+        try:
+            self._handle_event(event)
+        except Exception as error:  # noqa: BLE001 - exceptions must not escape libmpv callbacks
+            self._report_callback_error("event", error)
+
+    def _report_callback_error(self, source: str, error: Exception) -> None:
+        log.exception("Unexpected mpv %s callback failure", source)
+        with self._close_lock:
+            if self._closed:
+                return
+            try:
+                self._update.emit("error", f"Playback error: {error}")
+            except (RuntimeError, SystemError):
+                log.exception("Could not deliver mpv %s callback error", source)
+
+    def _handle_event(self, event: mpv.MpvEvent) -> None:
         if event.event_id.value == mpv.MpvEventID.FILE_LOADED:
             with self._close_lock:
                 if self._closed:

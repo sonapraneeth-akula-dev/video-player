@@ -142,6 +142,11 @@ tests without a native crash; remaining failures concern test isolation or
 performance, not a reproduced access violation. Non-RDP Windows and
 physical-GPU/Wayland crash validation remain open.
 
+Unexpected Python exceptions in UI slots and worker threads are logged and
+reported in the active window's error banner; unexpected mpv event/property
+callback failures are logged and sent to that window on the Qt thread. This
+containment does **not** catch native access violations or libmpv fast-fails.
+
 The first published GitHub Actions run (`38191869176`) failed **before**
 Ubuntu tests: Ubuntu's FFmpeg did not recognize `-fps_mode` in
 `scripts/make_test_media.py`; the Windows job was canceled. That fixture
