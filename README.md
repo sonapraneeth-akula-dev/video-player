@@ -16,6 +16,10 @@ SHA-256-verified `libmpv-2.dll` into `vendor/`. The script needs Windows'
 built-in `tar`.
 
 On Ubuntu 22.04, run `sudo apt install libmpv1 libxcb-cursor0` instead.
+For complete prerequisites, Windows/Ubuntu setup, test commands, build
+artifacts, and known CI limitations, see [Setup and build](docs/SETUP.md).
+For the native crash history and remaining investigation, see
+[Native crash investigation](docs/CRASHES.md).
 
 Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
 Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
@@ -50,12 +54,11 @@ container automatically.
 The SFTP connection dialog verifies unknown and changed SSH host keys before
 authentication. Trust once applies only to the current connection; trust and
 remember updates the application's known-hosts file without editing
-`~/.ssh/known_hosts`. Automatic reconnect fails without a trust prompt if the
-key is unknown or differs from the approved key. SFTP browsing is not yet
-exposed through the main window.
+`~/.ssh/known_hosts`. Automatic reconnection after a network drop is not yet
+implemented. SFTP browsing is not yet exposed through the main window.
 `SftpStream` reads remote files into one in-memory 4 MiB block using bounded
 SFTP requests. Reads may stop at a block boundary; the mpv stream callback
-integration needed for remote playback is still pending.
+supports remote playback in the `Player` facade.
 The lazy `SftpDirModel` lists remote folders on a worker thread and displays
 permission or missing-folder errors inline. It is not yet attached to the
 main-window browser.
@@ -65,7 +68,8 @@ when opted in, in the OS keyring, never in the INI; a saved profile restores
 the secret for subsequent connections when that keyring is available.
 `parse_sftp_uri()` validates and decodes SFTP URIs without accepting passwords
 in URLs; `ConnectDialog.for_sftp_uri()` selects one matching saved profile or
-prefills a new connection. CLI remote playback still awaits stream integration.
+prefills a new connection. CLI remote playback still awaits connection/UI
+wiring.
 SSH aliases resolve HostName, Port, User and IdentityFile before connecting;
 typed fields take precedence. Potentially executable `Match exec` blocks and
 canonicalization directives are skipped; ignored settings appear in the

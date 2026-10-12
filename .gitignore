@@ -1,4 +1,6 @@
 .venv/
+build/
+dist/
 *.egg-info/
 __pycache__/
 .pytest_cache/
@@ -6,4 +8,3 @@ __pycache__/
 .ruff_cache/
 tests/media/
 vendor/
-
