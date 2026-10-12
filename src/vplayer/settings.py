@@ -2,8 +2,10 @@
 
 import logging
 import math
+import os
 import uuid
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, QStandardPaths
@@ -49,6 +51,7 @@ class Settings:
         self.seek_long_s = 60
         self.speed_step = 0.05
         self.pitch_correction = True
+        self.resume_enabled = False
         self.skip_frames = 10
         self.readahead_mb = 64
         self.backbuffer_mb = 256
@@ -69,6 +72,16 @@ class Settings:
                 return number
         except (TypeError, ValueError):
             pass
+        log.warning("Invalid %s setting %r; using %s", key, value, default)
+        self.store.setValue(key, default)
+        return default
+
+    def _bool(self, key: str, default: bool) -> bool:
+        value = self.store.value(key, default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.lower() in ("true", "false"):
+            return value.lower() == "true"
         log.warning("Invalid %s setting %r; using %s", key, value, default)
         self.store.setValue(key, default)
         return default
@@ -102,15 +115,8 @@ class Settings:
             step = 0.05
             self.store.setValue("playback/speed_step", step)
         self.speed_step = step
-        value = self.store.value("playback/pitch_correction", True)
-        if isinstance(value, bool):
-            self.pitch_correction = value
-        elif isinstance(value, str) and value.lower() in ("true", "false"):
-            self.pitch_correction = value.lower() == "true"
-        else:
-            log.warning("Invalid playback/pitch_correction setting %r; using True", value)
-            self.pitch_correction = True
-            self.store.setValue("playback/pitch_correction", True)
+        self.pitch_correction = self._bool("playback/pitch_correction", True)
+        self.resume_enabled = self._bool("resume/enabled", False)
         self.store.sync()
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not read/write settings: {self.store.fileName()}")
@@ -123,6 +129,50 @@ class Settings:
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not save pitch correction: {self.store.fileName()}")
         self.pitch_correction = enabled
+
+    def set_resume_enabled(self, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
+            raise TypeError("Resume enabled must be a boolean")
+        self.store.setValue("resume/enabled", enabled)
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not save resume preference: {self.store.fileName()}")
+        self.resume_enabled = enabled
+
+    @staticmethod
+    def _resume_key(file: Path) -> str:
+        if not isinstance(file, Path) or not file.is_absolute():
+            raise ValueError("Resume path must be an absolute local file path")
+        return f"resume/positions/{sha256(os.path.normcase(str(file.resolve())).encode('utf-8')).hexdigest()}"
+
+    def resume_position(self, file: Path) -> float | None:
+        key = self._resume_key(file)
+        value = self.store.value(key)
+        if value is None:
+            return None
+        try:
+            if isinstance(value, bool) or not isinstance(value, (str, float, int)):
+                raise TypeError("Invalid resume position")
+            position = float(value)
+            if not math.isfinite(position) or position < 0:
+                raise ValueError("Invalid resume position")
+            return position
+        except (TypeError, ValueError):
+            log.warning("Invalid %s setting %r; removing it", key, value)
+            self.store.remove(key)
+            self.store.sync()
+            if self.store.status() != QSettings.Status.NoError:
+                raise OSError(f"Could not repair resume position: {self.store.fileName()}")
+            return None
+
+    def set_resume_position(self, file: Path, position: float) -> None:
+        key = self._resume_key(file)
+        if isinstance(position, bool) or not isinstance(position, (float, int)) or not math.isfinite(position) or position < 0:
+            raise ValueError("Resume position must be a nonnegative finite number")
+        self.store.setValue(key, position)
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not save resume position: {self.store.fileName()}")
 
     def connection_profiles(self) -> list[ConnectionProfile]:
         profiles = []

@@ -75,6 +75,8 @@ def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
         QTest.keyClick(preferences.pitch_correction, Qt.Key.Key_Space)
         assert not preferences.pitch_correction.isChecked()
         QTest.keyClick(preferences.pitch_correction, Qt.Key.Key_Tab)
+        assert preferences.resume_enabled.hasFocus()
+        QTest.keyClick(preferences.resume_enabled, Qt.Key.Key_Tab)
         assert QApplication.focusWidget().accessibleName() == "OK"
         preferences.close()
     finally:

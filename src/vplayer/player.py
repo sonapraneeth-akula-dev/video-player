@@ -81,6 +81,7 @@ class Player(QObject):
         self._close_lock = threading.Lock()
         self._loaded_pending = False
         self._uri = ""
+        self._start_position: float | None = None
         self._pending_frame_steps: list[int] = []
         self._pending_skip: int | None = None
         self._skip_total = 0
@@ -154,7 +155,10 @@ class Player(QObject):
                     return
                 if self.mpv.__getitem__("force-media-title", file_local=True) == PROBE_TITLE:
                     # Software probe finished: reload for real, with hwdec only if software could open the video.
-                    self.mpv.loadfile(self.mpv.path, hwdec="auto-safe" if self.mpv.video_codec else "no")
+                    options = {"hwdec": "auto-safe" if self.mpv.video_codec else "no"}
+                    if self._start_position is not None:
+                        options["start"] = str(self._start_position)
+                    self.mpv.loadfile(self.mpv.path, **options)
                     return
             # A hwdec attempt can fail mid-stream and fall back; announce the file once decoding has settled.
             self._loaded_pending = True
@@ -371,8 +375,20 @@ class Player(QObject):
         if self._skip_start is not None:
             self._stop_skip()
 
-    def load(self, path: str | Path, *, transport: paramiko.Transport | None = None) -> None:
+    def load(
+        self, path: str | Path, *, transport: paramiko.Transport | None = None,
+        start_position: float | None = None,
+    ) -> None:
+        if start_position is not None and (
+            isinstance(start_position, bool)
+            or not isinstance(start_position, (float, int))
+            or not math.isfinite(start_position)
+            or start_position < 0
+        ):
+            raise ValueError("Start position must be a nonnegative finite number")
         if transport is not None:
+            if start_position is not None:
+                raise ValueError("Resume position is only supported for local files")
             if not isinstance(transport, paramiko.Transport) or not transport.is_authenticated():
                 self.error.emit("An authenticated SSH connection is required")
                 return
@@ -386,6 +402,7 @@ class Player(QObject):
             self.mpv["demuxer-max-back-bytes"] = max(0, self.backbuffer_mb - 1) * 1024 * 1024
             self._sftp_sources.clear()
             self._uri = f"vpsftp://{uuid.uuid4().hex}/{posixpath.basename(path)}"
+            self._start_position = None
             self._sftp_sources[self._uri] = (transport, path)
             self.variable_frame_rate = False
             self._vfr_checked = False
@@ -402,6 +419,7 @@ class Player(QObject):
         self.mpv["demuxer-max-bytes"] = 64 * 1024 * 1024
         self.mpv["demuxer-max-back-bytes"] = 32 * 1024 * 1024
         self._uri = str(file.resolve())
+        self._start_position = start_position
         self.variable_frame_rate = False
         self._vfr_checked = False
         self._pending_skip = None

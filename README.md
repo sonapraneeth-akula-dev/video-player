@@ -44,6 +44,10 @@ Use **]** / **[** to adjust speed by the configured step (default 0.05×), or
 Audio pitch stays corrected at non-1× speed by default; uncheck
 **File > Preferences > Preserve audio pitch when changing speed** to turn
 correction off. The choice persists across launches.
+To reopen local files at their last saved position, enable **File > Preferences >
+Resume local files from the last position**. It is off by default; closing
+the window or opening another file saves the current position when enabled.
+Disabling it starts files from the beginning without erasing saved positions.
 Choose an audio or embedded subtitle track from the **Audio** or
 **Subtitles** menu; **A** and **J** cycle through their tracks and Off.
 Set an A-B repeat segment from **Playback > Set loop start/end** at the current

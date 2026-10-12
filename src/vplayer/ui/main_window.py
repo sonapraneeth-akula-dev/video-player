@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         self.resize(960, 600)
         self.settings = settings or Settings()
         self.settings.load()
+        self._current_file: Path | None = None
         self.player = Player(
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
             snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
@@ -361,9 +362,10 @@ class MainWindow(QMainWindow):
             dialog.raise_()
             dialog.activateWindow()
             return
-        dialog = PreferencesDialog(self.settings.pitch_correction, self)
+        dialog = PreferencesDialog(self.settings.pitch_correction, self, resume_enabled=self.settings.resume_enabled)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.accepted.connect(lambda: self._save_pitch_preference(dialog.pitch_correction.isChecked()))
+        dialog.accepted.connect(lambda: self._save_resume_preference(dialog.resume_enabled.isChecked()))
         dialog.open()
 
     def _save_pitch_preference(self, enabled: bool):
@@ -373,9 +375,31 @@ class MainWindow(QMainWindow):
         except (OSError, RuntimeError, SystemError, mpv.PropertyUnavailableError) as error:
             self.show_error(f"Could not save pitch correction: {error}")
 
+    def _save_resume_preference(self, enabled: bool):
+        try:
+            self.settings.set_resume_enabled(enabled)
+        except OSError as error:
+            self.show_error(f"Could not save resume preference: {error}")
+
+    def _save_position(self):
+        if not self.settings.resume_enabled or self._current_file is None:
+            return
+        if self.player.mpv.path != str(self._current_file):
+            return
+        position = self.player.mpv.time_pos
+        if isinstance(position, (int, float)) and math.isfinite(position) and position >= 0:
+            self.settings.set_resume_position(self._current_file, position)
+
     def open_file(self, path: str | Path):
         self.banner.hide()
-        self.player.load(path)
+        file = Path(path)
+        if not file.is_file():
+            self.player.load(path)
+            return
+        self._save_position()
+        self._current_file = file.resolve()
+        start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
+        self.player.load(self._current_file, start_position=start)
 
     def _refresh_tracks(self):
         tracks = self.player.mpv.track_list
@@ -475,6 +499,7 @@ class MainWindow(QMainWindow):
             self.showNormal()
 
     def closeEvent(self, event):
+        self._save_position()
         if shiboken6.isValid(self.video):
             self.video.dispose()
         self.player.close()

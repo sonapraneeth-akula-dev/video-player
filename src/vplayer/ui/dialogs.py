@@ -37,7 +37,7 @@ from vplayer.sftp import (
 
 
 class PreferencesDialog(QDialog):
-    def __init__(self, pitch_correction: bool, parent=None):
+    def __init__(self, pitch_correction: bool, parent=None, *, resume_enabled: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         layout = QVBoxLayout(self)
@@ -45,6 +45,10 @@ class PreferencesDialog(QDialog):
         self.pitch_correction.setAccessibleName("Preserve audio pitch")
         self.pitch_correction.setChecked(pitch_correction)
         layout.addWidget(self.pitch_correction)
+        self.resume_enabled = QCheckBox("Resume local files from the last position", self)
+        self.resume_enabled.setAccessibleName("Resume local files")
+        self.resume_enabled.setChecked(resume_enabled)
+        layout.addWidget(self.resume_enabled)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self,
         )

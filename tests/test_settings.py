@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QSettings
@@ -80,6 +81,39 @@ def test_pitch_correction_setting_is_validated_and_persists(tmp_path, caplog):
         assert settings.pitch_correction is True
         assert settings.store.value("playback/pitch_correction") in (True, "true")
     assert "Invalid playback/pitch_correction" in caplog.text
+
+
+def test_resume_settings_are_opt_in_validated_and_persist(tmp_path, caplog):
+    path = tmp_path / "settings.ini"
+    file = tmp_path / "movie.mp4"
+    settings = Settings(path)
+    settings.load()
+    assert settings.resume_enabled is False
+    assert settings.resume_position(file) is None
+    settings.set_resume_enabled(True)
+    settings.set_resume_position(file, 120.25)
+    restored = Settings(path)
+    restored.load()
+    assert restored.resume_enabled is True
+    assert restored.resume_position(file) == 120.25
+    assert not any("movie.mp4" in key for key in restored.store.allKeys())
+    with pytest.raises(TypeError, match="boolean"):
+        settings.set_resume_enabled("true")
+    for position in (float("nan"), float("inf"), -1, True, "120"):
+        with pytest.raises(ValueError, match="position"):
+            settings.set_resume_position(file, position)
+    with pytest.raises(ValueError, match="absolute"):
+        settings.resume_position(Path("relative.mp4"))
+    key = settings._resume_key(file)
+    settings.store.setValue(key, "not-a-number")
+    with caplog.at_level(logging.WARNING):
+        assert settings.resume_position(file) is None
+    assert settings.store.value(key) is None
+    settings.store.setValue("resume/enabled", "invalid")
+    with caplog.at_level(logging.WARNING):
+        settings.load()
+    assert settings.resume_enabled is False
+    assert "Invalid resume/enabled" in caplog.text
 
 
 def test_remote_buffer_settings_are_bounded(tmp_path, caplog):

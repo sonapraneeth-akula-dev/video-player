@@ -1003,7 +1003,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 14.1.1.1.1 | Task | Resume position — store per local file on close (new `resume` settings group + enable flag, design §5.2 to be extended); apply on reopen | 01:30 | 00:20 | Test: close at 2:00 → reopen within one keyframe; disabled → starts at 0 | FR-032; post-v1 |
+| 14.1.1.1.1 | Task | [x] Resume position — store per local file on close (new `resume` settings group + enable flag, design §5.2 to be extended); apply on reopen | 01:30 | 00:20 | Test: close at 2:00 → reopen within one keyframe; disabled → starts at 0 | FR-032; opt-in setting preserves start-at-zero default; local file positions saved on close or replacement under hashed canonical paths, restored on final mpv load without altering the software probe. Two-minute seek/reopen, per-file isolation, disabled path, validation and preferences covered in `tests/test_resume.py` and `tests/test_settings.py`; v0.32.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: close → reopen resumes within one keyframe (US-065)

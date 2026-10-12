@@ -464,6 +464,8 @@ QSettings INI keys (file: Windows `%APPDATA%\vplayer\vplayer.ini`, Linux
 | playback | `pitch_correction` | bool | no | — | Default true (FR-010) |
 | playback | `hwdec` | enum `auto-safe`/`no` | no | — | Default `auto-safe` |
 | playback | `overlay` | bool | no | — | Frame/timecode overlay on/off |
+| resume | `enabled` | bool | no | — | Default false; opt in to resuming local files (FR-032) |
+| resume/positions | `<sha256 of normalized absolute path>` | float seconds | yes | file path hash | Store on close or replacement; no plaintext local paths or SFTP positions |
 | snapshot | `dir` | path | no | — | Default `<Pictures>/vplayer` |
 | snapshot | `format` | enum `png`/`jpg` | no | — | Default `png`; decides the file extension, which sets mpv's output format |
 | snapshot | `jpeg_quality` | int | no | — | Default 90; 50–100 |
