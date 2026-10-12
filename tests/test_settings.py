@@ -39,6 +39,38 @@ def test_settings_keep_newer_schema_and_valid_seeks(tmp_path):
     assert int(raw.value("schema_version")) == 2
 
 
+def test_recent_files_dedupe_cap_and_reject_credentials(tmp_path):
+    path = tmp_path / "settings.ini"
+    settings = Settings(path)
+    files = [str(tmp_path / f"clip-{index}.mp4") for index in range(22)]
+    for item in files:
+        settings.add_recent_item(item)
+    assert settings.recent_items() == files[:1:-1]
+    settings.add_recent_item(files[10])
+    assert settings.recent_items()[0] == files[10]
+    assert len(settings.recent_items()) == 20
+    remote = "sftp://viewer@host.example:2222/media/clip%20one.mp4"
+    settings.add_recent_item(remote)
+    assert Settings(path).recent_items()[0] == remote
+    for invalid in ("sftp://viewer:secret@host.example/file", "sftp://host.example/file?secret=1",
+                    "relative.mp4", "https://host.example/clip.mp4"):
+        with pytest.raises(ValueError):
+            settings.add_recent_item(invalid)
+    assert "secret" not in path.read_text(encoding="utf-8")
+
+
+def test_recent_files_repairs_invalid_and_duplicate_entries_without_logging_secrets(tmp_path, caplog):
+    path = tmp_path / "settings.ini"
+    settings = Settings(path)
+    good = str(tmp_path / "good.mp4")
+    settings.store.setValue("recent/items", [good, "sftp://user:password@host/file", good, "relative.mp4"])
+    settings.store.sync()
+    with caplog.at_level(logging.WARNING):
+        assert settings.recent_items() == [good]
+    assert "password" not in caplog.text
+    assert "password" not in path.read_text(encoding="utf-8")
+
+
 def test_fractional_and_boolean_seek_settings_fall_back(tmp_path):
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("playback/seek_short_s", 2.5)

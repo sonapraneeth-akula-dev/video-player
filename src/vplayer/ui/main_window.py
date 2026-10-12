@@ -1,9 +1,10 @@
-"""Main window for local playback."""
+"""Main window for local and remote playback."""
 
 import math
 from pathlib import Path
 
 import mpv
+import paramiko
 import shiboken6
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QPainter, QPen
@@ -26,8 +27,9 @@ from vplayer import APP_NAME
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
 from vplayer.settings import Settings
+from vplayer.sftp import KnownHosts, SshPool
 from vplayer.ui.browser import BrowserDock
-from vplayer.ui.dialogs import PreferencesDialog
+from vplayer.ui.dialogs import ConnectDialog, PreferencesDialog
 
 
 class SeekBar(QSlider):
@@ -125,6 +127,10 @@ class MainWindow(QMainWindow):
         self.settings = settings or Settings()
         self.settings.load()
         self._current_file: Path | None = None
+        self._active_transport = None
+        self._transports = []
+        self._pending_recent: tuple[str, str] | None = None
+        self._connect_dialog = None
         self.player = Player(
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
             snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
@@ -135,6 +141,7 @@ class MainWindow(QMainWindow):
         self.speed_label.setAccessibleName("Playback speed")
         self.statusBar().addPermanentWidget(self.speed_label)
         self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
+        self.player.file_loaded.connect(self._file_opened)
         self.player.skip_status.connect(self.statusBar().showMessage)
         self.snapshot_button = QPushButton("Open folder", self)
         self.snapshot_button.setAccessibleName("Open snapshot folder")
@@ -183,6 +190,9 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self.choose_file)
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu.addAction(open_action)
+        self.recent_menu = self.file_menu.addMenu("Recent Files")
+        self.recent_menu.aboutToShow.connect(self._refresh_recent_menu)
+        self._refresh_recent_menu()
         preferences_action = QAction("Preferences...", self)
         preferences_action.triggered.connect(self.show_preferences)
         self.file_menu.addAction(preferences_action)
@@ -391,14 +401,68 @@ class MainWindow(QMainWindow):
 
     def open_file(self, path: str | Path):
         self.banner.hide()
+        if isinstance(path, str) and path.lower().startswith("sftp://"):
+            if self._connect_dialog is not None and self._connect_dialog.isVisible():
+                self._connect_dialog.raise_()
+                self._connect_dialog.activateWindow()
+                return
+            try:
+                dialog = ConnectDialog.for_sftp_uri(
+                    path, settings=self.settings, pool=SshPool(KnownHosts()), parent=self,
+                )
+            except (OSError, TypeError, ValueError, paramiko.SSHException) as error:
+                self.show_error(f"Could not open SFTP file: {error}")
+                return
+            self._connect_dialog = dialog
+            dialog.connected.connect(lambda transport: self._open_remote(path, dialog.remote_path, transport))
+            dialog.finished.connect(lambda: setattr(self, "_connect_dialog", None))
+            dialog.open()
+            return
         file = Path(path)
         if not file.is_file():
             self.player.load(path)
             return
         self._save_position()
         self._current_file = file.resolve()
+        self._active_transport = None
         start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
         self.player.load(self._current_file, start_position=start)
+        self._pending_recent = (self.player._uri, str(self._current_file))
+
+    def _open_remote(self, uri: str, remote_path: str, transport):
+        self._save_position()
+        self._current_file = None
+        self._active_transport = transport
+        self._transports.append(transport)
+        self.player.load(remote_path, transport=transport)
+        self._pending_recent = (self.player._uri, uri)
+
+    def _file_opened(self):
+        for transport in self._transports[:]:
+            if transport is not self._active_transport:
+                transport.close()
+                self._transports.remove(transport)
+        if self._pending_recent is not None and self._pending_recent[0] == self.player._uri:
+            try:
+                self.settings.add_recent_item(self._pending_recent[1])
+                self._refresh_recent_menu()
+            except OSError as error:
+                self.show_error(str(error))
+            self._pending_recent = None
+
+    def _refresh_recent_menu(self):
+        self.recent_menu.clear()
+        try:
+            items = self.settings.recent_items()
+        except OSError as error:
+            self.show_error(str(error))
+            items = []
+        for item in items:
+            action = self.recent_menu.addAction(item.replace("&", "&&"))
+            action.setData(item)
+            action.triggered.connect(lambda checked=False, source=item: self.open_file(source))
+        if not items:
+            self.recent_menu.addAction("(empty)").setEnabled(False)
 
     def _refresh_tracks(self):
         tracks = self.player.mpv.track_list
@@ -498,8 +562,13 @@ class MainWindow(QMainWindow):
             self.showNormal()
 
     def closeEvent(self, event):
+        if self._connect_dialog is not None:
+            self._connect_dialog.reject()
         self._save_position()
         if shiboken6.isValid(self.video):
             self.video.dispose()
         self.player.close()
+        for transport in self._transports:
+            transport.close()
+        self._transports.clear()
         super().closeEvent(event)

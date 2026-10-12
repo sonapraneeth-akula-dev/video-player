@@ -30,6 +30,11 @@ You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
 `vplayer --version` to print the version, or `vplayer --new-window FILE`. Until
 tabs and single-instance routing are added, each CLI file opens in its own
 window; every launch already creates a new window.
+Use `vplayer sftp://user@host:port/path` to authenticate and play a remote
+file without downloading a local copy. **File > Recent Files** reopens the
+last 20 successfully loaded local or SFTP files, newest first. Remote entries
+ask for authentication again unless a saved profile has a keyring secret;
+passwords are never accepted in SFTP URIs or saved in recent items.
 Use **Ctrl+B** to show or hide the local file browser; **All files** reveals
 files outside the media extension filter. Double-click or press **Enter** on a
 folder to open it, or on a video to play it.
@@ -87,8 +92,8 @@ when opted in, in the OS keyring, never in the INI; a saved profile restores
 the secret for subsequent connections when that keyring is available.
 `parse_sftp_uri()` validates and decodes SFTP URIs without accepting passwords
 in URLs; `ConnectDialog.for_sftp_uri()` selects one matching saved profile or
-prefills a new connection. CLI remote playback still awaits connection/UI
-wiring.
+prefills a new connection. The CLI and Recent Files menu use this dialog to
+connect before starting remote playback.
 SSH aliases resolve HostName, Port, User and IdentityFile before connecting;
 typed fields take precedence. Potentially executable `Match exec` blocks and
 canonicalization directives are skipped; ignored settings appear in the

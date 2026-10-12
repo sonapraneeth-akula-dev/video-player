@@ -174,6 +174,53 @@ class Settings:
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not save resume position: {self.store.fileName()}")
 
+    @staticmethod
+    def _recent_item(item: str) -> str:
+        if not isinstance(item, str) or not item:
+            raise ValueError("Recent item must be an absolute path or SFTP URI")
+        if item.lower().startswith("sftp://"):
+            from vplayer.sftp import parse_sftp_uri
+
+            parse_sftp_uri(item)
+            return item
+        if "://" in item or not Path(item).is_absolute():
+            raise ValueError("Recent item must be an absolute path or SFTP URI")
+        return str(Path(item).resolve())
+
+    def recent_items(self) -> list[str]:
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not read recent files: {self.store.fileName()}")
+        raw = self.store.value("recent/items", [])
+        entries = [raw] if isinstance(raw, str) else raw
+        if not isinstance(entries, list):
+            entries = []
+        result = []
+        for entry in entries:
+            try:
+                item = self._recent_item(entry)
+            except (TypeError, ValueError):
+                log.warning("Ignoring invalid recent file entry")
+                continue
+            if item not in result:
+                result.append(item)
+            if len(result) == 20:
+                break
+        if result != entries:
+            self.store.setValue("recent/items", result)
+            self.store.sync()
+            if self.store.status() != QSettings.Status.NoError:
+                raise OSError(f"Could not repair recent files: {self.store.fileName()}")
+        return result
+
+    def add_recent_item(self, item: str) -> None:
+        item = self._recent_item(item)
+        entries = self.recent_items()
+        self.store.setValue("recent/items", [item, *(entry for entry in entries if entry != item)][:20])
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not save recent files: {self.store.fileName()}")
+
     def connection_profiles(self) -> list[ConnectionProfile]:
         profiles = []
         self.store.beginGroup("connections")
