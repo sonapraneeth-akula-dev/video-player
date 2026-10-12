@@ -114,8 +114,8 @@ is **not** bundled into the wheel. `build\` and `dist\` are ignored by Git.
 on**. PyInstaller cannot cross-compile, so run it once per OS.
 The manually triggered **Windows package** GitHub Actions workflow builds
 both Windows artifacts, checks the installer size, runs the packaged
-codec/container matrix, smoke-tests fresh installs with PATH on/off and
-uninstall, and uploads the results.
+codec/container matrix, smoke-tests fresh installs with PATH on/off, an upgrade
+from PATH on to off, and uninstall, and uploads the results.
 
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|

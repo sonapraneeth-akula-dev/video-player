@@ -80,12 +80,19 @@ try {
     Uninstall
     Assert-PathState $false $false
 
+    Install @()
+    Assert-PathState $true $true
+    Install @('/MERGETASKS=!addtopath')
+    Assert-PathState $false $false
+    Uninstall
+    Assert-PathState $false $false
+
     $currentUserPath = (Get-Item $environmentKey).GetValue('Path', $null, 'DoNotExpandEnvironmentNames')
     if ($currentUserPath -cne $originalUserPath -or
         ($null -ne $originalUserPath -and (Get-Item $environmentKey).GetValueKind('Path') -ne $originalPathKind)) {
         throw 'Uninstall did not restore the original user PATH and value type.'
     }
-    Write-Host 'Fresh install PATH on/off, vplayer --version, and uninstall passed.'
+    Write-Host 'Fresh install PATH on/off, upgrade PATH on to off, and uninstall passed.'
 } finally {
     Uninstall
     $env:Path = $originalProcessPath
