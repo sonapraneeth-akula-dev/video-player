@@ -104,6 +104,28 @@ On Ubuntu, replace the Python path with `./.venv/bin/python`. The wheel is a
 discoverable `libmpv-2.dll`, and Ubuntu needs `libmpv1` and desktop libraries.
 The checked-out Windows app finds the fetched DLL in `vendor\`; that directory
 is **not** bundled into the wheel. `build\` and `dist\` are ignored by Git.
-PyInstaller/Inno Setup packaging, an AppImage, and installer scripts remain
-planned tasks in the [Azure task list](plans/2026-10-11_video-player_azure-task-list.md);
-there is currently no release-installer build command to run.
+
+## Portable and installable packages
+
+`scripts/package.py` builds a self-contained PyInstaller one-folder bundle
+(app, Python, Qt and libmpv) and then both package kinds **for the OS it runs
+on**. PyInstaller cannot cross-compile, so run it once per OS.
+
+| OS | Prerequisites | Portable | Installable |
+|---|---|---|---|
+| Windows | `scripts\fetch_libmpv.py`; [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup --scope user`) | `VPlayer-<v>-windows-x64-portable.zip`: unzip, run `vplayer\vplayer.exe` | `VPlayer-<v>-windows-x64-setup.exe`: per-user, no admin; Start menu, optional PATH, "Open with" and "Open in new VPlayer window"; clean uninstall |
+| Linux | `libmpv1` (bundled from the build machine; build on Ubuntu 22.04 for widest reach), [appimagetool](https://github.com/AppImage/appimagetool/releases) on `PATH` | `VPlayer-<v>-linux-<arch>.AppImage`: `chmod +x`, run | `VPlayer-<v>-linux-<arch>.tar.gz`: extract, `./install.sh` (`--uninstall` to remove) |
+| macOS | `brew install mpv` (libmpv is bundled into the app) | `VPlayer-<v>-macos-<arch>.zip`: unzipped `VPlayer.app` | `VPlayer-<v>-macos-<arch>.dmg` |
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[package]"
+.\.venv\Scripts\python.exe scripts\package.py
+$env:VPLAYER_BIN = "$PWD\dist\vplayer\vplayer.exe"; .\.venv\Scripts\python.exe -m pytest tests\test_codecs.py -k packaged
+```
+
+Set `VPLAYER_LIBMPV` to override which libmpv file the bundle includes.
+Packages are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first
+launch. Settings and logs stay in the user profile, also for the portable build.
+Only the Windows packages have been built and tested so far (installer
+install/uninstall, PATH and registry cleanup, and the packaged codec matrix);
+the Linux and macOS paths are untested.

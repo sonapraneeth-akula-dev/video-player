@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "pytest-qt", "ruff", "psutil"]
+package = ["pyinstaller>=6,<7"]
 
 [project.scripts]
 vplayer = "vplayer.__main__:main"

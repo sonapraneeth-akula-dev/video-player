@@ -2,6 +2,7 @@
 
 import argparse
 import ctypes
+import ctypes.util
 import locale
 import logging
 import os
@@ -99,9 +100,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.codec_probe and len(args.files) != 1:
         parser.error("--codec-probe requires exactly one FILE")
 
+    libdir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2] / "vendor"))
     if sys.platform == "win32":
-        vendor = Path(__file__).resolve().parents[2] / "vendor"
-        os.environ["PATH"] = str(vendor) + os.pathsep + os.environ["PATH"]
+        os.environ["PATH"] = str(libdir) + os.pathsep + os.environ["PATH"]
+    elif getattr(sys, "frozen", False):
+        # python-mpv only asks find_library, which never searches the bundle.
+        bundled = str(next(libdir.glob("libmpv*")))
+        find = ctypes.util.find_library
+        ctypes.util.find_library = lambda name: bundled if name == "mpv" else find(name)
 
     app = QApplication([sys.argv[0]])
     app.setApplicationName(APP_NAME)

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VPlayer
+Comment=Desktop video player for local and SFTP media
+Exec=vplayer %F
+Icon=vplayer
+Terminal=false
+Categories=AudioVideo;Video;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mp2t;video/x-m4v;video/x-ms-wmv;video/x-flv;video/mpeg;
