@@ -38,6 +38,17 @@ CORRUPT_SOURCES = (
 )
 
 
+def passthrough_sync() -> tuple[str, str]:
+    options = subprocess.check_output(
+        ["ffmpeg", "-hide_banner", "-h", "full"], text=True, stderr=subprocess.STDOUT,
+    )
+    if "-fps_mode" in options:
+        return "-fps_mode", "passthrough"
+    if "-vsync" in options:
+        return "-vsync", "0"
+    raise RuntimeError("FFmpeg has no passthrough video sync option")
+
+
 def generate(directory: Path = MEDIA) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for rate, name, offset in (
@@ -52,7 +63,7 @@ def generate(directory: Path = MEDIA) -> None:
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                 "-f", "lavfi", "-i", f"nullsrc=s={SIZE}:r={rate}",
                 "-frames:v", str(FRAMES), "-vf", filters,
-                "-fps_mode", "passthrough", "-c:v", "libx264",
+                *passthrough_sync(), "-c:v", "libx264",
                 "-pix_fmt", "yuv420p", "-qp", "0",
                 "-g", "250", "-keyint_min", "250", "-sc_threshold", "0",
                 str(directory / name),
@@ -101,7 +112,7 @@ def generate_vfr(directory: Path = MEDIA) -> Path:
             "-f", "lavfi", "-i", f"nullsrc=s={SIZE}:r=60",
             "-frames:v", "90",
             "-vf", f"{INDEX},setpts='3*floor(N/2)+2*mod(N,2)'",
-            "-fps_mode", "passthrough", "-c:v", "libx264",
+            *passthrough_sync(), "-c:v", "libx264",
             "-pix_fmt", "yuv420p", "-qp", "0",
             "-g", "250", "-keyint_min", "250", "-sc_threshold", "0",
             str(target),

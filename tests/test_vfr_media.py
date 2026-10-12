@@ -2,7 +2,7 @@ import json
 import subprocess
 from itertools import pairwise
 
-from scripts.make_test_media import generate_vfr
+from scripts.make_test_media import generate_vfr, passthrough_sync
 
 
 def test_generated_vfr_clip_alternates_frame_durations(tmp_path):
@@ -25,7 +25,7 @@ def test_generated_vfr_clip_alternates_frame_durations(tmp_path):
 
     video = subprocess.check_output([
         "ffmpeg", "-v", "error", "-i", str(path), "-map", "0:v:0",
-        "-frames:v", "4", "-fps_mode", "passthrough", "-pix_fmt", "bgr0", "-f", "rawvideo", "-",
+        "-frames:v", "4", *passthrough_sync(), "-pix_fmt", "bgr0", "-f", "rawvideo", "-",
     ])
     stride = 256 * 4
     frame_bytes = stride * 144

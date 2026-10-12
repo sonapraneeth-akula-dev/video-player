@@ -2,6 +2,8 @@ import json
 import subprocess
 from fractions import Fraction
 
+import pytest
+
 from scripts.make_test_media import (
     CORRUPT_SOURCES,
     FRAMES,
@@ -9,7 +11,26 @@ from scripts.make_test_media import (
     SIZE,
     generate,
     generate_corrupt,
+    passthrough_sync,
 )
+
+
+@pytest.mark.parametrize(
+    ("available", "expected"),
+    [
+        ("-fps_mode -vsync", ("-fps_mode", "passthrough")),
+        ("-vsync", ("-vsync", "0")),
+    ],
+)
+def test_passthrough_sync_uses_supported_ffmpeg_option(monkeypatch, available, expected):
+    monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: available)
+    assert passthrough_sync() == expected
+
+
+def test_passthrough_sync_requires_supported_ffmpeg_option(monkeypatch):
+    monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: "")
+    with pytest.raises(RuntimeError, match="passthrough"):
+        passthrough_sync()
 
 
 def test_frame_indexed_clips(tmp_path):
