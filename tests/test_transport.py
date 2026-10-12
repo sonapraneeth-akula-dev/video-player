@@ -26,6 +26,8 @@ def test_play_pause_and_click_drag_seek(qtbot, tmp_path, monkeypatch):
         window.controls.widgetForAction(window.controls.play_action).click()
         qtbot.waitUntil(lambda: window.player.state()["pause"] is True)
         qtbot.waitUntil(lambda: window.controls.play_action.text() == "Play")
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
         QTest.keyClick(window, Qt.Key.Key_Space)
         qtbot.waitUntil(lambda: window.player.state()["pause"] is False)
 
