@@ -16,6 +16,8 @@ def test_visible_keyboard_controls_have_accessible_names(qtbot, tmp_path: Path):
     window = MainWindow(settings)
     qtbot.addWidget(window)
     window.show()
+    # Keep a late no-media duration update from disabling the synthetic seek control.
+    window.player.duration.disconnect(window._duration_changed)
     window.seek_bar.setEnabled(True)
     window.controls.play_action.setEnabled(True)
     preferences = PreferencesDialog(True, window)
@@ -52,6 +54,7 @@ def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
         qtbot.waitUntil(window.isActiveWindow)
         window.video.setFocus()
         qtbot.waitUntil(window.video.hasFocus)
+        window.player.duration.disconnect(window._duration_changed)
         window.seek_bar.setEnabled(True)
         window.controls.play_action.setEnabled(True)
         assert window.video_focus.isVisible()
