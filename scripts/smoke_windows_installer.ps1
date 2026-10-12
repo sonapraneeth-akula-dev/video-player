@@ -101,7 +101,8 @@ try {
     $currentUserPath = (Get-Item $environmentKey).GetValue('Path', $null, 'DoNotExpandEnvironmentNames')
     if ($currentUserPath -cne $originalUserPath -or
         ($null -ne $originalUserPath -and (Get-Item $environmentKey).GetValueKind('Path') -ne $originalPathKind)) {
-        throw 'Uninstall did not restore the original user PATH and value type.'
+        $currentPathKind = if ($null -ne $currentUserPath) { (Get-Item $environmentKey).GetValueKind('Path') }
+        throw "Uninstall changed user PATH: before present=$($null -ne $originalUserPath) kind=$originalPathKind length=$($originalUserPath.Length); after present=$($null -ne $currentUserPath) kind=$currentPathKind length=$($currentUserPath.Length)"
     }
     Write-Host 'Fresh install PATH on/off, upgrade PATH on to off, and uninstall passed.'
 } finally {
