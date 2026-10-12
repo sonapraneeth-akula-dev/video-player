@@ -291,7 +291,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 2.2.2.2.1 | Task | [x] `tests/test_sftp_buffers.py` — sample `demuxer-cache-state` every 100 ms during play, seeks, back-steps: `fw-bytes` + 8 MiB ≤ `readahead_mb`, `total-bytes` ≤ readahead + backbuffer; play-to-EOF back-buffer check and `demuxer-donate-buffer` = `no` | 02:30 | 00:25 | Green on Linux CI | Generated > 16 MiB remote clip exercises cache beyond 6 MiB; four Docker-backed Windows runs pass, including EOF back-buffer bound; Linux CI pending |
-| 2.2.2.2.2 | Task | [x] `tests/test_zero_writes.py` — play SFTP 60 s, diff temp/cache/home dirs against the allow-list, scan written files for a 4 KB media sample; document the 2 h Procmon / `inotifywait` release run | 02:00 | 00:20 | CI green; release-run steps documented in the test docstring | Isolated HOME/TEMP/Qt cache verified; 60 s Docker SFTP loop and cross-chunk media-sample scan pass on Windows; Linux CI and 2 h release audit pending |
+| 2.2.2.2.2 | Task | [x] `tests/test_zero_writes.py` — play SFTP 60 s, diff temp/cache/home dirs against the allow-list, scan written files for a 4 KB media sample; document the 2 h Procmon / `inotifywait` release run | 02:00 | 00:20 | CI green; release-run steps documented in the test docstring | Isolated HOME/TEMP/Qt cache verified; 60 s Docker SFTP loop and cross-chunk media-sample scan pass on Windows. Linux child now overrides inherited XDG config/data homes alongside cache; Ubuntu audit rerun pending, 2 h release audit pending |
 
 ##### User Story 2.2.2.3 (US-018): `vplayer sftp://user@host/path` to stream a file
 - **Est. Manual**: 01:30 | **Est. AI**: 00:15

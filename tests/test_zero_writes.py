@@ -12,6 +12,7 @@ import tempfile
 import time
 from itertools import pairwise
 from pathlib import Path
+from types import SimpleNamespace
 
 import paramiko
 import pytest
@@ -50,6 +51,21 @@ def test_write_audit_detects_sample_across_read_boundary(tmp_path):
     assert not _contains_sample(file, b"z" * 4096)
 
 
+def test_zero_write_worker_redirects_xdg_config_and_data(tmp_path, monkeypatch):
+    environment = {}
+
+    def capture_worker(_command, **options):
+        environment.update(options["env"])
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", capture_worker)
+    server = SimpleNamespace(host="127.0.0.1", port=22, password="fixture")
+    test_sftp_playback_never_writes_media_to_disk(server, tmp_path)
+    assert Path(environment["XDG_CONFIG_HOME"]) == tmp_path / "local"
+    assert Path(environment["XDG_DATA_HOME"]) == tmp_path / "roaming"
+    assert Path(environment["XDG_CACHE_HOME"]) == tmp_path / "cache"
+
+
 @pytest.mark.sftp
 def test_sftp_playback_never_writes_media_to_disk(sftp_server, tmp_path):
     roots = [tmp_path / name for name in ("home", "temp", "cache", "local", "roaming")]
@@ -67,6 +83,8 @@ def test_sftp_playback_never_writes_media_to_disk(sftp_server, tmp_path):
         "TEMP": str(roots[1]),
         "TMPDIR": str(roots[1]),
         "XDG_CACHE_HOME": str(roots[2]),
+        "XDG_CONFIG_HOME": str(roots[3]),
+        "XDG_DATA_HOME": str(roots[4]),
         "LOCALAPPDATA": str(roots[3]),
         "APPDATA": str(roots[4]),
     })
@@ -86,7 +104,9 @@ def test_zero_writes_worker(qtbot):
     assert Path(tempfile.gettempdir()).resolve() == roots[1].resolve()
     for location in (QStandardPaths.StandardLocation.AppConfigLocation, QStandardPaths.StandardLocation.CacheLocation):
         target = Path(QStandardPaths.writableLocation(location)).resolve()
-        assert any(target.is_relative_to(root.resolve()) for root in roots)
+        assert any(target.is_relative_to(root.resolve()) for root in roots), (
+            f"Qt {location.name} escaped the isolated directories: {target}"
+        )
     player = Player(video_output="null")
     player.mpv.ao = "null"
     player.mpv.loop_file = "inf"
