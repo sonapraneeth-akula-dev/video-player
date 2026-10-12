@@ -87,11 +87,12 @@ def test_release_frees_render_context_without_swapping_update_callback(qtbot, mo
         render = widget._render
         events = []
         original_setattr = type(render).__setattr__
+        original_free = type(render).free
         monkeypatch.setattr(
             type(render), "__setattr__",
             lambda self, name, value: events.append(name) or original_setattr(self, name, value),
         )
-        monkeypatch.setattr(type(render), "free", lambda self, free=type(render).free: events.append("free") or free(self))
+        monkeypatch.setattr(type(render), "free", lambda self: events.append("free") or original_free(self))
         widget.release()
         assert events[0] == "free"
         assert "update_cb" not in events

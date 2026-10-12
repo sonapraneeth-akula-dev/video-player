@@ -69,11 +69,13 @@ with a usable hw device hits this on such a file: a bug in the pinned
 shinchiro `20261011` libmpv, not Qt/RDP.
 
 **Fix:** each load is a two-step `loadfile`. `Player._loadfile()` first loads
-with file-local `hwdec=no`, `mute=yes` and a marker `force-media-title`
-(software probe; tracks stay selected so audio-only files still load). On
-its `FILE_LOADED` (mpv event thread), the player reloads the same path with
-`hwdec=auto-safe` if a video decoder opened (`video-codec` set), else
-`hwdec=no`. Undecodable video therefore never reaches the looping hw path.
+with file-local `hwdec=no`, `ao=null`, `vo=null` and a marker
+`force-media-title` (software probe; tracks stay selected so audio-only files
+still load). On its `FILE_LOADED` (mpv event thread), the player reloads the
+same path with `hwdec=auto-safe` if a video decoder opened (`video-codec`
+set), else `hwdec=no`. Undecodable video therefore never reaches the looping
+hw path. Null outputs matter: with the real `libmpv` video output the probe
+waits on the GUI render thread and added ~0.8 s to first frame.
 Rejected: switching `hwdec` at runtime after load reinitialises the decoder
 under already-queued frames and broke 10+ frame-exact tests; probing with
 `aid=no` broke audio-only files (no track → no `FILE_LOADED`).
@@ -87,12 +89,18 @@ Cost: one extra file open per load (SFTP included).
 Regression: `test_undecodable_video_with_hwdec_keeps_core_responsive`
 (subprocess; `TimeoutExpired` on the old code).
 
-**Validation after both fixes:** full uninstrumented suite on this RDP box
-finished without a native fault (process exit 1 from test failures only):
-253 passed, 54 skipped, 2 failed. One is the pre-existing frame-step flake
-above. **Open regression:** `test_file_menu_opens_frame_and_errors_are_nonblocking`
-measured 2.3 s to first frame against its 1.5 s budget, caused by the extra
-probe open plus delaying `file_loaded` to the first playback restart.
+**Follow-up race (found and fixed the same day).** The reload runs on mpv's
+event thread; if the window closed at that moment, `terminate()` cleared the
+handle under it (`access violation reading 0x…40`, surfaced by python-mpv as
+a `RuntimeWarning`). `_on_event` and `close()` now share `_close_lock`, and
+the event thread skips the reload once closed.
+Regression: `test_close_during_probe_reload_does_not_touch_freed_handle`
+(fails 3/3 without the lock).
+
+**Validation after all fixes:** full uninstrumented suite on this RDP box:
+process exit 0, 256 passed, 54 skipped (Docker/SFTP and packaged-build tests),
+no warnings. `test_file_menu_opens_frame_and_errors_are_nonblocking` is back
+within budget. The frame-step tests can still flake here (see above).
 
 ### Other observations
 

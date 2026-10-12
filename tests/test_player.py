@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,6 +30,18 @@ def test_load_and_observe_on_gui_thread(qtbot):
         qtbot.waitUntil(lambda: player.state()["pause"] is False)
     finally:
         player.close()
+
+
+def test_close_during_probe_reload_does_not_touch_freed_handle(qtbot):
+    # The probe reload runs on mpv's event thread; close() used to free the handle under it.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for delay_ms in range(0, 60, 3):
+            player = Player(video_output="null")
+            player.load(MEDIA)
+            qtbot.wait(delay_ms)
+            player.close()
+    assert not [str(w.message) for w in caught if "event loop" in str(w.message)]
 
 
 def test_missing_file_emits_error_without_loading(qtbot, tmp_path):

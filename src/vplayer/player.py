@@ -6,6 +6,7 @@ import logging
 import math
 import posixpath
 import re
+import threading
 import uuid
 from decimal import Decimal
 from pathlib import Path
@@ -47,6 +48,7 @@ class Player(QObject):
         if type(jpeg_quality) is not int or not 50 <= jpeg_quality <= 100:
             raise ValueError("JPEG quality must be between 50 and 100")
         self._closed = False
+        self._close_lock = threading.Lock()
         self._loaded_pending = False
         self._uri = ""
         self._pending_frame_steps: list[int] = []
@@ -98,10 +100,13 @@ class Player(QObject):
 
     def _on_event(self, event: mpv.MpvEvent) -> None:
         if event.event_id.value == mpv.MpvEventID.FILE_LOADED:
-            if self.mpv.__getitem__("force-media-title", file_local=True) == PROBE_TITLE:
-                # Software probe finished: reload for real, with hwdec only if software could open the video.
-                self.mpv.loadfile(self.mpv.path, hwdec="auto-safe" if self.mpv.video_codec else "no")
-                return
+            with self._close_lock:
+                if self._closed:
+                    return
+                if self.mpv.__getitem__("force-media-title", file_local=True) == PROBE_TITLE:
+                    # Software probe finished: reload for real, with hwdec only if software could open the video.
+                    self.mpv.loadfile(self.mpv.path, hwdec="auto-safe" if self.mpv.video_codec else "no")
+                    return
             # A hwdec attempt can fail mid-stream and fall back; announce the file once decoding has settled.
             self._loaded_pending = True
         elif event.event_id.value == mpv.MpvEventID.PLAYBACK_RESTART:
@@ -336,7 +341,8 @@ class Player(QObject):
 
     def _loadfile(self) -> None:
         # libmpv retries forever on the core thread if hwdec and software both fail to open a stream.
-        self.mpv.loadfile(self._uri, hwdec="no", mute="yes", force_media_title=PROBE_TITLE)
+        # Null outputs keep the probe off the GUI render thread.
+        self.mpv.loadfile(self._uri, hwdec="no", ao="null", vo="null", force_media_title=PROBE_TITLE)
 
     def play_pause(self) -> None:
         self._stop_skip()
@@ -482,7 +488,9 @@ class Player(QObject):
     def close(self) -> None:
         if not self._closed:
             self._stop_skip()
-            self._closed = True
+            # The event thread reloads the probe; terminate() must not free the handle under it.
+            with self._close_lock:
+                self._closed = True
             for name in OBSERVED_PROPERTIES:
                 self.mpv.unobserve_property(name, self._on_property)
             self.mpv.unregister_event_callback(self._on_event)
