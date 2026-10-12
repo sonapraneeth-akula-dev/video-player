@@ -65,6 +65,9 @@ try {
     Assert-PathState $true $true
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
         [Environment]::GetEnvironmentVariable('Path', 'User')
+    $pythonScripts = Join-Path (Split-Path (Get-Command python.exe -CommandType Application).Source) 'Scripts'
+    $env:Path = (($env:Path -split ';') |
+        Where-Object { $_.TrimEnd('\') -ine $pythonScripts.TrimEnd('\') }) -join ';'
     $resolved = (Get-Command vplayer.exe -ErrorAction Stop).Source
     if ($resolved -ine (Join-Path $installDir 'vplayer.exe')) {
         throw "Fresh PATH resolved the wrong executable: $resolved"
