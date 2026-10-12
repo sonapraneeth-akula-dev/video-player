@@ -25,6 +25,12 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install ffmpeg --yes --no-progress
       - run: python -m pip install -e ".[dev]"
+      - name: Verify Ubuntu Qt xcb dependencies
+        if: runner.os == 'Linux'
+        run: |
+          plugin=$(python -c 'import PySide6; from pathlib import Path; print(Path(PySide6.__file__).parent / "Qt/plugins/platforms/libqxcb.so")')
+          ldd "$plugin"
+          if ldd "$plugin" | grep -q 'not found'; then exit 1; fi
       - name: Fetch Windows libmpv
         if: runner.os == 'Windows'
         run: python scripts/fetch_libmpv.py
