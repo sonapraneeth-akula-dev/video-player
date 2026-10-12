@@ -65,14 +65,21 @@ try {
     Assert-PathState $true $true
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
         [Environment]::GetEnvironmentVariable('Path', 'User')
-    $pythonScripts = Join-Path (Split-Path (Get-Command python.exe -CommandType Application).Source) 'Scripts'
+    $pythonDirectory = if ($env:pythonLocation) {
+        $env:pythonLocation
+    } else {
+        Split-Path (Get-Command python.exe -CommandType Application | Select-Object -First 1).Source
+    }
+    $pythonScripts = Join-Path $pythonDirectory 'Scripts'
     $env:Path = (($env:Path -split ';') |
         Where-Object { $_.TrimEnd('\') -ine $pythonScripts.TrimEnd('\') }) -join ';'
-    $resolved = (Get-Command vplayer.exe -ErrorAction Stop).Source
+    $resolved = & pwsh.exe -NoProfile -Command '(Get-Command vplayer.exe -CommandType Application | Select-Object -First 1).Source'
+    if ($LASTEXITCODE -ne 0) { throw 'Fresh shell could not resolve vplayer.exe.' }
+    $resolved = $resolved.Trim()
     if ($resolved -ine (Join-Path $installDir 'vplayer.exe')) {
-        throw "Fresh PATH resolved the wrong executable: $resolved"
+        throw "Fresh PATH resolved the wrong executable: $resolved (excluded $pythonScripts)"
     }
-    & vplayer.exe --version
+    & $resolved --version
     if ($LASTEXITCODE -ne 0) {
         throw "Installed vplayer --version exited with $LASTEXITCODE."
     }
