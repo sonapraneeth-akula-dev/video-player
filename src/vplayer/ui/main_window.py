@@ -133,6 +133,7 @@ class MainWindow(QMainWindow):
         self._connect_dialog = None
         self.player = Player(
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
+            retry_max=self.settings.retry_max,
             snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
         )
         if self.player.mpv.audio_pitch_correction != self.settings.pitch_correction:

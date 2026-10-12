@@ -55,6 +55,7 @@ class Settings:
         self.skip_frames = 10
         self.readahead_mb = 64
         self.backbuffer_mb = 256
+        self.retry_max = 6
         self.snapshot_dir = Path(
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
         ) / "vplayer"
@@ -95,6 +96,7 @@ class Settings:
         self.skip_frames = self._bounded_int("playback/skip_frames", 10, 2, 1000)
         self.readahead_mb = self._bounded_int("network/readahead_mb", 64, 16, 64)
         self.backbuffer_mb = self._bounded_int("network/backbuffer_mb", 256, 0, 256)
+        self.retry_max = self._bounded_int("network/retry_max", 6, 0, 20)
         snapshot_dir = self.store.value("snapshot/dir")
         if snapshot_dir is not None:
             if isinstance(snapshot_dir, str) and snapshot_dir.strip() and Path(snapshot_dir).is_absolute():

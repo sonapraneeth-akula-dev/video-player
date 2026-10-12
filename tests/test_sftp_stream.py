@@ -1,4 +1,6 @@
 from pathlib import Path
+from threading import Event, Thread
+from time import perf_counter
 from types import SimpleNamespace
 
 import conftest
@@ -128,6 +130,131 @@ def test_read_failure_does_not_advance_or_cache_partial_data():
     assert stream.seek(0, 1) == 0
     remote.readv = readv
     assert stream.read(2) == b"ab"
+
+
+def test_reconnect_reads_from_same_offset_and_reports_recovery(monkeypatch):
+    data = b"x" * (SftpStream.BLOCK_SIZE + 10)
+    first, replacement = FakeRemoteFile(data), FakeRemoteFile(data)
+    first.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
+    calls = []
+    stream = SftpStream(first, reopen=lambda cancel: replacement)
+    stream.reconnecting.connect(lambda attempt: calls.append(("retry", attempt)))
+    stream.reconnected.connect(lambda: calls.append(("restored", None)))
+    monkeypatch.setattr(stream._cancel_event, "wait", lambda delay: calls.append(("wait", delay)) or False)
+    stream.seek(SftpStream.BLOCK_SIZE + 4)
+
+    assert stream.read(3) == b"xxx"
+    assert stream.seek(0, 1) == SftpStream.BLOCK_SIZE + 7
+    assert replacement.requests == [[(SftpStream.BLOCK_SIZE, 10)]]
+    assert first.closes == 1
+    assert calls == [("retry", 1), ("wait", 1), ("restored", None)]
+    stream.close()
+    assert replacement.closes == 1
+
+
+def test_reconnect_ignores_close_error_from_disconnected_file(monkeypatch, caplog):
+    first, replacement = FakeRemoteFile(b"abc"), FakeRemoteFile(b"abc")
+    first.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
+    first.close = lambda: (_ for _ in ()).throw(OSError("already disconnected"))
+    stream = SftpStream(first, reopen=lambda _cancel: replacement)
+    monkeypatch.setattr(stream._cancel_event, "wait", lambda _delay: False)
+
+    assert stream.read(2) == b"ab"
+    assert stream.seek(0, 1) == 2
+    assert replacement.requests == [[(0, 3)]]
+    assert "already disconnected" in caplog.text
+
+
+def test_reconnect_backoff_saturates_at_30_seconds_without_advancing(monkeypatch):
+    failed = FakeRemoteFile(b"abc")
+    failed.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
+    stream = SftpStream(failed, reopen=lambda cancel: (_ for _ in ()).throw(OSError("still offline")), retry_max=8)
+    delays, attempts = [], []
+    stream.reconnecting.connect(attempts.append)
+    monkeypatch.setattr(stream._cancel_event, "wait", lambda delay: delays.append(delay) or False)
+    with pytest.raises(OSError, match="still offline"):
+        stream.read(2)
+    assert attempts == list(range(1, 9))
+    assert delays == [1, 2, 4, 8, 16, 30, 30, 30]
+    assert stream.seek(0, 1) == 0
+
+
+def test_reconnect_cancel_interrupts_backoff_within_one_second():
+    first = FakeRemoteFile(b"abc")
+    first.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
+    stream = SftpStream(first, reopen=lambda cancel: FakeRemoteFile(b"abc"))
+    waiting = Event()
+    wait = stream._cancel_event.wait
+    stream._cancel_event.wait = lambda delay: waiting.set() or wait(delay)
+    failures = []
+    worker = Thread(target=lambda: _capture_failure(stream, failures))
+    worker.start()
+    assert waiting.wait(timeout=2)
+    start = perf_counter()
+    stream.cancel()
+    worker.join(timeout=1)
+    assert perf_counter() - start < 1
+    assert not worker.is_alive()
+    assert len(failures) == 1 and "cancelled" in str(failures[0])
+    assert first.closes == 1
+
+
+def test_reconnect_cancel_interrupts_blocked_callback_within_one_second():
+    first = FakeRemoteFile(b"abc")
+    first.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
+    opening = Event()
+
+    def reopen(cancel):
+        opening.set()
+        cancel.wait(10)
+        raise OSError("connection aborted")
+
+    stream = SftpStream(first, reopen=reopen)
+    wait = stream._cancel_event.wait
+    calls = []
+
+    def skip_first_wait(delay):
+        calls.append(delay)
+        return False if len(calls) == 1 else wait(delay)
+
+    stream._cancel_event.wait = skip_first_wait
+    failures = []
+    worker = Thread(target=lambda: _capture_failure(stream, failures))
+    worker.start()
+    assert opening.wait(timeout=2)
+    start = perf_counter()
+    stream.cancel()
+    worker.join(timeout=1)
+    assert perf_counter() - start < 1
+    assert not worker.is_alive()
+    assert len(failures) == 1 and "cancelled" in str(failures[0])
+
+
+def _capture_failure(stream, failures):
+    try:
+        stream.read(2)
+    except OSError as error:
+        failures.append(error)
+
+
+def test_reconnect_rejects_changed_file_and_invalid_retry_configuration(monkeypatch):
+    first = FakeRemoteFile(b"abc")
+    first.readv = lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("socket closed"))
+    changed = FakeRemoteFile(b"abcd")
+    stream = SftpStream(first, reopen=lambda cancel: changed)
+    monkeypatch.setattr(stream._cancel_event, "wait", lambda _delay: False)
+    with pytest.raises(ValueError, match="changed during reconnect"):
+        stream.read(1)
+    assert changed.closes == 1
+    assert stream.seek(0, 1) == 0
+    for invalid in (-1, 21, True, "6"):
+        with pytest.raises(ValueError, match="retry count"):
+            SftpStream(FakeRemoteFile(b"abc"), retry_max=invalid)
+    with pytest.raises(TypeError, match="reopen callback"):
+        SftpStream(FakeRemoteFile(b"abc"), reopen=5)
+    disabled = SftpStream(first, reopen=lambda cancel: FakeRemoteFile(b"abc"), retry_max=0)
+    with pytest.raises(OSError, match="socket closed"):
+        disabled.read(1)
 
 
 def test_cancel_during_read_never_returns_cached_data():

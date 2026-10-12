@@ -39,6 +39,22 @@ def test_settings_keep_newer_schema_and_valid_seeks(tmp_path):
     assert int(raw.value("schema_version")) == 2
 
 
+def test_sftp_retry_count_is_bounded_and_configurable(tmp_path, caplog):
+    settings = Settings(tmp_path / "settings.ini")
+    settings.load()
+    assert settings.retry_max == 6
+    for valid in (0, 20):
+        settings.store.setValue("network/retry_max", valid)
+        settings.load()
+        assert settings.retry_max == valid
+    for invalid in ("-1", "21", "bad", True):
+        settings.store.setValue("network/retry_max", invalid)
+        with caplog.at_level(logging.WARNING):
+            settings.load()
+        assert settings.retry_max == 6
+    assert "Invalid network/retry_max" in caplog.text
+
+
 def test_recent_files_dedupe_cap_and_reject_credentials(tmp_path):
     path = tmp_path / "settings.ini"
     settings = Settings(path)

@@ -1,10 +1,12 @@
-"""SFTP host-key trust shared by connection and reconnect flows."""
+"""SFTP host-key trust and bounded in-memory remote reads."""
 
+import logging
 import os
 import re
 import shlex
 import tempfile
-from collections.abc import Iterable
+import threading
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -14,6 +16,8 @@ import paramiko
 from PySide6.QtCore import QObject, QStandardPaths, QThreadPool, Signal
 
 from vplayer.settings import ConnectionProfile
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -305,15 +309,29 @@ class SshPool:
         self.connected.emit(transport)
 
 
-class SftpStream:
+class SftpStream(QObject):
+    reconnecting = Signal(int)
+    reconnected = Signal()
     BLOCK_SIZE = 4 * 1024 * 1024
     CHUNK_SIZE = 32 * 1024
 
-    def __init__(self, remote_file: paramiko.SFTPFile):
+    def __init__(
+        self, remote_file: paramiko.SFTPFile, *,
+        reopen: Callable[[threading.Event], paramiko.SFTPFile] | None = None,
+        retry_max: int = 6,
+    ):
+        super().__init__()
+        if isinstance(retry_max, bool) or not isinstance(retry_max, int) or not 0 <= retry_max <= 20:
+            raise ValueError("SFTP retry count must be between 0 and 20")
+        if reopen is not None and not callable(reopen):
+            raise TypeError("SFTP reopen callback must be callable")
         size = remote_file.stat().st_size
         if isinstance(size, bool) or not isinstance(size, int) or size < 0:
             raise ValueError("Remote file size must be a nonnegative integer")
         self.remote_file = remote_file
+        self.reopen = reopen
+        self.retry_max = retry_max
+        self._cancel_event = threading.Event()
         self._size = size
         self._position = 0
         self._block_offset = -1
@@ -344,20 +362,11 @@ class SftpStream:
                 (offset + start, min(self.CHUNK_SIZE, length - start))
                 for start in range(0, length, self.CHUNK_SIZE)
             ]
-            try:
-                block = b"".join(
-                    self.remote_file.readv(chunks, max_concurrent_prefetch_requests=64)
-                )
-            except Exception as error:
-                if self._cancelled:
-                    raise OSError("SFTP stream cancelled") from error
-                raise
+            block = self._read_block(chunks, length, offset)
             if self._cancelled:
                 raise OSError("SFTP stream cancelled")
             if self._closed:
                 raise ValueError("SFTP stream is closed")
-            if len(block) != length:
-                raise EOFError(f"Expected {length} SFTP bytes at offset {offset}, got {len(block)}")
             self._block = block
             self._block_offset = offset
         start = self._position - offset
@@ -368,6 +377,59 @@ class SftpStream:
             raise ValueError("SFTP stream is closed")
         self._position += len(data)
         return data
+
+    def _read_block(self, chunks: list[tuple[int, int]], length: int, offset: int) -> bytes:
+        last_error: OSError | EOFError | paramiko.SSHException | None = None
+        for attempt in range(self.retry_max + 1):
+            if attempt:
+                self.reconnecting.emit(attempt)
+                if self._cancel_event.wait(min(2 ** (attempt - 1), 30)):
+                    raise OSError("SFTP stream cancelled") from last_error
+                replacement = None
+                try:
+                    replacement = self.reopen(self._cancel_event)
+                    if self._cancelled:
+                        raise OSError("SFTP stream cancelled")
+                    if replacement.stat().st_size != self._size:
+                        raise ValueError("Remote file changed during reconnect")
+                    old = self.remote_file
+                    self.remote_file = replacement
+                    replacement = None
+                    try:
+                        old.close()
+                    except (OSError, EOFError, ValueError, paramiko.SSHException) as error:
+                        log.warning("Could not close disconnected SFTP file: %s", error)
+                except ValueError:
+                    if replacement is not None:
+                        replacement.close()
+                    raise
+                except (OSError, EOFError, paramiko.SSHException):
+                    if replacement is not None:
+                        replacement.close()
+                    if self._cancelled:
+                        raise OSError("SFTP stream cancelled") from last_error
+                    if attempt == self.retry_max:
+                        raise
+                    continue
+            try:
+                block = b"".join(self.remote_file.readv(chunks, max_concurrent_prefetch_requests=64))
+                if len(block) != length:
+                    raise EOFError(f"Expected {length} SFTP bytes at offset {offset}, got {len(block)}")
+            except Exception as error:
+                if self._cancelled:
+                    raise OSError("SFTP stream cancelled") from error
+                if not isinstance(error, (OSError, EOFError, paramiko.SSHException)):
+                    raise
+                last_error = error
+                if self.reopen is None or attempt == self.retry_max:
+                    raise
+                continue
+            if self._cancelled:
+                raise OSError("SFTP stream cancelled")
+            if attempt:
+                self.reconnected.emit()
+            return block
+        raise RuntimeError("SFTP retry loop ended without a result")
 
     def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
         if self._cancelled:
@@ -397,4 +459,5 @@ class SftpStream:
 
     def cancel(self) -> None:
         self._cancelled = True
+        self._cancel_event.set()
         self.close()

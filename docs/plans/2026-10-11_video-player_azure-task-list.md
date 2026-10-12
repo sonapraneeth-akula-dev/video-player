@@ -320,7 +320,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 2.3.1.1.1 | Task | `SftpStream.read` reconnect — on socket error / timeout reconnect and reseek with backoff 1, 2, 4, 8, 16 s then 30 s, up to `retry_max`; `reconnecting(i)` / `reconnected()` signals; `cancel()` aborts within 1 s | 03:00 | 00:30 | Unit (fake file): schedule incl. 30 s for attempts > 5; cancel returns < 1 s | AD-007 |
+| 2.3.1.1.1 | Task | [x] `SftpStream.read` reconnect — on socket error / timeout reconnect and reseek with backoff 1, 2, 4, 8, 16 s then 30 s, up to `retry_max`; `reconnecting(i)` / `reconnected()` signals; `cancel()` aborts within 1 s | 03:00 | 00:30 | Unit (fake file): schedule incl. 30 s for attempts > 5; cancel returns < 1 s | AD-007; tested same-offset recovery, capped backoff, cancellation and changed-file rejection. Stream accepts an injected reopen callback; production SSH reconnect, transport ownership and UI indicator remain pending under 2.3.1.1.2 |
 | 2.3.1.1.2 | Task | "Reconnecting… (attempt i)" tab indicator; pause while `paused-for-cache` | 01:00 | 00:15 | Container test: `docker pause` 10 s → indicator, resume at same position, no reload \|\| |  |
 | 2.3.1.1.3 | Task | `scripts/net_drop.py` — random 1–60 s `docker pause` plus firewall DROP variant, two concurrent streams from one server, N iterations | 02:30 | 00:25 | CI runs 5 iterations green; 100-iteration run logged before release | NFR-005 |
 

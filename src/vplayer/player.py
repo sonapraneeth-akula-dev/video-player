@@ -67,7 +67,7 @@ class Player(QObject):
 
     def __init__(
         self, parent: QObject | None = None, *, video_output: str = "libmpv",
-        readahead_mb: int = 64, backbuffer_mb: int = 256,
+        readahead_mb: int = 64, backbuffer_mb: int = 256, retry_max: int = 6,
         snapshot_dir: Path | None = None, jpeg_quality: int = 90,
     ):
         super().__init__(parent)
@@ -76,6 +76,8 @@ class Player(QObject):
             or isinstance(backbuffer_mb, bool) or not isinstance(backbuffer_mb, int) or not 0 <= backbuffer_mb <= 256
         ):
             raise ValueError("Invalid SFTP buffer limits")
+        if isinstance(retry_max, bool) or not isinstance(retry_max, int) or not 0 <= retry_max <= 20:
+            raise ValueError("SFTP retry count must be between 0 and 20")
         if type(jpeg_quality) is not int or not 50 <= jpeg_quality <= 100:
             raise ValueError("JPEG quality must be between 50 and 100")
         self._closed = False
@@ -98,6 +100,7 @@ class Player(QObject):
         self._vfr_checked = False
         self.readahead_mb = readahead_mb
         self.backbuffer_mb = backbuffer_mb
+        self.retry_max = retry_max
         self.snapshot_dir = snapshot_dir or Path(
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
         ) / "vplayer"
@@ -238,7 +241,7 @@ class Player(QObject):
         try:
             transport, path = self._sftp_sources[uri.decode("utf-8")]
             client = paramiko.SFTPClient.from_transport(transport)
-            stream = SftpStream(client.open(path, "rb"))
+            stream = SftpStream(client.open(path, "rb"), retry_max=self.retry_max)
             cookie = id(stream)
             self._sftp_streams[cookie] = (stream, client)
             info.contents.cookie = cookie

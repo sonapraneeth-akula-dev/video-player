@@ -99,6 +99,12 @@ def test_invalid_remote_buffer_limits_fail_before_starting_mpv(readahead, backbu
         Player(video_output="null", readahead_mb=readahead, backbuffer_mb=backbuffer)
 
 
+@pytest.mark.parametrize("retry_max", [-1, 21, True, "6"])
+def test_invalid_retry_count_fails_before_starting_mpv(retry_max):
+    with pytest.raises(ValueError, match="SFTP retry count"):
+        Player(video_output="null", retry_max=retry_max)
+
+
 @pytest.mark.sftp
 def test_mpv_plays_and_seeks_remote_file_without_copy(qtbot, sftp_server):
     player = Player(readahead_mb=32, backbuffer_mb=16)
