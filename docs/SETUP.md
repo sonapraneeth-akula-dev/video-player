@@ -34,10 +34,12 @@ Rendered-frame tests need a real display/OpenGL context: Qt's `offscreen`
 backend has not passed their frame checks.
 
 CI isolates the Windows native player-lifecycle tests and the Ubuntu corrupt
-corpus in separate pytest processes (and a separate Xvfb display for the
-corrupt corpus). Remaining tests append their coverage; the combined result
-must still meet the 80% line-coverage gate. The Ubuntu suites have explicit
-timeouts so a native stall cannot consume an unbounded runner session.
+corpus in separate pytest processes. Ubuntu's other test files run in groups
+of ten, each with a fresh Xvfb display. All groups append their coverage;
+the combined result must still meet the 80% line-coverage gate. The Ubuntu
+groups have explicit timeouts so a native stall cannot consume an unbounded
+runner session. Isolation does not establish the root cause of shared-process
+native crashes.
 
 ## Windows (PowerShell)
 

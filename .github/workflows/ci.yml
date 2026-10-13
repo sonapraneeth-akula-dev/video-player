@@ -65,8 +65,15 @@ jobs:
         run: xvfb-run -a python -u -X faulthandler -m pytest -x -vv -s tests/test_corrupt.py --cov=src/vplayer --cov=scripts --cov-report= --cov-fail-under=0
       - name: Test remaining cases on Ubuntu
         if: runner.os == 'Linux'
-        timeout-minutes: 20
-        run: xvfb-run -a python -u -X faulthandler -m pytest -x -vv -s --ignore=tests/test_corrupt.py --cov=src/vplayer --cov=scripts --cov-append --cov-report=term-missing --cov-fail-under=80
+        timeout-minutes: 30
+        run: |
+          files=(tests/test_*.py)
+          for ((start=0; start<${#files[@]}; start+=10)); do
+            timeout 8m xvfb-run -a python -u -X faulthandler -m pytest -x -vv -s \
+              "${files[@]:start:10}" --deselect=tests/test_corrupt.py \
+              --cov=src/vplayer --cov=scripts --cov-append --cov-report= --cov-fail-under=0
+          done
+          python -m coverage report -m --fail-under=80
       - name: Report emulated SFTP playback latency
         if: runner.os == 'Linux'
         run: |
