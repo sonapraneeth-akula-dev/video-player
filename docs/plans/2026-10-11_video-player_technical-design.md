@@ -364,15 +364,15 @@ sequenceDiagram
     participant N as new vplayer process
     participant L as running vplayer (QLocalServer)
     OS->>N: vplayer [--new-window] file1 [file2…]
-    N->>L: connect "vplayer-<user>"
-    alt server reachable
+    N->>N: tryLock QLockFile "vplayer-<user>.lock"
+    alt lock held by running instance
+        N->>L: connect "vplayer-<user>" (retry up to 3 s)
         N->>L: {"v":1,"new_window":false,"items":["C:\\v\\a.mp4"]}
-        N->>N: exit 0
         L->>L: last-used window has < 4 tabs? new tab : new window
-    else no server
-        N->>N: tryLock QLockFile "vplayer-<user>.lock"
+        L-->>N: ok acknowledgment
+        N->>N: exit 0
+    else lock acquired
         N->>N: got lock → removeServer (stale socket), start QLocalServer, open items
-        N->>N: no lock → retry connect for up to 3 s, then show error
     end
 ```
 The lock file (in the user's temp dir) guarantees one primary even when two launches race —
@@ -520,7 +520,8 @@ absolute local paths or `sftp://` URIs. Anything else is dropped and logged. Bef
 the sender makes every local argument absolute (`os.path.abspath` against its own working
 directory); `sftp://` URIs pass unchanged. The primary does the same for its own argv. On
 Windows the sender calls `AllowSetForegroundWindow(ASFW_ANY)` first, so the receiver's
-`raise_()` + `activateWindow()` can bring the target window to the front.
+`raise_()` + `activateWindow()` can bring the target window to the front. The
+sender exits successfully only after the server acknowledges an accepted request.
 
 **Stream scheme**: `vpsftp://<user>@<host>:<port>/<url-encoded path>` — internal only, never shown
 to the user. Separate from `sftp://` so FFmpeg's own sftp handler is never used.

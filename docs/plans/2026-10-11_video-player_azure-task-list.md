@@ -608,7 +608,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 6.3.1.1.1 | Task | `__main__.py` single instance — `QLockFile` `vplayer-<user>.lock` decides primary; primary listens on `QLocalServer` `vplayer-<user>`; secondary sends `{"v":1,"new_window":…,"items":[…]}` with absolute paths, calls `AllowSetForegroundWindow` on Windows, exits 0 | 03:00 | 00:30 | `tests/test_single_instance.py`: 5 simultaneous launches → one primary, all files open (both OSes) | AD-010, FR-042 |
+| 6.3.1.1.1 | Task | [x] `__main__.py` single instance — `QLockFile` `vplayer-<user>.lock` decides primary; primary listens on `QLocalServer` `vplayer-<user>`; secondary sends `{"v":1,"new_window":…,"items":[…]}` with absolute paths, calls `AllowSetForegroundWindow` on Windows, exits 0 | 03:00 | 00:30 | `tests/test_single_instance.py`: 5 simultaneous launches → one primary, all files open (both OSes) | Lock election, bounded IPC, subprocess acknowledgment, five-launch and CLI routing tests passed on Windows; Linux validation pending. Initial CLI files now open as tabs. v0.44.0 |
 | 6.3.1.1.2 | Task | [x] `app.py` receiver — validate ≤ 64 KB, version, types, absolute path or `sftp://`; open in last-used window, overflow → new window; raise + activate | 01:30 | 00:20 | `test_single_instance.py`: malformed/oversize logged without payload, missing files reported, focus routing and 4-tab overflow verified; IPC listener wiring follows in 6.3.1.1.1 |  |
 
 #### Feature 6.3.2 (FEAT-006.3.2): Open in new window

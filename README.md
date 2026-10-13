@@ -35,9 +35,10 @@ Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).
 You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
-`vplayer --version` to print the version, or `vplayer --new-window FILE`. Until
-single-instance routing is added, each CLI file opens in its own window;
-every launch already creates a new window.
+`vplayer --version` to print the version, or `vplayer --new-window FILE`.
+External opens join the running app as tabs in its most recently focused window;
+more than four tabs spill into another window. Use `--new-window` to open
+the files in a separate window instead.
 Use `vplayer sftp://user@host:port/path` to authenticate and play a remote
 file without downloading a local copy. **File > Recent Files** reopens the
 last 20 successfully loaded local or SFTP files, newest first. Remote entries

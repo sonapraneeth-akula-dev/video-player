@@ -107,27 +107,31 @@ def test_cli_opens_relative_file_and_reports_missing_file(qtbot, monkeypatch, tm
     media = tmp_path / MEDIA.name
     copyfile(MEDIA, media)
     relative = os.path.relpath(media, tmp_path)
+    second = tmp_path / "second.mp4"
+    copyfile(MEDIA, second)
     missing = "missing.mp4"
 
     def exit_after_show(self):
         windows = [w for w in self.topLevelWidgets() if isinstance(w, MainWindow) and w.isVisible()]
-        assert len(windows) == 2
-        playing = next(w for w in windows if w.player is not None and w.player._uri == str(media))
-        qtbot.waitUntil(
-            lambda: playing.player.state()["duration"] is not None,
-            timeout=10000,
-        )
-        failed = next(w for w in windows if w is not playing)
-        assert playing.player._uri == str(media)
-        assert failed.banner.isVisible()
-        assert "File not found" in failed.banner.text()
-        for window in windows:
-            window.close()
-        return 0
+        try:
+            assert len(windows) == 1
+            playing = windows[0]
+            assert playing.statusBar().currentMessage() == "Could not open 1 file(s)"
+            qtbot.waitUntil(
+                lambda: playing.player.state()["duration"] is not None,
+                timeout=10000,
+            )
+            assert playing.player._uri == str(second)
+            assert playing.tabs.count() == 2
+            assert {playing.tabs.widget(i).player._uri for i in range(2)} == {str(media), str(second)}
+            return 0
+        finally:
+            for window in windows:
+                window.close()
 
     monkeypatch.setattr(QApplication, "exec", exit_after_show)
     try:
-        assert entry.main([*flags, relative, missing]) == 0
+        assert entry.main([*flags, relative, str(second), missing]) == 0
     finally:
         for handler in logger.handlers[:]:
             if handler not in old_handlers:

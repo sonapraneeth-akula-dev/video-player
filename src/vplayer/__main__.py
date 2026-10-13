@@ -182,31 +182,42 @@ def main(argv: list[str] | None = None) -> int:
     logger.addHandler(RotatingFileHandler(log_dir / "vplayer.log", maxBytes=1_000_000, backupCount=3))
 
     from vplayer.app import AppController
+    from vplayer.single_instance import SingleInstance, open_message
 
     controller = AppController(app)
+    instance = None
+    if not args.codec_probe:
+        try:
+            instance = SingleInstance(controller)
+            payload = open_message(args.files, new_window=args.new_window)
+            if not instance.start(payload):
+                return 0
+            if not controller.receive_open_request(payload):
+                raise RuntimeError("Could not open initial request")
+        except (OSError, RuntimeError, ValueError) as error:
+            if instance is not None:
+                instance.close()
+            logger.error("Could not route external open request: %s", error)
+            if sys.stderr is not None:
+                print(f"VPlayer: {error}", file=sys.stderr)
+            return 1
     restore = _install_exception_handlers(controller.windows)
     try:
-        for file in args.files or [None]:
+        if args.codec_probe:
+            file = args.files[0]
             window = controller.new_window(show=False)
-            if file is not None:
-                path = file if file.startswith("sftp://") else os.path.abspath(file)
-                if args.codec_probe or (not path.startswith("sftp://") and Path(path).is_file()):
-                    tab = window._add_player_tab(Path(path).name)
-                    tab.video.ready.connect(
-                        lambda window=window, path=path: window.open_file(path),
-                        Qt.ConnectionType.SingleShotConnection,
-                    )
-                elif path.startswith("sftp://"):
-                    QTimer.singleShot(0, lambda window=window, path=path: window.open_file(path))
-                else:
-                    window.open_file(path)
-            if args.codec_probe:
-                return _probe_codec(app, window, args.codec_probe)
-            window.show()
-        # ponytail: until IPC routing exists, separate windows keep every CLI file reachable.
+            path = os.path.abspath(file)
+            tab = window._add_player_tab(Path(path).name)
+            tab.video.ready.connect(
+                lambda window=window, path=path: window.open_file(path),
+                Qt.ConnectionType.SingleShotConnection,
+            )
+            return _probe_codec(app, window, args.codec_probe)
         return app.exec()
     finally:
         restore()
+        if instance is not None:
+            instance.close()
 
 
 if __name__ == "__main__":
