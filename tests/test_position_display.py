@@ -45,6 +45,7 @@ def test_copy_position_formats_frame_and_updates_clipboard(qtbot, tmp_path, monk
             window.open_file(MEDIA)
         tab.player.mpv.pause = True
         monkeypatch.setattr(tab.player, "_fps_values", lambda: (fps, fps))
+        monkeypatch.setattr(window, "_position_changed", lambda _position: None)
         window._position = position
         window.copy_position()
         assert clipboard.text() == expected
@@ -123,6 +124,7 @@ def test_vfr_clip_shows_approximate_frame_label(qtbot, tmp_path):
         with qtbot.waitSignal(window.player.vfr_detected, timeout=10000):
             window.open_file(generate_vfr(tmp_path))
         assert "≈ f " in window.time_label.text()
-        assert window.time_label.text().startswith("00:00:01.")
+        assert window._position >= 1
+        assert window.time_label.text().startswith(window._clock(window._position))
     finally:
         window.close()

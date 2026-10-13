@@ -78,11 +78,17 @@ class AppController(QObject):
         self.windows = []
         self.last_used_window = None
         app.installEventFilter(self)
+        app.focusChanged.connect(self._focus_changed)
 
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Type.WindowActivate and watched in self.windows:
             self.last_used_window = watched
         return False
+
+    def _focus_changed(self, _previous, current):
+        window = current.window() if current is not None else None
+        if window in self.windows:
+            self.last_used_window = window
 
     def new_window(self, *, show=True):
         from vplayer.ui.main_window import MainWindow

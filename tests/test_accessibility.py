@@ -10,6 +10,8 @@ from vplayer.sftp import KnownHosts
 from vplayer.ui.dialogs import ConnectDialog, HostKeyDialog, PreferencesDialog
 from vplayer.ui.main_window import MainWindow
 
+MEDIA = Path(__file__).parent / "media" / "h264_25.mp4"
+
 
 def test_visible_keyboard_controls_have_accessible_names(qtbot, tmp_path: Path):
     settings = Settings(tmp_path / "settings.ini")
@@ -17,10 +19,9 @@ def test_visible_keyboard_controls_have_accessible_names(qtbot, tmp_path: Path):
     window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
-    # Keep a late no-media duration update from disabling the synthetic seek control.
-    window.player.duration.disconnect(window._duration_changed)
-    window.seek_bar.setEnabled(True)
-    window.controls.play_action.setEnabled(True)
+    with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+        window.open_file(MEDIA)
+    qtbot.waitUntil(lambda: window.seek_bar.isEnabled() and window.controls.play_button.isEnabled())
     preferences = PreferencesDialog(True, window)
     connect = ConnectDialog(settings=settings, parent=window)
     host_key = HostKeyDialog(
@@ -52,13 +53,14 @@ def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
     qtbot.addWidget(window)
     window.show()
     try:
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        window.player.mpv.pause = True
+        qtbot.waitUntil(lambda: window.seek_bar.isEnabled() and window.controls.play_button.isEnabled())
         window.activateWindow()
         qtbot.waitUntil(window.isActiveWindow)
         window.video.setFocus()
         qtbot.waitUntil(window.video.hasFocus)
-        window.player.duration.disconnect(window._duration_changed)
-        window.seek_bar.setEnabled(True)
-        window.controls.play_action.setEnabled(True)
         assert window.video_focus.isVisible()
         for expected in (
             window.seek_bar, window.controls.play_button, window.browser.all_files,
