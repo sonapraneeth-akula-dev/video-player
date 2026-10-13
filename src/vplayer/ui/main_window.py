@@ -178,6 +178,17 @@ class MainWindow(QMainWindow):
         content = QWidget(self)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.limit_message = QLabel(content)
+        self.limit_message.setAccessibleName("Tab limit")
+        self.limit_message.setWordWrap(True)
+        self.limit_message.hide()
+        layout.addWidget(self.limit_message)
+        self.limit_button = QPushButton("Open in new window", content)
+        self.limit_button.setAccessibleName("Open file in new window")
+        self.limit_button.clicked.connect(self._open_overflow_window)
+        self.limit_button.hide()
+        layout.addWidget(self.limit_button)
+        self._overflow_path = None
         self.banner = QLabel(content)
         self.banner.setAccessibleName("Playback error")
         self.banner.setWordWrap(True)
@@ -475,11 +486,24 @@ class MainWindow(QMainWindow):
     def new_tab(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open Video")
         if path:
-            if not Path(path).is_file():
-                self.show_error(f"File not found: {path}")
-                return
-            self._add_player_tab(Path(path).name)
-            self.open_file(path)
+            from vplayer.app import open_in_window
+
+            open_in_window(self, path, new_tab=True)
+
+    def show_tab_limit(self, path):
+        self._overflow_path = path
+        self.limit_message.setText("This window has 4 tabs. Close one, or open in a new window")
+        self.limit_message.show()
+        self.limit_button.show()
+
+    def _open_overflow_window(self):
+        if self._overflow_path is None:
+            return
+        path = self._overflow_path
+        self._overflow_path = None
+        self.limit_message.hide()
+        self.limit_button.hide()
+        self.new_window().open_file(path)
 
     def new_window(self):
         if self.controller is None:
@@ -497,6 +521,10 @@ class MainWindow(QMainWindow):
         if self._retry_cancel is not None:
             self._retry_cancel.set()
         self.tabs.close_tab(index)
+        if self.tabs.count() < 4:
+            self._overflow_path = None
+            self.limit_message.hide()
+            self.limit_button.hide()
 
     def _close_tab_at(self, index):
         self.tabs.setCurrentIndex(index)
@@ -600,7 +628,7 @@ class MainWindow(QMainWindow):
         if isinstance(position, (int, float)) and math.isfinite(position) and position >= 0:
             self.settings.set_resume_position(current_file, position)
 
-    def open_file(self, path: str | Path):
+    def open_file(self, path: str | Path, *, new_tab: bool = False):
         self.banner.hide()
         self.retry_button.hide()
         if isinstance(path, str) and path.lower().startswith("sftp://"):
@@ -616,10 +644,10 @@ class MainWindow(QMainWindow):
                 self.show_error(f"Could not open SFTP file: {error}")
                 return
             self._connect_dialog = dialog
-            tab = self._active_tab
+            tab = None if new_tab else self._active_tab
             dialog.connected.connect(
                 lambda transport: self._open_connected_remote(
-                    tab, path, dialog.remote_path, transport, dialog.pool,
+                    tab, path, dialog.remote_path, transport, dialog.pool, new_tab=new_tab,
                 ),
             )
             dialog.finished.connect(lambda: setattr(self, "_connect_dialog", None))
@@ -648,11 +676,15 @@ class MainWindow(QMainWindow):
         self._update_tab_status(self._active_tab)
         self._store_active_tab_state()
 
-    def _open_connected_remote(self, tab, uri, remote_path, transport, pool):
-        if tab is not None and self.tabs.indexOf(tab) < 0:
+    def _open_connected_remote(self, tab, uri, remote_path, transport, pool, *, new_tab=False):
+        if tab is not None and (not shiboken6.isValid(tab) or self.tabs.indexOf(tab) < 0):
             transport.close()
             return
         if tab is None:
+            if new_tab and self.tabs.count() >= 4:
+                transport.close()
+                self.show_tab_limit(uri)
+                return
             self._add_player_tab(Path(remote_path).name)
         elif tab is not self._active_tab:
             self.tabs.setCurrentWidget(tab)

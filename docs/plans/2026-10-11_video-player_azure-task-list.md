@@ -552,7 +552,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 6.1.1.3.1 | Task | 4-tab rule in `app.open_in_window()`; compare tab counts as 1; limit toast | 00:45 | 00:10 | Test: 5th tab refused with message | FR-040, AD-017 |
+| 6.1.1.3.1 | Task | [x] 4-tab rule in `app.open_in_window()`; compare tab counts as 1; limit toast | 00:45 | 00:10 | Test: 5th tab refused with message | `QTabWidget.count()` counts each tab once; fifth request leaves current player intact and offers Open in new window. Local/remote requests, invalid paths and closed windows covered in `test_windows.py`; `app.py` coverage 100%; v0.40.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: independent state per tab; action routing to active tab; 4-tab limit
