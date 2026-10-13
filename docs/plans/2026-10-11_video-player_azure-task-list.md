@@ -5,7 +5,7 @@
 - **PRD**: [docs/prds/2026-10-11_video-player_prd.md](../prds/2026-10-11_video-player_prd.md) (Approved)
 - **Technical design**: [2026-10-11_video-player_technical-design.md](2026-10-11_video-player_technical-design.md) · **Discovery**: [2026-10-11_video-player_discovery.md](2026-10-11_video-player_discovery.md)
 - **Total Est. Manual**: 232:15 | **Total Est. AI**: 45:05 (v1 = Must + Should: 227:15 / 43:55; Could adds 05:00 / 01:10)
-- **Items**: 119 (111 Tasks, 8 Debug spikes/triage, 0 Bugs) across 66 user stories, 28 milestones, 15 requirements
+- **Items**: 121 (112 Tasks, 9 Debug spikes/triage, 0 Bugs) across 66 user stories, 28 milestones, 15 requirements
 
 **Estimation rules**: User Story = Σ items; Feature = Σ stories; Milestone = Σ features + exit verification (01:00 manual / 00:15 AI); Requirement = Σ milestones. AI totals here are bottom-up per item (v1 43:55) and land close to the PRD's top-down v1 estimate (44:35); per-story values differ because scaffolding, CI, fixtures and spikes sit in the first story that needs them. Debug items marked "Only if…" are contingency; drop their time if the condition doesn't occur.
 

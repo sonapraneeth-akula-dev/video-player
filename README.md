@@ -20,6 +20,8 @@ For complete prerequisites, Windows/Ubuntu setup, test commands, build
 artifacts, and known CI limitations, see [Setup and build](docs/SETUP.md).
 For the native crash history and remaining investigation, see
 [Native crash investigation](docs/CRASHES.md).
+For open checklist items, dependencies, and release blockers, see
+[Remaining work and blockers](docs/REMAINING_WORK.md).
 
 Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
 The window starts with an Open file / Connect to server placeholder. **Ctrl+T**
