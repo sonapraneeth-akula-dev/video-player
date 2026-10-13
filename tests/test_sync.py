@@ -15,6 +15,7 @@ class FakeMpv:
         self.speed = 1.0
         self.auto_restart = True
         self.seeks = []
+        self.eof_reached = False
 
     def seek(self, position, *, reference, precision):
         assert (reference, precision) == ("absolute", "exact")
@@ -187,6 +188,65 @@ def test_drift_threshold_uses_two_frames_for_low_fps(qapp):
         master.mpv.time_pos = 0
         controller._check_drift()
         controller._check_drift()
-        assert follower.mpv.seeks == [4.5]
+        assert follower.mpv.seeks == [4.5, 0]
+        assert controller.out_of_range == "B not started yet"
+        assert follower.mpv.pause is True
+    finally:
+        controller.close()
+
+
+@pytest.mark.parametrize(("offset", "position", "status", "end"), [
+    (3.0, 1.0, "B not started yet", 0),
+    (-3.0, 11.0, "B ended", 299 / 25),
+])
+def test_follower_holds_at_nearest_end_and_rejoins(qapp, offset, position, status, end):
+    master, follower = FakePlayer(), FakePlayer()
+    master.mpv.time_pos = position
+    master.mpv.pause = follower.mpv.pause = False
+    controller = SyncController(master, follower, offset=offset)
+    changes = []
+    controller.out_of_range_changed.connect(changes.append)
+    try:
+        controller._check_drift()
+        assert changes == [status]
+        assert follower.mpv.pause is True
+        assert follower.mpv.seeks == [end]
+        controller._check_drift()
+        assert follower.mpv.seeks == [end]
+        master.mpv.time_pos = 5
+        controller._check_drift()
+        assert changes == [status, None]
+        assert follower.mpv.seeks[-1] == 5 - offset
+        assert follower.mpv.pause is False
+    finally:
+        controller.close()
+
+
+def test_master_eof_pauses_follower_and_does_not_restart(qapp):
+    master, follower = FakePlayer(), FakePlayer()
+    master.mpv.pause = follower.mpv.pause = False
+    controller = SyncController(master, follower)
+    try:
+        master.mpv.eof_reached = True
+        controller._check_drift()
+        assert follower.mpv.pause is True
+        master.mpv.pause = True
+        controller.play_pause()
+        assert master.mpv.pause is follower.mpv.pause is True
+        assert follower.mpv.seeks == []
+    finally:
+        controller.close()
+
+
+def test_eof_during_follower_seek_does_not_resume(qapp):
+    master, follower = FakePlayer(), FakePlayer()
+    master.mpv.pause = follower.mpv.pause = False
+    follower.mpv.auto_restart = False
+    controller = SyncController(master, follower)
+    try:
+        controller.seek(6.0)
+        master.mpv.eof_reached = True
+        follower.playback_restarted.emit()
+        assert master.mpv.pause is follower.mpv.pause is True
     finally:
         controller.close()

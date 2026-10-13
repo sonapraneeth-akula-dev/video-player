@@ -678,7 +678,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 7.2.1.2.1 | Task | Out-of-range hold — B paused at its nearest end, never a negative seek, rejoins when A re-enters; A at EOF pauses B | 02:00 | 00:20 | Compare tests: hold and rejoin; A EOF pauses B \|\| |  |
+| 7.2.1.2.1 | Task | [x] Out-of-range hold — B paused at its nearest end, never a negative seek, rejoins when A re-enters; A at EOF pauses B | 02:00 | 00:20 | Compare tests: hold and rejoin; A EOF pauses B \|\| | Sync core emits B range status, holds at first/last valid frame and rejoins on the 250 ms tick; EOF and in-flight seek races keep B paused. Local native offset alignment and deterministic boundary/EOF tests passed; UI banner wiring awaits CompareTab. No version bump for non-UI core |
 | 7.2.1.2.2 | Task | VFR side in compare → VFR banner; ±n uses the single-step queue on both sides | 01:00 | 00:15 | VFR test case (d) green | Design §4.3 |
 
 #### Feature 7.2.2 (FEAT-007.2.2): Offset and sync toggle

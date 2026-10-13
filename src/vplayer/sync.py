@@ -4,7 +4,7 @@ import math
 import time
 from collections import deque
 
-from PySide6.QtCore import QCoreApplication, QObject, QTimer
+from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
 
 
 def fps_match(a: float | None, b: float | None) -> bool:
@@ -20,6 +20,8 @@ def fps_match(a: float | None, b: float | None) -> bool:
 
 
 class SyncController(QObject):
+    out_of_range_changed = Signal(object)
+
     def __init__(self, master, follower, *, offset: float = 0.0, parent=None):
         super().__init__(parent)
         if isinstance(offset, bool) or not isinstance(offset, (int, float)) or not math.isfinite(offset):
@@ -34,6 +36,7 @@ class SyncController(QObject):
         self._queued = deque()
         self._drift_streak = 0
         self._last_correction = float("-inf")
+        self.out_of_range = None
         self._timer = QTimer(self)
         self._timer.setInterval(250)
         self._timer.timeout.connect(self._check_drift)
@@ -60,8 +63,16 @@ class SyncController(QObject):
 
     def _align(self):
         self._waiting = "follower"
-        target = max(0.0, min((self.master.mpv.time_pos or 0.0) - self.offset, self.follower.mpv.duration))
+        mapped = (self.master.mpv.time_pos or 0.0) - self.offset
+        self._set_range("B not started yet" if mapped < 0 else "B ended" if mapped > self.follower.mpv.duration else None)
+        last = max(0, math.ceil(self.follower.mpv.duration * self.follower.frame_rate()) - 1)
+        target = max(0.0, min(mapped, last / self.follower.frame_rate()))
         self.follower.mpv.seek(target, reference="absolute", precision="exact")
+
+    def _set_range(self, status):
+        if self.out_of_range != status:
+            self.out_of_range = status
+            self.out_of_range_changed.emit(status)
 
     def _master_position(self, _position):
         if (
@@ -77,14 +88,15 @@ class SyncController(QObject):
     def _follower_restarted(self):
         if self._waiting == "follower":
             self._waiting = None
-            if self._resume:
+            if self._resume and not self.master.mpv.eof_reached:
                 self.master.mpv.pause = False
-                self.follower.mpv.pause = False
+                if self.out_of_range is None:
+                    self.follower.mpv.pause = False
             if self._queued:
                 self._queued.popleft()()
 
     def _check_drift(self):
-        if self._waiting is not None or self.master.mpv.pause or self.follower.mpv.pause:
+        if self._waiting is not None:
             self._drift_streak = 0
             return
         a_position = self.master.mpv.time_pos
@@ -94,7 +106,28 @@ class SyncController(QObject):
         if any(
             not isinstance(value, (int, float)) or not math.isfinite(value)
             for value in (a_position, b_position, duration, fps)
-        ) or fps <= 0 or not 0 <= a_position - self.offset <= duration:
+        ) or fps <= 0:
+            self._drift_streak = 0
+            return
+        if self.master.mpv.eof_reached:
+            if not self.follower.mpv.pause:
+                self.follower.mpv.pause = True
+            self._drift_streak = 0
+            return
+        target = a_position - self.offset
+        if not 0 <= target <= duration:
+            status = "B not started yet" if target < 0 else "B ended"
+            if self.out_of_range != status:
+                self._resume = not self.master.mpv.pause
+                self.follower.mpv.pause = True
+                self._align()
+            self._drift_streak = 0
+            return
+        if self.out_of_range is not None:
+            self._resume = not self.master.mpv.pause
+            self._align()
+            return
+        if self.master.mpv.pause or self.follower.mpv.pause:
             self._drift_streak = 0
             return
         threshold = max(2 / fps, 0.1)
@@ -122,6 +155,8 @@ class SyncController(QObject):
             self._queued.append(self.play_pause)
             return
         if self.master.mpv.pause:
+            if self.master.mpv.eof_reached:
+                return
             self._start("follower")
             self._resume = True
             self._align()
