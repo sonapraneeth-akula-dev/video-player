@@ -33,6 +33,12 @@ its 2-second seek limit; performance is not yet consistently within budget.
 Rendered-frame tests need a real display/OpenGL context: Qt's `offscreen`
 backend has not passed their frame checks.
 
+CI isolates the Windows native player-lifecycle tests and the Ubuntu corrupt
+corpus in separate pytest processes (and a separate Xvfb display for the
+corrupt corpus). Remaining tests append their coverage; the combined result
+must still meet the 80% line-coverage gate. The Ubuntu suites have explicit
+timeouts so a native stall cannot consume an unbounded runner session.
+
 ## Windows (PowerShell)
 
 `py -3.12` selects Python 3.12 when the Windows Python launcher is installed;
