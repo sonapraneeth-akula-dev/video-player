@@ -65,9 +65,8 @@ jobs:
             Where-Object { $_.Name -notin @('test_player.py', 'test_corrupt.py') } |
             Sort-Object Name |
             ForEach-Object FullName)
-          for ($start = 0; $start -lt $files.Count; $start += 10) {
-            $last = [Math]::Min($start + 9, $files.Count - 1)
-            python -u -m pytest -vv $files[$start..$last] --cov=src/vplayer --cov=scripts --cov-append --cov-report= --cov-fail-under=0
+          foreach ($file in $files) {
+            python -u -m pytest -vv $file --cov=src/vplayer --cov=scripts --cov-append --cov-report= --cov-fail-under=0
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           python -m coverage report -m --fail-under=80
@@ -82,10 +81,10 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 30
         run: |
-          files=(tests/test_*.py)
-          for ((start=0; start<${#files[@]}; start+=10)); do
+          for file in tests/test_*.py; do
+            if [[ "$file" == tests/test_corrupt.py ]]; then continue; fi
             timeout 8m xvfb-run -a python -u -X faulthandler -m pytest -x -vv -s \
-              "${files[@]:start:10}" --deselect=tests/test_corrupt.py \
+              "$file" \
               --cov=src/vplayer --cov=scripts --cov-append --cov-report= --cov-fail-under=0
           done
           python -m coverage report -m --fail-under=80

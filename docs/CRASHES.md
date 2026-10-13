@@ -151,10 +151,18 @@ physical-GPU/Wayland crash validation remain open.
 
 Windows run `38382763090` subsequently timed out after 20 minutes: its last
 reported result was the end of the codec tests, immediately before the
-corrupt-corpus tests. The previous run passed the same boundary. Windows CI
-now runs that corpus separately and groups the other test files into fresh
-pytest processes while preserving aggregate coverage. The specific stall
-and any underlying shared-process native defect remain unrooted.
+corrupt-corpus tests. The previous run passed the same boundary. The corpus
+passed in a separate process in run `38390000306`, but a ten-file Windows
+group then timed out at the start of
+`test_unplayable_tab_shows_reason_without_interrupting_other_tab`.
+
+Ubuntu run `38390000306` also segfaulted at
+`test_speed_nudges_are_decimal_and_bounded`, the same test as run
+`38378468250`, after other native tests in its ten-file group. CI now runs
+each remaining test file in a fresh pytest process, and each Ubuntu file
+under a fresh Xvfb display, while preserving aggregate coverage. This
+isolates accumulated test state, not a demonstrated root cause or production
+fix.
 
 Unexpected Python exceptions in UI slots and worker threads are logged and
 reported in the active window's error banner; unexpected mpv event/property

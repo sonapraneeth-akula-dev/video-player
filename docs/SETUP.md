@@ -35,8 +35,8 @@ backend has not passed their frame checks.
 
 CI isolates the native player-lifecycle and corrupt-corpus tests in separate
 pytest processes on Windows, and the corrupt corpus on Ubuntu. Other test
-files run in groups of ten: fresh pytest processes on Windows and fresh
-pytest/Xvfb displays on Ubuntu. All groups append their coverage; the
+files run one at a time in fresh pytest processes on Windows and fresh
+pytest/Xvfb displays on Ubuntu. All files append their coverage; the
 combined result must still meet the 80% line-coverage gate. Steps have
 timeouts so a native stall cannot consume an unbounded runner session.
 Isolation does not establish the root cause of shared-process native crashes.
