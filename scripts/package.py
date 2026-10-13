@@ -65,7 +65,7 @@ def linux(version: str, folder: Path) -> list[Path]:
     appdir = BUILD / "VPlayer.AppDir"
     shutil.rmtree(appdir, ignore_errors=True)
     shutil.copytree(folder, appdir)
-    for name in ("vplayer.desktop", "vplayer.svg"):
+    for name in ("vplayer.desktop", "vplayer.png"):
         shutil.copy2(PACKAGING / "linux" / name, appdir / name)
     apprun = appdir / "AppRun"
     apprun.write_text('#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/vplayer" "$@"\n', encoding="utf-8")
@@ -75,7 +75,7 @@ def linux(version: str, folder: Path) -> list[Path]:
     kit = DIST / f"VPlayer-{version}-linux-{arch}.tar.gz"
     with tarfile.open(kit, "w:gz") as archive:
         archive.add(image, f"{kit.name[:-7]}/{image.name}")
-        for name in ("install.sh", "vplayer.desktop", "vplayer.svg"):
+        for name in ("install.sh", "vplayer.desktop", "vplayer-new-window.desktop", "vplayer.png"):
             archive.add(PACKAGING / "linux" / name, f"{kit.name[:-7]}/{name}")
     return [image, kit]
 

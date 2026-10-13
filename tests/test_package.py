@@ -1,10 +1,12 @@
 import runpy
 import sys
+import tarfile
 from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
 
 import vplayer
+from scripts import package
 
 
 def test_package_version_matches_metadata():
@@ -44,3 +46,21 @@ def test_spec_bundles_libmpv_without_unused_qt_modules(tmp_path, monkeypatch):
     assert recorded["exe"]["console"] is False
     if sys.platform == "win32":
         assert Path(recorded["exe"]["icon"]).read_bytes().startswith(b"\x00\x00\x01\x00")
+
+
+def test_linux_package_contains_desktop_templates_and_256_icon(tmp_path, monkeypatch):
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    monkeypatch.setattr(package, "DIST", dist)
+    monkeypatch.setattr(package, "BUILD", tmp_path / "build")
+    monkeypatch.setattr(package.shutil, "which", lambda command: "appimagetool" if command == "appimagetool" else None)
+    monkeypatch.setattr(package, "run", lambda _tool, _appdir, image, **_kwargs: image.write_bytes(b"image"))
+    folder = dist / "vplayer"
+    folder.mkdir()
+    (folder / "vplayer").write_bytes(b"executable")
+    image, kit = package.linux(vplayer.__version__, folder)
+    assert image.read_bytes() == b"image"
+    assert (package.BUILD / "VPlayer.AppDir" / "vplayer.png").read_bytes().startswith(b"\x89PNG")
+    with tarfile.open(kit) as archive:
+        names = {Path(name).name for name in archive.getnames()}
+    assert {"install.sh", "vplayer.desktop", "vplayer-new-window.desktop", "vplayer.png", image.name} <= names

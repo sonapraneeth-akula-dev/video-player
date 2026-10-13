@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=VPlayer (new window)
+Comment=Open video in a new VPlayer window
+Exec=vplayer --new-window %F
+Icon=vplayer
+Terminal=false
+Categories=AudioVideo;Video;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mp2t;video/x-m4v;video/x-ms-wmv;video/x-flv;video/mpeg;
+NoDisplay=true
