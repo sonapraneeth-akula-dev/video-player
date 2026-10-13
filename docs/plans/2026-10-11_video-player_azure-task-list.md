@@ -760,7 +760,7 @@
 |---|------|------|-------------|---------|--------------|-------|
 | 8.2.1.1.1 | Task | `packaging/linux/build-appimage.sh` — build on 22.04 with distro `libmpv1` (linuxdeploy + Qt plugin) | 02:30 | 00:30 | AppImage runs on a clean 22.04 VM with `libxcb-cursor0`; codec matrix green with `VPLAYER_BIN` | AD-016 |
 | 8.2.1.1.2 | Task | `packaging/linux/install.sh` + `vplayer.desktop` / `vplayer-new-window.desktop` templates — AppImage → `~/.local/bin/vplayer`, hicolor 256 icon, expanded absolute quoted `Exec`, MimeType list, `update-desktop-database`, `gtk-update-icon-cache`, PATH notice | 02:30 | 00:25 | `shellcheck` clean; icon in app grid; Open With lists both entries on X11 and Wayland | FR-030/043 |
-| 8.2.1.1.3 | Task | README setup section — prerequisites (`libxcb-cursor0`; `libmpv1` for dev), install and uninstall commands for both OSes | 00:45 | 00:10 | Steps followed on a fresh VM work | NFR-012 |
+| 8.2.1.1.3 | Task | [x] README setup section — prerequisites (`libxcb-cursor0`; `libmpv1` for dev), install and uninstall commands for both OSes | 00:45 | 00:10 | Steps followed on a fresh VM work | NFR-012; linked `docs/SETUP.md` names both platforms' prerequisites and exact installer/uninstaller commands, with default-path and unbuilt-AppImage caveats. Fresh Ubuntu desktop UAT pending artifact from 8.2.1.1.1 |
 
 ##### User Story 8.2.1.2 (US-052): `install.sh --uninstall`
 - **Est. Manual**: 01:00 | **Est. AI**: 00:10

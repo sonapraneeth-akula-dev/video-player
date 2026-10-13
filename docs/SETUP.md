@@ -1,6 +1,6 @@
 # Development setup and build
 
-VPlayer `0.43.0` can be run from source or built as a portable Windows bundle;
+VPlayer `0.47.0` can be run from source or built as a portable Windows bundle;
 the Windows installer passes hosted install/upgrade/uninstall smoke tests,
 but full release/UAT and the Linux AppImage are not yet verified. Run commands from the
 repository root. The supported development target is Windows 10/11 x64 or
@@ -151,3 +151,41 @@ in an Ubuntu 22.04 container using a dummy AppImage; the actual AppImage and
 desktop UAT, and all macOS packaging, remain untested. The Linux installer
 refuses to overwrite an unmanaged VPlayer path; remove any earlier unmanaged
 installation explicitly before using it.
+
+## Install and uninstall
+
+On Windows, download the `VPlayer-<version>-windows-x64-setup.exe` artifact,
+replace `<version>` below with its version number, and run it as your own user:
+
+```powershell
+& ".\VPlayer-<version>-windows-x64-setup.exe"
+& "$env:LOCALAPPDATA\Programs\VPlayer\vplayer.exe" --version
+& "$env:LOCALAPPDATA\Programs\VPlayer\unins000.exe"
+```
+
+The last command uninstalls VPlayer at the installer's **default** location.
+If you chose another directory, uninstall through **Settings > Apps > Installed
+apps** instead. Uninstall removes only the PATH entry the installer added; a
+new terminal is needed to see any PATH changes.
+
+On Ubuntu 22.04, install `libxcb-cursor0` before running the AppImage.
+`libmpv1` is needed for **source/development** runs; the AppImage carries the
+runtime from the machine on which it was built. Extract the matching
+`VPlayer-<version>-linux-<arch>.tar.gz` distribution, then run the included
+installer from that directory:
+
+```sh
+sudo apt-get install -y libxcb-cursor0
+tar -xzf VPlayer-<version>-linux-<arch>.tar.gz
+cd VPlayer-<version>-linux-<arch>
+./install.sh
+~/.local/bin/vplayer --version
+./install.sh --uninstall
+```
+
+Use the archive's actual version and architecture in those commands. The
+installer copies the AppImage to `~/.local/bin/vplayer` and registers its
+desktop entries and icon; `--uninstall` removes only files it installed. The
+Linux AppImage still needs a build and a clean Ubuntu 22.04 desktop UAT;
+these commands are instructions for that artifact, not a claim that it has
+passed release testing.
