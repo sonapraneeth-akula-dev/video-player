@@ -34,15 +34,19 @@ be verified until that integration exists.
 
 ## Other open Tasks (15)
 
-These are **not all blocked by SFTP**. "Depends on" below means an
-implementation prerequisite, not a request for owner input; the foundational
-registry and suspension tasks can be developed independently if prioritized.
+These are **not all directly SFTP tasks**. "Depends on" below means an
+implementation prerequisite, not a separate owner decision. Local portions of
+the registry and suspension work could be started, but neither numbered task
+can be marked complete as specified while its remote/compare behavior remains
+deferred: design section 6 requires **every** action ID, including SFTP and
+compare controls; design section 4.7 requires suspended SFTP tabs to
+reauthenticate on a worker before restoring playback.
 
 | Task | Remaining work / blocker |
 |---|---|
 | `3.2.1.2.3` | Strict 50-position 4K HEVC GOP-250 back-step gate: p95 **2,004 ms** on this Hyper-V/RDP Windows host versus **<300 ms** required on both OSes. `hwdec-current=no`; forced D3D11VA/DXVA2 copy-back also fell back to software. The opt-in fixture/benchmark exists, but a representative Windows GPU and Ubuntu 22.04 desktop/GPU are unavailable here; measure and optimize before closing. Do not relax the threshold. |
-| `5.1.1.1.1` | Central `ACTIONS` registry and per-window `QAction` creation for every design action ID. Foundational unfinished implementation; no external blocker. |
-| `5.1.1.1.2` | Registry/control/shortcut parity, conflict and invalid-settings tests. Depends on `5.1.1.1.1`; existing hand-wired actions are not a registry. |
+| `5.1.1.1.1` | Central `ACTIONS` registry and per-window `QAction` creation for **every** design action ID. A local-action registry can start now, but closing this row requires functioning deferred SFTP/compare/new-window action handlers, not dead controls or placeholder success. |
+| `5.1.1.1.2` | Registry/control/shortcut parity, conflict and invalid-settings tests. Depends on the complete registry and implemented actions; existing hand-wired actions do not establish parity. |
 | `5.2.1.1.1` | Shortcut editor with named conflicts and Swap/Cancel, rejecting empty bindings. Depends on the registry. |
 | `5.2.1.2.1` | PortableText binding persistence, resets and live multi-window application. Depends on the registry and editor. |
 | `7.1.1.1.2` | Create compare from playing, paused and suspended tabs; replace compare on open. Depends on `CompareTab` (`7.1.1.1.1`) and suspension (`9.1.1.1.1`). |
@@ -50,7 +54,7 @@ registry and suspension tasks can be developed independently if prioritized.
 | `7.2.1.2.2` | VFR compare banner and per-side queued frame skips. Depends on `CompareTab` and its existing sync-core integration. |
 | `7.2.2.1.1` | Frame-rounded offset controls and synchronized pause/realign/resume. Depends on `CompareTab` and its existing sync-core integration. |
 | `7.2.2.2.1` | Sync toggle and active-side focus/routing. Depends on `CompareTab` and action routing. |
-| `9.1.1.1.1` | Hidden-tab 60 s suspend and full playback-state restore. Foundational unfinished implementation; requires a real 70 s integration test, not an owner decision. |
+| `9.1.1.1.1` | Hidden-tab 60 s suspend and full playback-state restore. The local path can start now, but full design section 4.7 also requires SSH reauthentication on a worker for suspended SFTP tabs, plus a real 70 s integration test. Do not close from local-only coverage. |
 | `9.1.1.1.2` | Suspend both players in a background compare tab. Depends on suspension and `CompareTab`. |
 | `9.1.1.1.3` | `scripts/memory_check.py` and RSS limits for warmed 4K, suspended tabs and two windows x four tabs. Depends on suspension; representative 4K measurements remain necessary. |
 | `10.3.1.1.1` | Refresh shortcut tooltips/menus when bindings change. Depends on registry and rebind signal. |

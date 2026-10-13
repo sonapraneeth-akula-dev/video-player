@@ -1,6 +1,6 @@
 # Native crash investigation
 
-Status as of 2026-10-12 (updated after the investigation below). This document separates confirmed findings from
+Status as of 2026-10-13 (updated after the investigation below). This document separates confirmed findings from
 suspected causes; a passing individual test is not evidence that the full
 application is crash-free.
 
@@ -138,8 +138,15 @@ processes. Before the callback fix, three full runs under ProcDump exited
 cleanly, but subsequent uninstrumented broader suites still failed. After
 both fixes, an uninstrumented full run exited 0 with 256 passing tests and no
 warnings. Later Windows and Ubuntu CI suites progressed through hundreds of
-tests without a native crash; remaining failures concern test isolation or
-performance, not a reproduced access violation. Non-RDP Windows and
+tests without the identified Windows access violation. A later Ubuntu run
+(`38378468250`) exited with signal 11 / code 139 during
+`test_speed_nudges_are_decimal_and_bounded` after many native tests shared
+one Xvfb process. A previous combined run stalled before the corrupt-corpus
+worker. The corrupt worker passed when isolated; splitting the remaining
+Ubuntu tests into fresh, bounded Xvfb groups subsequently passed CI run
+`38380466187` and the documentation run `38381677213`. This contains
+runner instability without identifying the newer Ubuntu fault's root cause
+or proving long-lived playback crash-free. Non-RDP Windows and
 physical-GPU/Wayland crash validation remain open.
 
 Unexpected Python exceptions in UI slots and worker threads are logged and
