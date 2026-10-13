@@ -105,8 +105,7 @@ def test_snapshot_respects_rotation_and_maps_hdr_to_sdr(qtbot, tmp_path, source,
         else:
             color = image.pixelColor(128, 72)
             assert 60 < color.red() < 240
-            assert color.green() < color.red()
-            assert color.blue() < color.green()
+            assert color.red() > max(color.green(), color.blue()) * 1.5
     finally:
         window.close()
 
