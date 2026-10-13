@@ -131,6 +131,18 @@ def test_pitch_correction_setting_is_validated_and_persists(tmp_path, caplog):
     assert "Invalid playback/pitch_correction" in caplog.text
 
 
+def test_background_tabs_setting_persists(tmp_path):
+    path = tmp_path / "settings.ini"
+    settings = Settings(path)
+    settings.load()
+    assert settings.background_tabs == "pause"
+    for mode in ("muted", "play", "pause"):
+        settings.set_background_tabs(mode)
+        restored = Settings(path)
+        restored.load()
+        assert restored.background_tabs == mode
+
+
 def test_resume_settings_are_opt_in_validated_and_persist(tmp_path, caplog):
     path = tmp_path / "settings.ini"
     file = tmp_path / "movie.mp4"

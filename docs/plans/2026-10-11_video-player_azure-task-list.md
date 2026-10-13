@@ -950,7 +950,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 12.1.1.1.1 | Task | [x] `background_tabs` (`pause` / `muted` / `play`) applied on tab change and window minimize (Wayland: tab change only); resume only if it was playing | 01:30 | 00:20 | Tests per value on tab switch and minimize (Windows, X11) | FR-039; all modes, prior pause/mute preservation, minimize and tab move tested locally on Windows; X11 runtime validation pending. Default pause; Preferences control follows in 12.1.1.1.2; v0.46.0 |
-| 12.1.1.1.2 | Task | Preferences control for `background_tabs` | 00:30 | 00:10 | Setting persists across restart \|\| |  |
+| 12.1.1.1.2 | Task | [x] Preferences control for `background_tabs` | 00:30 | 00:10 | Setting persists across restart \|\| | File > Preferences provides accessible pause/muted/play choice; cancel leaves setting unchanged, save updates existing windows and survives restart. v0.47.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: each setting value on tab switch and minimize (X11/Windows)

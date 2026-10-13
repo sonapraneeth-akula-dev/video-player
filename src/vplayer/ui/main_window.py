@@ -681,10 +681,14 @@ class MainWindow(QMainWindow):
             dialog.raise_()
             dialog.activateWindow()
             return
-        dialog = PreferencesDialog(self.settings.pitch_correction, self, resume_enabled=self.settings.resume_enabled)
+        dialog = PreferencesDialog(
+            self.settings.pitch_correction, self, resume_enabled=self.settings.resume_enabled,
+            background_tabs=self.settings.background_tabs,
+        )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.accepted.connect(lambda: self._save_pitch_preference(dialog.pitch_correction.isChecked()))
         dialog.accepted.connect(lambda: self._save_resume_preference(dialog.resume_enabled.isChecked()))
+        dialog.accepted.connect(lambda: self._save_background_preference(dialog.background_tabs.currentData()))
         dialog.open()
 
     def _save_pitch_preference(self, enabled: bool):
@@ -700,6 +704,22 @@ class MainWindow(QMainWindow):
             self.settings.set_resume_enabled(enabled)
         except OSError as error:
             self.show_error(f"Could not save resume preference: {error}")
+
+    def _save_background_preference(self, mode: str):
+        try:
+            self.settings.set_background_tabs(mode)
+            windows = self.controller.windows if self.controller is not None else [self]
+            for window in windows:
+                if window._closing:
+                    continue
+                window.settings.background_tabs = mode
+                for index in range(window.tabs.count()):
+                    tab = window.tabs.widget(index)
+                    if tab.background_mode is not None:
+                        window._show_background_tab(tab)
+                        window._hide_background_tab(tab)
+        except (OSError, RuntimeError, SystemError, mpv.PropertyUnavailableError) as error:
+            self.show_error(f"Could not apply background tab preference: {error}")
 
     def _save_position(self, tab=None):
         player = tab.player if tab is not None else self.player

@@ -37,7 +37,10 @@ from vplayer.sftp import (
 
 
 class PreferencesDialog(QDialog):
-    def __init__(self, pitch_correction: bool, parent=None, *, resume_enabled: bool = False):
+    def __init__(
+        self, pitch_correction: bool, parent=None, *, resume_enabled: bool = False,
+        background_tabs: str = "pause",
+    ):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         layout = QVBoxLayout(self)
@@ -49,6 +52,16 @@ class PreferencesDialog(QDialog):
         self.resume_enabled.setAccessibleName("Resume local files")
         self.resume_enabled.setChecked(resume_enabled)
         layout.addWidget(self.resume_enabled)
+        self.background_tabs = QComboBox(self)
+        self.background_tabs.setAccessibleName("Background tabs")
+        self.background_tabs.addItem("Pause hidden tabs", "pause")
+        self.background_tabs.addItem("Keep playing, muted", "muted")
+        self.background_tabs.addItem("Keep playing with audio", "play")
+        index = self.background_tabs.findData(background_tabs)
+        if index < 0:
+            raise ValueError("Invalid background tab mode")
+        self.background_tabs.setCurrentIndex(index)
+        layout.addWidget(self.background_tabs)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self,
         )
