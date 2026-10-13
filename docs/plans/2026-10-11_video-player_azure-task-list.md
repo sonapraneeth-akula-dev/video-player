@@ -609,7 +609,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 6.3.1.1.1 | Task | `__main__.py` single instance — `QLockFile` `vplayer-<user>.lock` decides primary; primary listens on `QLocalServer` `vplayer-<user>`; secondary sends `{"v":1,"new_window":…,"items":[…]}` with absolute paths, calls `AllowSetForegroundWindow` on Windows, exits 0 | 03:00 | 00:30 | `tests/test_single_instance.py`: 5 simultaneous launches → one primary, all files open (both OSes) | AD-010, FR-042 |
-| 6.3.1.1.2 | Task | `app.py` receiver — validate ≤ 64 KB, version, types, absolute path or `sftp://`; open in last-used window, overflow → new window; raise + activate | 01:30 | 00:20 | Unit: malformed messages dropped and logged; 4-tab overflow → new window \|\| |  |
+| 6.3.1.1.2 | Task | [x] `app.py` receiver — validate ≤ 64 KB, version, types, absolute path or `sftp://`; open in last-used window, overflow → new window; raise + activate | 01:30 | 00:20 | `test_single_instance.py`: malformed/oversize logged without payload, missing files reported, focus routing and 4-tab overflow verified; IPC listener wiring follows in 6.3.1.1.1 |  |
 
 #### Feature 6.3.2 (FEAT-006.3.2): Open in new window
 - **Est. Manual**: 01:30 | **Est. AI**: 00:20

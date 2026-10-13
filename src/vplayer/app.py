@@ -1,8 +1,48 @@
 """Ownership of independent player windows."""
 
+import json
+import logging
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
+
+log = logging.getLogger("vplayer")
+
+
+def parse_open_request(payload: bytes) -> dict | None:
+    if len(payload) > 65536:
+        log.warning("Ignoring oversized IPC request")
+        return None
+    try:
+        request = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        log.warning("Ignoring malformed IPC request")
+        return None
+    if (
+        not isinstance(request, dict)
+        or type(request.get("v")) is not int or request["v"] != 1
+        or type(request.get("new_window")) is not bool
+        or not isinstance(request.get("items"), list)
+    ):
+        log.warning("Ignoring unsupported IPC request")
+        return None
+    for item in request["items"]:
+        if not isinstance(item, str) or not item:
+            log.warning("Ignoring IPC request with invalid item")
+            return None
+        if item.lower().startswith("sftp://"):
+            try:
+                remote = urlsplit(item)
+                if remote.hostname and remote.path:
+                    continue
+            except ValueError:
+                pass
+        elif Path(item).is_absolute():
+            continue
+        log.warning("Ignoring IPC request with invalid path or URI")
+        return None
+    return request
 
 
 def open_in_window(window, path: str | Path, *, new_tab: bool = False) -> bool:
@@ -85,6 +125,26 @@ class AppController(QObject):
         source._overflow_path = None
         if source.tabs.count() == 0 and len(self.windows) > 1:
             source.close()
+        return True
+
+    def receive_open_request(self, payload: bytes) -> bool:
+        request = parse_open_request(payload)
+        if request is None:
+            return False
+        if request["new_window"] or not self.windows:
+            window = self.new_window()
+        else:
+            window = self.last_used_window or self.windows[-1]
+        failures = 0
+        for item in request["items"]:
+            if window.tabs.count() >= 4:
+                window = self.new_window()
+            if not open_in_window(window, item, new_tab=True):
+                failures += 1
+        if failures:
+            window.statusBar().showMessage(f"Could not open {failures} file(s)", 10000)
+        window.raise_()
+        window.activateWindow()
         return True
 
     def window_closed(self, window):
