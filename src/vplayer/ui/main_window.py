@@ -8,7 +8,7 @@ from typing import ClassVar
 import mpv
 import paramiko
 import shiboken6
-from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
@@ -453,11 +453,18 @@ class MainWindow(QMainWindow):
         previous = self._active_tab
         self._store_active_tab_state()
         tab = self.tabs.widget(index)
+        if previous is not None and previous is not tab:
+            self._hide_background_tab(previous)
         if previous is not None and previous is not tab and previous.retry_cancel is not None:
             previous.retry_cancel.set()
             previous.retry_cancel = None
             self.retry_button.setEnabled(True)
         self._active_tab = tab
+        if tab is not None:
+            if self.isMinimized() and not QApplication.platformName().lower().startswith("wayland"):
+                self._hide_background_tab(tab)
+            else:
+                self._show_background_tab(tab)
         self.player = tab.player if tab else None
         self.video = tab.video if tab else None
         if tab is None:
@@ -499,6 +506,37 @@ class MainWindow(QMainWindow):
         if tab is not None:
             self.controls.play_action.setText("Play" if self.player.mpv.pause else "Pause")
         self._refresh_tracks()
+
+    def _hide_background_tab(self, tab):
+        if tab.background_mode is not None:
+            return
+        tab.background_mode = self.settings.background_tabs
+        if tab.background_mode == "pause":
+            tab.background_playing = not tab.player.mpv.pause
+            if tab.background_playing:
+                tab.player.mpv.pause = True
+        elif tab.background_mode == "muted":
+            tab.background_muted = tab.player.mpv.mute
+            tab.player.mpv.mute = True
+
+    def _show_background_tab(self, tab):
+        if tab.background_mode == "pause" and tab.background_playing:
+            tab.player.mpv.pause = False
+        elif tab.background_mode == "muted":
+            tab.player.mpv.mute = tab.background_muted
+        tab.background_mode = None
+
+    def changeEvent(self, event):
+        if (
+            event.type() == QEvent.Type.WindowStateChange
+            and not QApplication.platformName().lower().startswith("wayland")
+            and self._active_tab is not None
+        ):
+            if self.isMinimized():
+                self._hide_background_tab(self._active_tab)
+            else:
+                self._show_background_tab(self._active_tab)
+        super().changeEvent(event)
 
     def new_tab(self):
         path, _ = QFileDialog.getOpenFileName(self, "Open Video")

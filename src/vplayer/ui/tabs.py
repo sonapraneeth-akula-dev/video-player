@@ -38,6 +38,9 @@ class PlayerTab(QWidget):
         self.banner_text = ""
         self.banner_visible = False
         self.retry_visible = False
+        self.background_mode = None
+        self.background_playing = False
+        self.background_muted = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

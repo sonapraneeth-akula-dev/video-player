@@ -30,6 +30,8 @@ each tab keeps its own playback position, speed, volume and track selection.
 Playback shortcuts affect only the active tab of the focused window.
 Each window supports up to four tabs; a fifth request offers **Open in new
 window** without replacing the current video.
+By default, switching tabs or minimizing a window pauses playback; returning
+resumes only videos that were playing before they became hidden.
 Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**

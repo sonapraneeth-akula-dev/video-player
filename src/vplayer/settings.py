@@ -51,6 +51,7 @@ class Settings:
         self.seek_long_s = 60
         self.speed_step = 0.05
         self.pitch_correction = True
+        self.background_tabs = "pause"
         self.resume_enabled = False
         self.skip_frames = 10
         self.readahead_mb = 64
@@ -118,6 +119,11 @@ class Settings:
             self.store.setValue("playback/speed_step", step)
         self.speed_step = step
         self.pitch_correction = self._bool("playback/pitch_correction", True)
+        self.background_tabs = self.store.value("playback/background_tabs", "pause")
+        if self.background_tabs not in ("pause", "muted", "play"):
+            log.warning("Invalid playback/background_tabs setting %r; using pause", self.background_tabs)
+            self.background_tabs = "pause"
+            self.store.setValue("playback/background_tabs", self.background_tabs)
         self.resume_enabled = self._bool("resume/enabled", False)
         self.store.sync()
         if self.store.status() != QSettings.Status.NoError:
@@ -131,6 +137,15 @@ class Settings:
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not save pitch correction: {self.store.fileName()}")
         self.pitch_correction = enabled
+
+    def set_background_tabs(self, mode: str) -> None:
+        if mode not in ("pause", "muted", "play"):
+            raise ValueError("Background tabs must be pause, muted, or play")
+        self.store.setValue("playback/background_tabs", mode)
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not save background tab preference: {self.store.fileName()}")
+        self.background_tabs = mode
 
     def set_resume_enabled(self, enabled: bool) -> None:
         if not isinstance(enabled, bool):
