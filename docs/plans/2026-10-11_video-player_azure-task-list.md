@@ -196,7 +196,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 1.3.2.2.1 | Task | `player.py` maps `end-file` reason `error` → `error(str)`; per-tab banner in `ui/main_window.py`; other tabs untouched | 01:30 | 00:15 | `tests/test_errors.py`: unplayable file → banner with reason; a second tab keeps playing \|\| |  |
+| 1.3.2.2.1 | Task | [x] `player.py` maps `end-file` reason `error` → `error(str)`; per-tab banner in `ui/main_window.py`; other tabs untouched | 01:30 | 00:15 | `tests/test_errors.py`: unplayable file → banner with reason; a second tab keeps playing \|\| | Native mapping and tab-local banner already implemented; added direct end-file reason and unplayable-file tests verifying the other tab advances and its banner stays hidden. No runtime change/version bump |
 | 1.3.2.2.2 | Task | [x] Error containment — `sys.excepthook`, `threading.excepthook`, guarded mpv event callbacks → log + banner, never exit | 01:30 | 00:15 | Test raising in a slot: logged, banner shown, app alive | Reused by US-054; UI-slot and worker exceptions logged and queued to the active window's banner; mpv event/property callbacks guarded, failed notifications logged; hooks restored on app exit. `tests/test_errors.py` covers slot, worker, active-window and mpv paths; v0.31.1. Native crashes still require separate triage |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):

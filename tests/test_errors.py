@@ -2,11 +2,14 @@ import logging
 import sys
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 
+import mpv
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QPushButton
 
 from vplayer import __main__ as entry
+from vplayer.player import Player
 from vplayer.settings import Settings
 from vplayer.ui.main_window import MainWindow
 
@@ -105,5 +108,53 @@ def test_mpv_callback_exception_is_contained_and_reported(qtbot, monkeypatch, tm
             qtbot.waitUntil(lambda: window.banner.isVisible() and "mpv event failed" in window.banner.text())
         assert "Unexpected mpv event callback failure" in caplog.text
         assert window.isVisible()
+    finally:
+        window.close()
+
+
+def test_end_file_error_includes_mpv_reason(qtbot):
+    player = Player(video_output="null")
+    errors = []
+    player.error.connect(errors.append)
+    player._uri = "broken.mp4"
+    event = SimpleNamespace(
+        event_id=SimpleNamespace(value=mpv.MpvEventID.END_FILE),
+        data=SimpleNamespace(reason=mpv.MpvEventEndFile.ERROR, error=-12),
+    )
+    try:
+        player._handle_event(event)
+        qtbot.waitUntil(lambda: bool(errors), timeout=1000)
+        assert errors == ["Could not play broken.mp4: mpv error -12"]
+    finally:
+        player.close()
+        assert player.wait_closed(10)
+
+
+def test_unplayable_tab_shows_reason_without_interrupting_other_tab(qtbot, tmp_path: Path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window.show()
+    media = Path(__file__).parent / "media" / "h264_25.mp4"
+    broken = tmp_path / "broken.mp4"
+    broken.write_bytes(b"not a video")
+    try:
+        window.open_file(media)
+        first = window.player
+        qtbot.waitUntil(lambda: first.mpv.duration is not None, timeout=10000)
+        first.mpv.pause = False
+        first_uri = first._uri
+        before = first.mpv.time_pos or 0
+        window._add_player_tab("Broken")
+        window.open_file(broken)
+        qtbot.waitUntil(lambda: window.banner.isVisible(), timeout=10000)
+        assert "Could not play" in window.banner.text()
+        assert "mpv error" in window.banner.text()
+        assert not first._closed and first._uri == first_uri
+        assert first.mpv.path == first_uri and first.mpv.pause is False
+        qtbot.waitUntil(lambda: (first.mpv.time_pos or 0) > before + 0.1, timeout=5000)
+        window.prev_tab()
+        assert window.player is first
+        assert not window.banner.isVisible()
+        window.next_tab()
+        assert "mpv error" in window.banner.text()
     finally:
         window.close()
