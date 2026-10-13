@@ -249,6 +249,11 @@ class MainWindow(QMainWindow):
         self.move_tab_action.setShortcut("Ctrl+Shift+N")
         self.move_tab_action.triggered.connect(lambda: self._detach_tab(self.tabs.currentWidget()))
         self.file_menu.addAction(self.move_tab_action)
+        self.copy_position_action = QAction("Copy position", self)
+        self.copy_position_action.setObjectName("copy_position")
+        self.copy_position_action.setShortcut("Ctrl+Shift+C")
+        self.copy_position_action.triggered.connect(self.copy_position)
+        self.file_menu.addAction(self.copy_position_action)
         close_tab_action = QAction("Close tab", self)
         close_tab_action.setShortcut("Ctrl+W")
         close_tab_action.triggered.connect(self.close_tab)
@@ -484,6 +489,7 @@ class MainWindow(QMainWindow):
                 self.video.setFocus()
         loaded = tab is not None and self.player.mpv.duration is not None
         self.move_tab_action.setEnabled(tab is not None)
+        self.copy_position_action.setEnabled(tab is not None)
         self.seek_bar.setEnabled(loaded)
         for action in self.playback_menu.actions():
             if action.text() not in ("Fullscreen", "Exit fullscreen"):
@@ -575,6 +581,20 @@ class MainWindow(QMainWindow):
         hours, remainder = divmod(whole, 3600)
         minutes, second = divmod(remainder, 60)
         return f"{hours:02}:{minutes:02}:{second:02}.{millis:03}"
+
+    def copy_position(self):
+        if self.player is None or self.player._uri is None:
+            self.show_error("Open a video to copy its position")
+            return
+        position = self._position
+        if not isinstance(position, (int, float)) or not math.isfinite(position) or position < 0:
+            self.show_error("Current position is unavailable")
+            return
+        timestamp = self._clock(position)
+        fps = self.player.frame_rate()
+        text = f"{timestamp} f{round(position * fps)}" if fps is not None else timestamp
+        QApplication.clipboard().setText(text)
+        self.statusBar().showMessage("Position copied to clipboard", 3000)
 
     def _update_time(self):
         fps = self.player.frame_rate()

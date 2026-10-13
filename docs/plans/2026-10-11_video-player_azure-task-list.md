@@ -846,7 +846,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 10.1.2.1.1 | Task | `copy_position` (Ctrl+Shift+C) → clipboard `00:12:34.567 f22213` or timestamp only; compare uses the active side; toast | 00:45 | 00:10 | Unit format + clipboard integration test | FR-050 |
+| 10.1.2.1.1 | Task | [x] `copy_position` (Ctrl+Shift+C) → clipboard `00:12:34.567 f22213` or timestamp only; compare uses the active side; toast | 00:45 | 00:10 | Unit format + clipboard integration test | FR-050; File-menu shortcut copies the active player position with status confirmation, including unknown frame rate; compare-side selection remains pending 7.1.1.1.1; local keyboard and clipboard-adapter tests passed; v0.45.0 |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Unit tests**: snapshot naming and clipboard format, incl. unknown fps and collisions
