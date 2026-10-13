@@ -56,6 +56,7 @@ def snapshot_name(source: str, time_s: float, fps: float | None = None, collisio
 class Player(QObject):
     shutdown_finished = Signal()
     file_loaded = Signal()
+    playback_restarted = Signal()
     position = Signal(object)
     duration = Signal(object)
     paused = Signal(object)
@@ -235,6 +236,7 @@ class Player(QObject):
         elif name == "playback-restart":
             self._skip_restarted = True
             self._skip_step_changed(self.mpv.time_pos)
+            self.playback_restarted.emit()
         elif name == "hwdec-current":
             if value is not None:
                 log.info("Decoder: %s", value)

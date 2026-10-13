@@ -7,6 +7,7 @@ import pytest
 
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
+from vplayer.sync import SyncController
 
 MEDIA = Path(__file__).resolve().parent / "media"
 CASES = (
@@ -29,6 +30,46 @@ def frame_index(player: Player) -> int:
         (data[8 * stride + (bit * 16 + 8) * 4 + 2] > 128) << bit
         for bit in range(min(9, image["w"] // 16))
     )
+
+
+@pytest.mark.parametrize("offset_frames", (0, 2, -2))
+def test_synced_step_skip_and_seek_reach_offset_frames(qtbot, paused_video, offset_frames):
+    master, master_widget = paused_video
+    follower = Player()
+    follower.mpv.ao = "null"
+    follower.mpv.pause = True
+    follower_widget = MpvWidget(follower)
+    follower_widget.resize(256, 144)
+    follower_widget.show()
+    controller = None
+    try:
+        qtbot.waitUntil(lambda: master_widget._render is not None and follower_widget._render is not None)
+        master.mpv.pause = True
+        with qtbot.waitSignal(master.file_loaded, timeout=10000):
+            master.load(MEDIA / "h264_25.mp4")
+        with qtbot.waitSignal(follower.file_loaded, timeout=10000):
+            follower.load(MEDIA / "h264_25.mp4")
+        master.mpv.seek(2, reference="absolute", precision="exact")
+        follower.mpv.seek(2 - offset_frames / 25, reference="absolute", precision="exact")
+        qtbot.waitUntil(lambda: frame_index(master) == 50 and frame_index(follower) == 50 - offset_frames)
+        controller = SyncController(master, follower, offset=offset_frames / 25)
+        controller.frame_step(-1)
+        qtbot.waitUntil(lambda: frame_index(master) == 49 and frame_index(follower) == 49 - offset_frames)
+        qtbot.waitUntil(lambda: controller._waiting is None)
+        controller.skip_frames(3)
+        qtbot.waitUntil(lambda: frame_index(master) == 52 and frame_index(follower) == 52 - offset_frames)
+        qtbot.waitUntil(lambda: controller._waiting is None)
+        controller.seek(10.0)
+        qtbot.waitUntil(lambda: frame_index(master) == 250 and frame_index(follower) == 250 - offset_frames)
+        qtbot.waitUntil(lambda: controller._waiting is None)
+        controller.set_speed(1.25)
+        assert master.mpv.speed == follower.mpv.speed == 1.25
+    finally:
+        if controller is not None:
+            controller.close()
+        follower_widget.dispose()
+        follower.close()
+        assert follower.wait_closed(10)
 
 
 @pytest.fixture(scope="module")

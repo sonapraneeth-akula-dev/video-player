@@ -669,7 +669,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 7.2.1.1.1 | Task | `src/vplayer/sync.py` `SyncController` — A is master; play/pause, seek, speed, step and ±n skip applied to B at A.time-pos − offset | 03:00 | 00:30 | Compare frame-accuracy: both sides on target frame after steps, skips, seeks with offset 0, +, − | FR-045, design §4.4 |
+| 7.2.1.1.1 | Task | [x] `src/vplayer/sync.py` `SyncController` — A is master; play/pause, seek, speed, step and ±n skip applied to B at A.time-pos − offset | 03:00 | 00:30 | Compare frame-accuracy: both sides on target frame after steps, skips, seeks with offset 0, +, − | FR-045, design §4.4; two native players reached exact target frames at zero, positive and negative offsets; queued commands and invalid inputs covered. Compare UI integration and out-of-range hold remain separate tasks; no version bump for non-UI core |
 | 7.2.1.1.2 | Task | Drift correction — drift > max(2 frames, 100 ms) on two samples in a row → pause, exact seek, unpause; at most once per 2 s | 02:00 | 00:20 | Test: injected drift corrected once; jitter below threshold ignored | AD-014 |
 | 7.2.1.1.3 | Task | `swap_audio` (Ctrl+Shift+A) — choose which side is audible | 00:45 | 00:10 | Test: exactly one side unmuted after swap \|\| |  |
 
