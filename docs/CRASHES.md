@@ -149,6 +149,13 @@ runner instability without identifying the newer Ubuntu fault's root cause
 or proving long-lived playback crash-free. Non-RDP Windows and
 physical-GPU/Wayland crash validation remain open.
 
+Windows run `38382763090` subsequently timed out after 20 minutes: its last
+reported result was the end of the codec tests, immediately before the
+corrupt-corpus tests. The previous run passed the same boundary. Windows CI
+now runs that corpus separately and groups the other test files into fresh
+pytest processes while preserving aggregate coverage. The specific stall
+and any underlying shared-process native defect remain unrooted.
+
 Unexpected Python exceptions in UI slots and worker threads are logged and
 reported in the active window's error banner; unexpected mpv event/property
 callback failures are logged and sent to that window on the Qt thread. This
