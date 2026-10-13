@@ -1,6 +1,8 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -74,10 +76,32 @@ def test_packaged_build_decodes_codec(codec, ext):
         pytest.fail(f"VPLAYER_BIN does not exist: {binary}")
     clip = MEDIA / f"matrix_{codec}_{ext}.{ext}"
     kind = "video" if (codec, ext) in VIDEO_CASES else "audio"
+    command = [str(binary), "--codec-probe", kind, str(clip)]
+    if sys.platform == "linux" and not os.environ.get("DISPLAY"):
+        command = ["xvfb-run", "-a", *command]
     result = subprocess.run(
-        [str(binary), "--codec-probe", kind, str(clip)],
+        command,
         capture_output=True, text=True, timeout=40, check=False,
     )
     assert result.returncode == 0, (
         f"Packaged codec probe exited {result.returncode}: {clip}: {result.stderr}"
     )
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="headless Linux codec probe")
+def test_packaged_probe_uses_separate_xvfb_when_headless(monkeypatch, tmp_path):
+    binary = tmp_path / "vplayer"
+    binary.touch()
+    monkeypatch.setenv("VPLAYER_BIN", str(binary))
+    monkeypatch.delenv("DISPLAY", raising=False)
+    commands = []
+
+    def run(command, **_kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    test_packaged_build_decodes_codec("h264", "mp4")
+    assert commands == [[
+        "xvfb-run", "-a", str(binary), "--codec-probe", "video", str(MEDIA / "matrix_h264_mp4.mp4"),
+    ]]

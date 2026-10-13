@@ -2,7 +2,7 @@
 
 Windows: VPlayer-<v>-windows-x64-portable.zip and VPlayer-<v>-windows-x64-setup.exe (Inno Setup 6)
 Linux:   VPlayer-<v>-linux-<arch>.AppImage (portable) and VPlayer-<v>-linux-<arch>.tar.gz
-         (AppImage + install.sh; needs appimagetool on PATH)
+         (AppImage + install.sh; build on Ubuntu 22.04 via packaging/linux/build-appimage.sh)
 macOS:   VPlayer-<v>-macos-<arch>.zip (portable .app) and VPlayer-<v>-macos-<arch>.dmg
 
 Requires `pip install -e .[package]` and the platform libmpv (scripts/fetch_libmpv.py on Windows,
@@ -59,17 +59,30 @@ def windows(version: str, folder: Path) -> list[Path]:
 
 def linux(version: str, folder: Path) -> list[Path]:
     tool = shutil.which("appimagetool")
-    if tool is None:
-        raise SystemExit("appimagetool not found on PATH: https://github.com/AppImage/appimagetool/releases")
+    deploy = shutil.which("linuxdeploy")
+    if tool is None or deploy is None or shutil.which("linuxdeploy-plugin-qt") is None:
+        raise SystemExit("Linux AppImage needs appimagetool, linuxdeploy and linuxdeploy-plugin-qt on PATH")
     arch = platform.machine()
     appdir = BUILD / "VPlayer.AppDir"
     shutil.rmtree(appdir, ignore_errors=True)
-    shutil.copytree(folder, appdir)
+    shutil.copytree(folder, appdir / "usr" / "bin")
     for name in ("vplayer.desktop", "vplayer.png"):
         shutil.copy2(PACKAGING / "linux" / name, appdir / name)
     apprun = appdir / "AppRun"
-    apprun.write_text('#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/vplayer" "$@"\n', encoding="utf-8")
+    apprun.write_text(
+        '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/vplayer" "$@"\n',
+        encoding="utf-8",
+    )
     apprun.chmod(0o755)
+    qt_core = next((appdir / "usr" / "bin" / "_internal").rglob("libQt6Core.so.6"), None)
+    if qt_core is None:
+        raise SystemExit("PyInstaller bundle is missing libQt6Core.so.6")
+    run(
+        deploy, "--appdir", appdir, "--library", qt_core,
+        "--desktop-file", appdir / "vplayer.desktop", "--icon-file", appdir / "vplayer.png",
+        "--plugin", "qt",
+        env={**os.environ, "ARCH": arch},
+    )
     image = DIST / f"VPlayer-{version}-linux-{arch}.AppImage"
     run(tool, appdir, image, env={**os.environ, "ARCH": arch})
     kit = DIST / f"VPlayer-{version}-linux-{arch}.tar.gz"

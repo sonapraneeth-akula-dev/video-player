@@ -15,10 +15,18 @@ libmpv = os.environ.get("VPLAYER_LIBMPV") or next((p for p in candidates if Path
 if not libmpv:
     raise SystemExit("libmpv not found; run scripts/fetch_libmpv.py (Windows), install libmpv, or set VPLAYER_LIBMPV")
 
+binaries = [(libmpv, ".")]
+if sys.platform == "linux":
+    for name in ("libwayland-client.so.0", "libwayland-cursor.so.0", "libwayland-egl.so.1"):
+        path = next(iter(glob(f"/usr/lib/*/{name}")), None)
+        if path is None:
+            raise SystemExit(f"libmpv dependency {name} not found; install Ubuntu's libmpv1 runtime")
+        binaries.append((path, "."))
+
 a = Analysis(
     [str(root / "src" / "vplayer" / "__main__.py")],
     pathex=[str(root / "src")],
-    binaries=[(libmpv, ".")],
+    binaries=binaries,
     excludes=[
         "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets",
         "PySide6.Qt3DCore", "PySide6.QtQuick",

@@ -5,6 +5,8 @@ from importlib.metadata import version
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import vplayer
 from scripts import package
 
@@ -39,7 +41,14 @@ def test_spec_bundles_libmpv_without_unused_qt_modules(tmp_path, monkeypatch):
         },
     )
     assert recorded["scripts"] == [str(root / "src" / "vplayer" / "__main__.py")]
-    assert recorded["analysis"]["binaries"] == [(str(libmpv), ".")]
+    binaries = recorded["analysis"]["binaries"]
+    assert binaries[0] == (str(libmpv), ".")
+    if sys.platform == "linux":
+        assert {Path(src).name for src, _ in binaries[1:]} == {
+            "libwayland-client.so.0", "libwayland-cursor.so.0", "libwayland-egl.so.1",
+        }
+    else:
+        assert len(binaries) == 1
     assert {"PySide6.QtWebEngineCore", "PySide6.Qt3DCore", "PySide6.QtQuick"} <= set(
         recorded["analysis"]["excludes"]
     )
@@ -53,14 +62,43 @@ def test_linux_package_contains_desktop_templates_and_256_icon(tmp_path, monkeyp
     dist.mkdir()
     monkeypatch.setattr(package, "DIST", dist)
     monkeypatch.setattr(package, "BUILD", tmp_path / "build")
-    monkeypatch.setattr(package.shutil, "which", lambda command: "appimagetool" if command == "appimagetool" else None)
-    monkeypatch.setattr(package, "run", lambda _tool, _appdir, image, **_kwargs: image.write_bytes(b"image"))
+    monkeypatch.setattr(
+        package.shutil, "which",
+        lambda command: command if command in ("appimagetool", "linuxdeploy", "linuxdeploy-plugin-qt") else None,
+    )
+    calls = []
+
+    def fake_run(tool, *args, **kwargs):
+        calls.append((tool, args))
+        if tool == "appimagetool":
+            args[-1].write_bytes(b"image")
+
+    monkeypatch.setattr(package, "run", fake_run)
     folder = dist / "vplayer"
-    folder.mkdir()
+    (folder / "_internal").mkdir(parents=True)
     (folder / "vplayer").write_bytes(b"executable")
+    (folder / "_internal" / "libQt6Core.so.6").write_bytes(b"qt")
     image, kit = package.linux(vplayer.__version__, folder)
     assert image.read_bytes() == b"image"
     assert (package.BUILD / "VPlayer.AppDir" / "vplayer.png").read_bytes().startswith(b"\x89PNG")
+    appdir = package.BUILD / "VPlayer.AppDir"
+    assert (appdir / "usr" / "bin" / "vplayer").read_bytes() == b"executable"
+    assert b"usr/bin/vplayer" in (appdir / "AppRun").read_bytes()
+    assert calls[0] == (
+        "linuxdeploy",
+        ("--appdir", appdir, "--library", appdir / "usr" / "bin" / "_internal" / "libQt6Core.so.6",
+         "--desktop-file", appdir / "vplayer.desktop", "--icon-file", appdir / "vplayer.png",
+         "--plugin", "qt"),
+    )
     with tarfile.open(kit) as archive:
         names = {Path(name).name for name in archive.getnames()}
     assert {"install.sh", "vplayer.desktop", "vplayer-new-window.desktop", "vplayer.png", image.name} <= names
+
+
+@pytest.mark.parametrize("missing", ("appimagetool", "linuxdeploy", "linuxdeploy-plugin-qt"))
+def test_linux_package_requires_all_deploy_tools(tmp_path, monkeypatch, missing):
+    monkeypatch.setattr(package, "BUILD", tmp_path / "build")
+    monkeypatch.setattr(package.shutil, "which", lambda tool: None if tool == missing else tool)
+    with pytest.raises(SystemExit, match="needs appimagetool, linuxdeploy and linuxdeploy-plugin-qt"):
+        package.linux("0.1.0", tmp_path / "vplayer")
+    assert not package.BUILD.exists()

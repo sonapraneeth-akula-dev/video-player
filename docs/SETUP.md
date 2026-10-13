@@ -1,8 +1,9 @@
 # Development setup and build
 
 VPlayer can be run from source or built as a portable Windows bundle;
-the Windows installer passes hosted install/upgrade/uninstall smoke tests,
-but full release/UAT and the Linux AppImage are not yet verified. Run commands from the
+the Windows installer passes hosted install/upgrade/uninstall smoke tests.
+The Linux AppImage is built and codec-tested locally on Ubuntu 22.04,
+but interactive desktop UAT remains open. Run commands from the
 repository root. The supported development target is Windows 10/11 x64 or
 Ubuntu 22.04 with a desktop display; release testing on both operating systems
 is still in progress.
@@ -132,7 +133,7 @@ passed all of these checks for version `0.27.0`.
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
 | Windows | `scripts\fetch_libmpv.py`; [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup --scope user`) | `VPlayer-<v>-windows-x64-portable.zip`: unzip, run `vplayer\vplayer.exe` | `VPlayer-<v>-windows-x64-setup.exe`: per-user, no admin; Start menu, optional PATH, "Open with" and "Open in new VPlayer window"; clean uninstall |
-| Linux | `libmpv1` (bundled from the build machine; build on Ubuntu 22.04 for widest reach), [appimagetool](https://github.com/AppImage/appimagetool/releases) on `PATH` | `VPlayer-<v>-linux-<arch>.AppImage`: `chmod +x`, run | `VPlayer-<v>-linux-<arch>.tar.gz`: extract, `./install.sh` (`--uninstall` to remove only files managed by that installer) |
+| Linux | Ubuntu 22.04 `libmpv1`, `qmake6`, Python 3.12 with `.[package]`, [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy/releases), [Qt plugin](https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases) and [appimagetool](https://github.com/AppImage/appimagetool/releases) on `PATH` | `VPlayer-<v>-linux-<arch>.AppImage`: `chmod +x`, run | `VPlayer-<v>-linux-<arch>.tar.gz`: extract, `./install.sh` (`--uninstall` to remove only files managed by that installer) |
 | macOS | `brew install mpv` (libmpv is bundled into the app) | `VPlayer-<v>-macos-<arch>.zip`: unzipped `VPlayer.app` | `VPlayer-<v>-macos-<arch>.dmg` |
 
 ```powershell
@@ -141,6 +142,29 @@ passed all of these checks for version `0.27.0`.
 $env:VPLAYER_BIN = "$PWD\dist\vplayer\vplayer.exe"; .\.venv\Scripts\python.exe -m pytest tests\test_codecs.py -k packaged
 .\scripts\smoke_windows_installer.ps1 -InstallerPath (Get-Item dist\VPlayer-*-windows-x64-setup.exe).FullName
 ```
+
+On Ubuntu 22.04, install `libmpv1`, `qmake6` and Python 3.12, then obtain executable
+`linuxdeploy`, `linuxdeploy-plugin-qt` and `appimagetool` from their linked
+releases above, rename them to those three names, and place them on `PATH`.
+Keep the Qt plugin discoverable by linuxdeploy. Set `QMAKE` if qmake6 is
+installed at a nonstandard path. From the repository root:
+
+```sh
+python3.12 -m venv .venv
+./.venv/bin/python -m pip install -e '.[package,dev]'
+VPLAYER_PYTHON="$PWD/.venv/bin/python" sh packaging/linux/build-appimage.sh
+VPLAYER_BIN="$PWD/build/VPlayer.AppDir/AppRun" \
+  ./.venv/bin/python -m pytest -q tests/test_codecs.py -k packaged
+APPIMAGE_EXTRACT_AND_RUN=1 "$PWD/dist/VPlayer-<version>-linux-<arch>.AppImage" --version
+```
+
+Replace the artifact name with the generated version and architecture. The
+codec tests use an individual `xvfb-run` session per packaged probe when
+`DISPLAY` is unset. They test the uncompressed AppImage payload so a container
+without FUSE need not decompress the entire image 25 times. In containers
+without FUSE, set `APPIMAGE_EXTRACT_AND_RUN=1` for the AppImage build tools
+and the direct archive smoke above. A headless Xvfb codec probe does not
+replace interactive X11/Wayland desktop UAT on a clean Ubuntu 22.04 VM.
 
 Set `VPLAYER_LIBMPV` to override which libmpv file the bundle includes.
 The installer smoke test changes the current user's PATH temporarily and refuses
@@ -151,11 +175,13 @@ video extensions, Start menu shortcut removal, and preservation of a
 pre-existing PATH entry.
 Packages are unsigned: Windows SmartScreen and macOS Gatekeeper warn on first
 launch. Settings and logs stay in the user profile, also for the portable build.
-Only the Windows packages have been built and tested so far (installer
-install/uninstall, PATH and registry cleanup, and the packaged codec matrix).
+Windows packages passed installer install/uninstall, PATH and registry cleanup,
+and the packaged codec matrix. A Linux AppImage was built inside Ubuntu 22.04
+using the distro `libmpv1`; the 25-case packaged codec matrix passed under
+Xvfb and the artifact was launched in a separate clean Ubuntu 22.04 container.
 The Linux installer script passed install/upgrade/uninstall and ownership checks
-in an Ubuntu 22.04 container using a dummy AppImage; the actual AppImage and
-desktop UAT, and all macOS packaging, remain untested. The Linux installer
+in an Ubuntu 22.04 container using a dummy AppImage. Interactive Ubuntu
+X11/Wayland VM UAT and all macOS packaging remain untested. The Linux installer
 refuses to overwrite an unmanaged VPlayer path; remove any earlier unmanaged
 installation explicitly before using it.
 
@@ -193,6 +219,5 @@ cd VPlayer-<version>-linux-<arch>
 Use the archive's actual version and architecture in those commands. The
 installer copies the AppImage to `~/.local/bin/vplayer` and registers its
 desktop entries and icon; `--uninstall` removes only files it installed. The
-Linux AppImage still needs a build and a clean Ubuntu 22.04 desktop UAT;
-these commands are instructions for that artifact, not a claim that it has
-passed release testing.
+Linux AppImage still needs clean Ubuntu 22.04 **desktop** UAT; headless
+container validation is not a substitute for release testing on X11 and Wayland.
