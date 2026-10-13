@@ -570,7 +570,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 6.2.1.1.1 | Task | `src/vplayer/app.py` — window list, `new_window` (Ctrl+N), closing a window closes its players, closing the last window quits | 01:30 | 00:20 | Test: 3 windows with own tabs; closing one leaves the others playing | FR-036 |
+| 6.2.1.1.1 | Task | [x] `src/vplayer/app.py` — window list, `new_window` (Ctrl+N), closing a window closes its players, closing the last window quits | 01:30 | 00:20 | Test: 3 windows with own tabs; closing one leaves the others playing | Three-window test verifies independent players, Ctrl+N, surviving windows and last-close quit; CLI startup and codec probe remain green. `app.py` coverage 100%; v0.38.0 |
 
 #### Feature 6.2.2 (FEAT-006.2.2): Tab move between windows
 - **Est. Manual**: 05:45 | **Est. AI**: 01:15

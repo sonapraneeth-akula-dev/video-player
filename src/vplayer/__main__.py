@@ -171,14 +171,13 @@ def main(argv: list[str] | None = None) -> int:
     logger.setLevel(logging.INFO)
     logger.addHandler(RotatingFileHandler(log_dir / "vplayer.log", maxBytes=1_000_000, backupCount=3))
 
-    from vplayer.ui.main_window import MainWindow
+    from vplayer.app import AppController
 
-    windows = []
-    restore = _install_exception_handlers(windows)
+    controller = AppController(app)
+    restore = _install_exception_handlers(controller.windows)
     try:
         for file in args.files or [None]:
-            window = MainWindow()
-            windows.append(window)
+            window = controller.new_window(show=False)
             if file is not None:
                 path = file if file.startswith("sftp://") else os.path.abspath(file)
                 if args.codec_probe or (not path.startswith("sftp://") and Path(path).is_file()):

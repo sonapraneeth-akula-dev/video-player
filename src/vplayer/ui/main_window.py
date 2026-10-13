@@ -136,10 +136,11 @@ class MainWindow(QMainWindow):
         "_position": "position",
     }
 
-    def __init__(self, settings: Settings | None = None):
+    def __init__(self, settings: Settings | None = None, *, controller=None):
         super().__init__()
         self.setWindowTitle(APP_NAME)
         self.resize(960, 600)
+        self.controller = controller
         self.settings = settings or Settings()
         self.settings.load()
         self._current_file: Path | None = None
@@ -218,6 +219,10 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self.choose_file)
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu.addAction(open_action)
+        new_window_action = QAction("New window", self)
+        new_window_action.setShortcut("Ctrl+N")
+        new_window_action.triggered.connect(self.new_window)
+        self.file_menu.addAction(new_window_action)
         self.recent_menu = self.file_menu.addMenu("Recent Files")
         self.recent_menu.aboutToShow.connect(self._refresh_recent_menu)
         self._refresh_recent_menu()
@@ -475,6 +480,14 @@ class MainWindow(QMainWindow):
                 return
             self._add_player_tab(Path(path).name)
             self.open_file(path)
+
+    def new_window(self):
+        if self.controller is None:
+            from vplayer.app import AppController
+
+            self.controller = AppController(QApplication.instance())
+            self.controller.register(self)
+        return self.controller.new_window()
 
     def close_tab(self):
         index = self.tabs.currentIndex()
@@ -1007,3 +1020,5 @@ class MainWindow(QMainWindow):
                 tab.retry_cancel.set()
             self.tabs.close_tab(0)
         super().closeEvent(event)
+        if self.controller is not None and event.isAccepted():
+            self.controller.window_closed(self)

@@ -584,6 +584,9 @@ window stays open.
 Each `PlayerTab` owns its player and render surface; closing detaches the player
 from Qt's tab parent before asynchronous native shutdown, then schedules
 deletion on the Qt thread. Window-level controls reflect the selected tab.
+`AppController` owns the open-window list and Ctrl+N creates a window with
+independent tabs. Closing one window tears down only its players; closing the
+last requests app quit.
 
 `copy_position` (FR-050) copies `<HH:MM:SS.mmm> f<frame>` of the current tab, e.g.
 `00:12:34.567 f22213`, or only `<HH:MM:SS.mmm>` when fps is unknown (§4.3); in compare view,
