@@ -80,6 +80,7 @@ class DetachableTabWidget(QTabWidget):
             self.placeholder.raise_()
 
     def new_tab(self, tab: PlayerTab, label: str) -> int:
+        tab.title = label
         index = self.addTab(tab, label)
         self.setCurrentIndex(index)
         self._show_placeholder()

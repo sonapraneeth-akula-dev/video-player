@@ -84,8 +84,8 @@ authentication. Trust once applies only to the current connection; trust and
 remember updates the application's known-hosts file without editing
 `~/.ssh/known_hosts`. Remote playback retries socket errors and timeouts
 without reloading the file, reauthenticating against the originally approved
-host key. A status indicator shows the retry attempt or cache buffering in
-the current active tab's window; placement in tab headers is pending.
+host key. The tab header and window status bar show retry attempts or cache
+buffering, including when another tab is active.
 Retry count defaults to 6 (`network/retry_max`, 0–20); cancellation interrupts
 connection attempts. Exhausted retries show the last playback time and a
 **Retry** button; Retry reauthenticates and resumes from that time. SFTP

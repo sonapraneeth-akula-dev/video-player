@@ -380,18 +380,11 @@ class MainWindow(QMainWindow):
             active(player.file_loaded, lambda action=action: action.setEnabled(True))
         active(player.paused, lambda paused: self.controls.play_action.setText("Play" if paused else "Pause"))
         player.sftp_open_failed.connect(lambda uri: self._remote_open_failed(uri, tab))
-        active(
-            player.sftp_reconnecting, self._remote_reconnecting,
-            lambda uri, attempt: setattr(tab, "reconnect_attempt", attempt) if uri == player._uri else None,
+        player.sftp_reconnecting.connect(
+            lambda uri, attempt: self._remote_reconnecting(uri, attempt, tab),
         )
-        active(
-            player.sftp_reconnected, self._remote_reconnected,
-            lambda uri: setattr(tab, "reconnect_attempt", None) if uri == player._uri else None,
-        )
-        active(
-            player.sftp_retry_failed, self._remote_retry_failed,
-            lambda uri: self._remote_retry_failed_for_tab(tab, uri),
-        )
+        player.sftp_reconnected.connect(lambda uri: self._remote_reconnected(uri, tab))
+        player.sftp_retry_failed.connect(lambda uri: self._remote_retry_failed(uri, tab))
         active(
             player.connection_failed, self._connection_failed,
             lambda position: self._connection_failed_for_tab(tab, position),
@@ -401,7 +394,7 @@ class MainWindow(QMainWindow):
                 uri, previous, replacement, tab,
             ),
         )
-        active(player.cache_paused, self._cache_pause_changed, lambda paused: setattr(tab, "cache_paused", bool(paused)))
+        player.cache_paused.connect(lambda paused: self._cache_pause_changed(paused, tab))
         active(player.skip_status, self.statusBar().showMessage)
         active(
             player.error, self.show_error,
@@ -638,7 +631,8 @@ class MainWindow(QMainWindow):
         start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
         self.player.load(self._current_file, start_position=start)
         self._pending_recent = (self.player._uri, str(self._current_file))
-        self.tabs.setTabText(self.tabs.currentIndex(), file.name)
+        self._active_tab.title = file.name
+        self._update_tab_status(self._active_tab)
         self._store_active_tab_state()
 
     def _open_connected_remote(self, tab, uri, remote_path, transport, pool):
@@ -673,7 +667,8 @@ class MainWindow(QMainWindow):
             start_position=start_position,
         )
         self._pending_recent = (self.player._uri, uri)
-        self.tabs.setTabText(self.tabs.currentIndex(), Path(remote_path).name)
+        self._active_tab.title = Path(remote_path).name
+        self._update_tab_status(self._active_tab)
         self._store_active_tab_state()
 
     def _connection_failed(self, position: float):
@@ -750,32 +745,69 @@ class MainWindow(QMainWindow):
             self.connection_status.show()
         else:
             self.connection_status.hide()
+        if self._active_tab is not None:
+            self._update_tab_status(self._active_tab)
 
-    def _remote_reconnecting(self, uri: str, attempt: int):
-        if uri == self.player._uri:
+    def _update_tab_status(self, tab):
+        if not shiboken6.isValid(tab) or (index := self.tabs.indexOf(tab)) < 0:
+            return
+        attempt = self._reconnect_attempt if tab is self._active_tab else tab.reconnect_attempt
+        paused = self._cache_paused if tab is self._active_tab else tab.cache_paused
+        transport = self._active_transport if tab is self._active_tab else tab.active_transport
+        status = ""
+        if transport is not None:
+            if attempt is not None:
+                status = f"Reconnecting… (attempt {attempt})"
+            elif paused:
+                status = "Buffering…"
+        self.tabs.setTabText(index, f"{tab.title} · {status}" if status else tab.title)
+        self.tabs.setTabToolTip(index, status or tab.title)
+
+    def _remote_reconnecting(self, uri: str, attempt: int, tab=None):
+        tab = tab or self._active_tab
+        if tab is None or not shiboken6.isValid(tab) or uri != tab.player._uri:
+            return
+        tab.reconnect_attempt = attempt
+        if tab is self._active_tab:
             self._reconnect_attempt = attempt
             self._update_connection_status()
+        else:
+            self._update_tab_status(tab)
 
-    def _remote_reconnected(self, uri: str):
-        if uri == self.player._uri:
+    def _remote_reconnected(self, uri: str, tab=None):
+        tab = tab or self._active_tab
+        if tab is None or not shiboken6.isValid(tab) or uri != tab.player._uri:
+            return
+        tab.reconnect_attempt = None
+        if tab is self._active_tab:
             self._reconnect_attempt = None
             self._update_connection_status()
+        else:
+            self._update_tab_status(tab)
 
-    def _remote_retry_failed(self, uri: str):
-        if uri == self.player._uri:
+    def _remote_retry_failed(self, uri: str, tab=None):
+        tab = tab or self._active_tab
+        if tab is None or not shiboken6.isValid(tab) or uri != tab.player._uri:
+            return
+        tab.reconnect_attempt = None
+        tab.cache_paused = False
+        if tab is self._active_tab:
             self._reconnect_attempt = None
             self._cache_paused = False
-            self.connection_status.hide()
+            self._update_connection_status()
+        else:
+            self._update_tab_status(tab)
 
-    @staticmethod
-    def _remote_retry_failed_for_tab(tab, uri):
-        if uri == tab.player._uri:
-            tab.reconnect_attempt = None
-            tab.cache_paused = False
-
-    def _cache_pause_changed(self, paused):
-        self._cache_paused = bool(paused)
-        self._update_connection_status()
+    def _cache_pause_changed(self, paused, tab=None):
+        tab = tab or self._active_tab
+        if tab is None or not shiboken6.isValid(tab):
+            return
+        tab.cache_paused = bool(paused)
+        if tab is self._active_tab:
+            self._cache_paused = bool(paused)
+            self._update_connection_status()
+        else:
+            self._update_tab_status(tab)
 
     def _transport_reconnected(self, uri: str, previous, replacement, tab=None):
         tab = tab or self._active_tab

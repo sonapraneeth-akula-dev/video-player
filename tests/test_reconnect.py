@@ -184,17 +184,45 @@ def test_remote_status_follows_reconnect_and_cache_pause(qtbot, tmp_path):
         window.player._update.emit("sftp-reconnecting", (uri, 2))
         qtbot.waitUntil(lambda: window.connection_status.isVisible(), timeout=1000)
         assert window.connection_status.text() == "Reconnecting… (attempt 2)"
+        assert window.tabs.tabText(0) == "Video · Reconnecting… (attempt 2)"
         window.player._update.emit("paused-for-cache", True)
         window.player._update.emit("sftp-reconnected", uri)
         qtbot.waitUntil(lambda: window.connection_status.text() == "Buffering…", timeout=1000)
+        assert window.tabs.tabText(0) == "Video · Buffering…"
         window.player._update.emit("paused-for-cache", False)
         qtbot.waitUntil(lambda: not window.connection_status.isVisible(), timeout=1000)
+        assert window.tabs.tabText(0) == "Video"
         window.player._update.emit("sftp-reconnecting", (uri, 3))
         qtbot.waitUntil(lambda: window.connection_status.isVisible(), timeout=1000)
         window.player._update.emit("sftp-retry-failed", uri)
         qtbot.waitUntil(lambda: not window.connection_status.isVisible(), timeout=1000)
+        assert window.tabs.tabText(0) == "Video"
     finally:
         window._active_transport = None
+        window.close()
+
+
+def test_hidden_tab_tracks_reconnect_without_changing_active_status(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    first = window._add_player_tab("Remote")
+    window._active_transport = object()
+    first.player._uri = "vpsftp://fixture/video.mp4"
+    window._add_player_tab("Local")
+    window.show()
+    try:
+        first.player._update.emit("sftp-reconnecting", (first.player._uri, 4))
+        qtbot.waitUntil(lambda: "attempt 4" in window.tabs.tabText(0), timeout=1000)
+        assert window.tabs.tabText(1) == "Local"
+        assert not window.connection_status.isVisible()
+        window.prev_tab()
+        assert window.connection_status.text() == "Reconnecting… (attempt 4)"
+        window.next_tab()
+        first.player._update.emit("paused-for-cache", True)
+        first.player._update.emit("sftp-reconnected", first.player._uri)
+        qtbot.waitUntil(lambda: window.tabs.tabText(0) == "Remote · Buffering…", timeout=1000)
+        first.player._update.emit("paused-for-cache", False)
+        qtbot.waitUntil(lambda: window.tabs.tabText(0) == "Remote", timeout=1000)
+    finally:
         window.close()
 
 
@@ -343,6 +371,7 @@ def test_docker_pause_resumes_same_media_without_reload(
             reader.start()
         assert window.connection_status.isVisible()
         assert window.connection_status.text().startswith("Reconnecting… (attempt ")
+        assert "Reconnecting… (attempt " in window.tabs.tabText(0)
         qtbot.wait(10000)
         subprocess.run(["docker", "unpause", sftp_server.container], check=True, capture_output=True)
         paused = False
@@ -351,6 +380,7 @@ def test_docker_pause_resumes_same_media_without_reload(
         assert stream.seek(0, 1) == 16
         qtbot.waitUntil(lambda: window._reconnect_attempt is None, timeout=5000)
         qtbot.waitUntil(lambda: window._active_transport is not transport, timeout=5000)
+        assert window.tabs.tabText(0) == "h264_25.mp4"
         assert window._active_transport.is_active()
         assert not transport.is_active()
         window.player.seek(1)
