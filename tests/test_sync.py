@@ -14,9 +14,11 @@ class FakeMpv:
         self.pause = True
         self.speed = 1.0
         self.auto_restart = True
+        self.seeks = []
 
     def seek(self, position, *, reference, precision):
         assert (reference, precision) == ("absolute", "exact")
+        self.seeks.append(position)
         self.time_pos = position
         if self.auto_restart:
             self.owner.playback_restarted.emit()
@@ -135,5 +137,56 @@ def test_sync_queues_new_commands_until_follower_restarts():
         controller.skip_frames(-3)
         assert controller._waiting is None
         assert (master.mpv.time_pos, follower.mpv.time_pos) == (0, 0)
+    finally:
+        controller.close()
+
+
+def test_drift_needs_two_samples_and_is_rate_limited(qapp, monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr("vplayer.sync.time.monotonic", lambda: clock[0])
+    master, follower = FakePlayer(), FakePlayer()
+    master.mpv.pause = follower.mpv.pause = False
+    controller = SyncController(master, follower)
+    try:
+        follower.mpv.time_pos = 4.91
+        controller._check_drift()
+        controller._check_drift()
+        assert not follower.mpv.seeks
+        follower.mpv.time_pos = 4.8
+        controller._check_drift()
+        assert not follower.mpv.seeks
+        controller._check_drift()
+        assert follower.mpv.seeks == [5.0]
+        assert master.mpv.pause is follower.mpv.pause is False
+        follower.mpv.time_pos = 4.8
+        controller._check_drift()
+        controller._check_drift()
+        assert follower.mpv.seeks == [5.0]
+        clock[0] += 2
+        controller._check_drift()
+        assert follower.mpv.seeks == [5.0, 5.0]
+    finally:
+        controller.close()
+
+
+def test_drift_threshold_uses_two_frames_for_low_fps(qapp):
+    master, follower = FakePlayer(), FakePlayer()
+    master.frame_rate = follower.frame_rate = lambda: 10
+    master.mpv.pause = follower.mpv.pause = False
+    controller = SyncController(master, follower, offset=0.5)
+    try:
+        follower.mpv.time_pos = 4.35
+        controller._check_drift()
+        controller._check_drift()
+        assert not follower.mpv.seeks
+        follower.mpv.time_pos = 4.2
+        controller._check_drift()
+        controller._check_drift()
+        assert follower.mpv.seeks == [4.5]
+        follower.mpv.time_pos = 0
+        master.mpv.time_pos = 0
+        controller._check_drift()
+        controller._check_drift()
+        assert follower.mpv.seeks == [4.5]
     finally:
         controller.close()

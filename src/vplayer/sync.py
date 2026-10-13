@@ -1,9 +1,10 @@
 """Frame-rate admission and master-driven paired playback."""
 
 import math
+import time
 from collections import deque
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QCoreApplication, QObject, QTimer
 
 
 def fps_match(a: float | None, b: float | None) -> bool:
@@ -31,6 +32,13 @@ class SyncController(QObject):
         self._resume = False
         self._origin = None
         self._queued = deque()
+        self._drift_streak = 0
+        self._last_correction = float("-inf")
+        self._timer = QTimer(self)
+        self._timer.setInterval(250)
+        self._timer.timeout.connect(self._check_drift)
+        if QCoreApplication.instance() is not None:
+            self._timer.start()
         master.position.connect(self._master_position)
         master.playback_restarted.connect(self._master_restarted)
         follower.playback_restarted.connect(self._follower_restarted)
@@ -74,6 +82,29 @@ class SyncController(QObject):
                 self.follower.mpv.pause = False
             if self._queued:
                 self._queued.popleft()()
+
+    def _check_drift(self):
+        if self._waiting is not None or self.master.mpv.pause or self.follower.mpv.pause:
+            self._drift_streak = 0
+            return
+        a_position = self.master.mpv.time_pos
+        b_position = self.follower.mpv.time_pos
+        duration = self.follower.mpv.duration
+        fps = self.master.frame_rate()
+        if any(
+            not isinstance(value, (int, float)) or not math.isfinite(value)
+            for value in (a_position, b_position, duration, fps)
+        ) or fps <= 0 or not 0 <= a_position - self.offset <= duration:
+            self._drift_streak = 0
+            return
+        threshold = max(2 / fps, 0.1)
+        self._drift_streak = self._drift_streak + 1 if abs(a_position - self.offset - b_position) > threshold else 0
+        now = time.monotonic()
+        if self._drift_streak >= 2 and now - self._last_correction >= 2:
+            self._drift_streak = 0
+            self._last_correction = now
+            self._start("follower")
+            self._align()
 
     def _start(self, event):
         self._loaded()
@@ -150,6 +181,7 @@ class SyncController(QObject):
         self.follower.set_speed(self.master.mpv.speed)
 
     def close(self):
+        self._timer.stop()
         self._queued.clear()
         self.master.position.disconnect(self._master_position)
         self.master.playback_restarted.disconnect(self._master_restarted)
