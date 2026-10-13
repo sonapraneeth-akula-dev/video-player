@@ -6,12 +6,13 @@ Debug items**: 26 numbered rows remain open. Milestone exit criteria are
 separate checkboxes and are not included in these counts. No open item below is
 marked complete just because its test harness or a partial implementation exists.
 
-GitHub Actions run `38380466187` at commit `0063d38` passed Windows and
+GitHub Actions run `38393960679` at commit `22ad317` passed Windows and
 Ubuntu, with combined line coverage of 84% and 87%, respectively (80%
-required). Ubuntu tests run in bounded groups with fresh Xvfb displays and
-Windows player-lifecycle tests run separately. This establishes a green CI
-baseline, **not** the absence of shared-process native crashes or completion
-of device-specific performance, release soak, or manual desktop checks.
+required). Native tests run per file in fresh processes (and fresh Xvfb
+displays on Ubuntu) after earlier shared-process stalls and a segfault.
+This establishes a green CI baseline, **not** the absence of shared-process
+native crashes or completion of device-specific performance, release soak,
+or manual desktop checks.
 
 ## Tasks directly involving deferred SFTP work (7)
 
@@ -71,7 +72,8 @@ reauthenticate on a worker before restoring playback.
 
 **Other release gates remain separate:** the emulated SFTP first-frame
 criterion (<3 s) has exceeded its limit on some Windows runs (for example
-4.527 s), despite an earlier green Ubuntu netem run. Previous long-lived
+4.343 s locally), despite a 2.938 s Ubuntu netem CI result in run
+`38393960679`. Previous long-lived
 pytest/Xvfb processes stalled or segfaulted at varying native playback tests;
 process isolation keeps CI bounded but has not established that native root
 cause. Interactive Windows/Ubuntu X11/Wayland UAT, release soak, and
