@@ -27,6 +27,7 @@ opens a file in a new tab, **Ctrl+W** closes the active tab, and **Ctrl+Tab** /
 **Ctrl+Shift+Tab** switch tabs. Closing the last tab restores the placeholder;
 each tab keeps its own playback position, speed, volume and track selection.
 **Ctrl+N** opens another window with its own tabs and playback.
+Playback shortcuts affect only the active tab of the focused window.
 Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**

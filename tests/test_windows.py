@@ -1,6 +1,10 @@
 from pathlib import Path
 from unittest.mock import Mock
 
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
+
 from vplayer.app import AppController
 from vplayer.settings import Settings
 from vplayer.ui.main_window import MainWindow
@@ -70,6 +74,48 @@ def test_standalone_window_ctrl_n_joins_window_registry(qtbot, tmp_path):
         assert controller.windows == [second]
         second.close()
         controller.app.quit.assert_called_once_with()
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_shortcuts_target_focused_windows_active_tab(qtbot):
+    controller = AppController(QApplication.instance())
+    first = controller.new_window()
+    second = controller.new_window()
+    qtbot.addWidget(first)
+    qtbot.addWidget(second)
+    try:
+        first.open_file(MEDIA)
+        other_tab = first.player
+        first._add_player_tab("Another video")
+        first.open_file(MEDIA)
+        active_tab = first.player
+        second.open_file(MEDIA)
+        second_player = second.player
+        qtbot.waitUntil(
+            lambda: all(player.mpv.duration is not None for player in (other_tab, active_tab, second_player)),
+            timeout=10000,
+        )
+        first.activateWindow()
+        qtbot.waitUntil(first.isActiveWindow)
+        first.video.setFocus()
+        qtbot.waitUntil(first.video.hasFocus)
+        assert controller.last_used_window is first
+        QTest.keyClick(first.video, Qt.Key.Key_5, Qt.KeyboardModifier.AltModifier)
+        qtbot.waitUntil(lambda: active_tab.mpv.speed == 2)
+        assert other_tab.mpv.speed == 1 and second_player.mpv.speed == 1
+
+        second.activateWindow()
+        qtbot.waitUntil(second.isActiveWindow)
+        second.video.setFocus()
+        qtbot.waitUntil(second.video.hasFocus)
+        assert controller.last_used_window is second
+        QTest.keyClick(second.video, Qt.Key.Key_3, Qt.KeyboardModifier.AltModifier)
+        qtbot.waitUntil(lambda: second_player.mpv.speed == 0.67)
+        assert active_tab.mpv.speed == 2 and other_tab.mpv.speed == 1
+        second.close()
+        assert controller.last_used_window is first
     finally:
         for window in controller.windows[:]:
             window.close()

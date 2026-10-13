@@ -545,7 +545,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 6.1.1.2.1 | Task | Route actions to the focused window's active tab; `app.py` tracks the last-used window | 01:00 | 00:15 | Test: two windows; a shortcut changes only the focused window's active tab \|\| |  |
+| 6.1.1.2.1 | Task | [x] Route actions to the focused window's active tab; `app.py` tracks the last-used window | 01:00 | 00:15 | Test: two windows; a shortcut changes only the focused window's active tab \|\| | Ctrl+N windows retain local QAction shortcut scope; Qt window activation updates `AppController.last_used_window`. Two-window, three-player shortcut test and 100% `app.py` coverage; v0.39.0 |
 
 ##### User Story 6.1.1.3 (US-036): A clear message at 4 tabs
 - **Est. Manual**: 00:45 | **Est. AI**: 00:10
