@@ -1,5 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
+from time import perf_counter
+from unittest.mock import Mock
 
 import pytest
 import shiboken6
@@ -113,3 +116,57 @@ def test_dispose_rejects_background_thread(qtbot):
     finally:
         widget.dispose()
         player.close()
+
+
+def test_close_playing_video_frees_surface_before_worker_termination(qtbot, monkeypatch):
+    player = Player()
+    widget = MpvWidget(player)
+    widget.resize(256, 144)
+    widget.show()
+    release_termination = Event()
+    terminate_started = Event()
+    original_terminate = type(player.mpv).terminate
+
+    def delayed_terminate(mpv):
+        if mpv is player.mpv:
+            terminate_started.set()
+            release_termination.wait(5)
+        original_terminate(mpv)
+
+    monkeypatch.setattr(type(player.mpv), "terminate", delayed_terminate)
+    try:
+        qtbot.waitUntil(lambda: widget._render is not None, timeout=10000)
+        with qtbot.waitSignal(player.file_loaded, timeout=10000):
+            player.load(MEDIA)
+        start = perf_counter()
+        player.close()
+        assert perf_counter() - start < 1
+        assert not shiboken6.isValid(widget)
+        assert terminate_started.wait(2)
+        assert not player._shutdown_done.is_set()
+    finally:
+        release_termination.set()
+        widget.dispose()
+        player.close()
+        assert player.wait_closed(10)
+    assert not player._shutdown_thread.is_alive()
+
+
+def test_window_close_does_not_wait_for_remote_transport(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window.show()
+    release_transport = Event()
+    transport = Mock()
+    transport.close.side_effect = lambda: release_transport.wait(5)
+    window._transports.append(transport)
+    try:
+        qtbot.waitUntil(lambda: window.video._render is not None, timeout=10000)
+        start = perf_counter()
+        window.close()
+        assert perf_counter() - start < 1
+        assert not shiboken6.isValid(window.video)
+    finally:
+        release_transport.set()
+        assert window.player.wait_closed(10)
+    transport.close.assert_called_once_with()
+    assert not window.player._shutdown_thread.is_alive()

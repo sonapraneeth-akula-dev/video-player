@@ -14,7 +14,8 @@ from pathlib import Path
 
 import mpv
 import paramiko
-from PySide6.QtCore import QObject, QStandardPaths, Qt, QTimer, Signal, Slot
+import shiboken6
+from PySide6.QtCore import QObject, QStandardPaths, Qt, QThread, QTimer, Signal, Slot
 
 from vplayer.sftp import SftpStream
 
@@ -89,6 +90,9 @@ class Player(QObject):
             raise ValueError("JPEG quality must be between 50 and 100")
         self._closed = False
         self._close_lock = threading.Lock()
+        self._shutdown_thread: threading.Thread | None = None
+        self._shutdown_done = threading.Event()
+        self._video_widget = None
         self._loaded_pending = False
         self._uri = ""
         self._start_position: float | None = None
@@ -683,16 +687,53 @@ class Player(QObject):
             "hwdec-current": self.mpv.hwdec_current,
         }
 
-    def close(self) -> None:
-        if not self._closed:
-            self._stop_skip()
-            # The event thread reloads the probe; terminate() must not free the handle under it.
-            with self._close_lock:
-                self._closed = True
-            for name in OBSERVED_PROPERTIES:
-                self.mpv.unobserve_property(name, self._on_property)
-            self.mpv.unregister_event_callback(self._on_event)
-            # ponytail: remote shutdown may block the GUI while an SFTP read is in flight.
-            self.mpv.terminate()
-            self._sftp_sources.clear()
-            self._sftp_callbacks = None
+    def close(self, *, transports: tuple[paramiko.Transport, ...] = ()) -> None:
+        if self._closed:
+            return
+        if self._video_widget is not None:
+            widget = self._video_widget()
+            if widget is not None and shiboken6.isValid(widget):
+                if QThread.currentThread() != widget.thread():
+                    raise RuntimeError("Video surface must be disposed on the GUI thread")
+                widget.dispose()
+        self._stop_skip()
+        with self._close_lock:
+            self._closed = True
+        for name in OBSERVED_PROPERTIES:
+            self.mpv.unobserve_property(name, self._on_property)
+        self.mpv.unregister_event_callback(self._on_event)
+        streams = [stream for stream, _client in list(self._sftp_streams.values())]
+        for stream in streams:
+            stream.request_cancel()
+
+        def shutdown():
+            try:
+                for transport in transports:
+                    try:
+                        transport.close()
+                    except (OSError, EOFError, ValueError, paramiko.SSHException) as error:
+                        log.warning("Could not close SFTP transport: %s", error)
+                for stream in streams:
+                    try:
+                        stream.cancel()
+                    except (OSError, EOFError, ValueError, paramiko.SSHException) as error:
+                        log.warning("Could not close cancelled SFTP stream: %s", error)
+                self.mpv.terminate()
+            except Exception:
+                log.exception("Could not terminate playback core")
+            finally:
+                for cookie in tuple(self._sftp_streams):
+                    self._sftp_close(cookie)
+                self._sftp_sources.clear()
+                self._sftp_callbacks = None
+                self._shutdown_done.set()
+
+        self._shutdown_thread = threading.Thread(target=shutdown, name="vplayer-mpv-shutdown")
+        self._shutdown_thread.start()
+
+    def wait_closed(self, timeout: float | None = None) -> bool:
+        if not self._shutdown_done.wait(timeout):
+            return False
+        if self._shutdown_thread is not threading.current_thread():
+            self._shutdown_thread.join()
+        return True

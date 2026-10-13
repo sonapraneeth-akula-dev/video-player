@@ -41,6 +41,7 @@ def test_close_during_probe_reload_does_not_touch_freed_handle(qtbot):
             player.load(MEDIA)
             qtbot.wait(delay_ms)
             player.close()
+            assert player.wait_closed(10)
     assert not [str(w.message) for w in caught if "event loop" in str(w.message)]
 
 
@@ -115,3 +116,4 @@ def test_close_unregisters_mpv_callbacks():
     player.close()
     assert not player.mpv._event_callbacks
     assert not any(player.mpv._property_handlers.values())
+    assert player.wait_closed(10)

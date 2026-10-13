@@ -1,4 +1,6 @@
 import ctypes
+from threading import Event, Thread
+from time import perf_counter
 from unittest.mock import Mock
 
 import mpv
@@ -93,6 +95,60 @@ def test_cancelled_read_does_not_report_expected_channel_close(qtbot):
         player.close()
 
 
+def test_close_during_remote_read_returns_quickly_and_joins_workers(qtbot):
+    player = Player(video_output="null")
+    remote = FakeRemoteFile(b"abc")
+    stream = SftpStream(remote)
+    client = Mock()
+    transport = Mock()
+    transport_closed = Event()
+    transport.close.side_effect = transport_closed.set
+    cookie = id(stream)
+    player._sftp_streams[cookie] = (stream, client)
+    reading = Event()
+    release_read = Event()
+    release_close = Event()
+    original_close = remote.close
+    results = []
+
+    def slow_read(*_args, **_kwargs):
+        reading.set()
+        release_read.wait(5)
+        return [b"abc"]
+
+    def slow_close():
+        release_close.wait(5)
+        original_close()
+        release_read.set()
+
+    remote.readv = slow_read
+    remote.close = slow_close
+    reader = Thread(
+        target=lambda: results.append(player._sftp_read(cookie, ctypes.create_string_buffer(1), 1)),
+    )
+    try:
+        reader.start()
+        assert reading.wait(2)
+        start = perf_counter()
+        player.close(transports=(transport,))
+        assert perf_counter() - start < 1
+        assert stream.cancelled
+        assert transport_closed.wait(2)
+        transport.close.assert_called_once_with()
+        assert not player._shutdown_done.is_set()
+    finally:
+        release_close.set()
+        release_read.set()
+        reader.join(10)
+        player.close()
+        assert player.wait_closed(10)
+    assert not reader.is_alive()
+    assert not player._shutdown_thread.is_alive()
+    assert results == [-1]
+    assert not player._sftp_streams
+    client.close.assert_called_once_with()
+
+
 @pytest.mark.parametrize(("readahead", "backbuffer"), [(15, 256), (65, 256), (64, -1), (64, True)])
 def test_invalid_remote_buffer_limits_fail_before_starting_mpv(readahead, backbuffer):
     with pytest.raises(ValueError, match="Invalid SFTP buffer limits"):
@@ -138,6 +194,7 @@ def test_mpv_plays_and_seeks_remote_file_without_copy(qtbot, sftp_server):
     finally:
         widget.dispose()
         player.close()
+    assert player.wait_closed(10)
     assert not player._sftp_streams
 
 

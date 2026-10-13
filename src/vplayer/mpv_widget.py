@@ -1,5 +1,7 @@
 """OpenGL video surface owned by Qt, rendered by libmpv."""
 
+import weakref
+
 import mpv
 import shiboken6
 from PySide6.QtCore import Qt, QThread, Signal, Slot
@@ -16,6 +18,7 @@ class MpvWidget(QOpenGLWidget):
     def __init__(self, player: Player, parent=None):
         super().__init__(parent)
         self.player = player
+        player._video_widget = weakref.ref(self)
         self._render = None
         self._get_proc = mpv.MpvGlGetProcAddressFn(self._get_proc_address)
         self._frame_ready.connect(self._request_frame, Qt.ConnectionType.QueuedConnection)
@@ -61,6 +64,8 @@ class MpvWidget(QOpenGLWidget):
             self.doneCurrent()
 
     def dispose(self):
+        if not shiboken6.isValid(self):
+            return
         if QThread.currentThread() != self.thread():
             raise RuntimeError("Video surface must be disposed on the GUI thread")
         self.release()

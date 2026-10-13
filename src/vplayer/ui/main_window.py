@@ -731,8 +731,6 @@ class MainWindow(QMainWindow):
         self._save_position()
         if shiboken6.isValid(self.video):
             self.video.dispose()
-        self.player.close()
-        for transport in self._transports:
-            transport.close()
+        self.player.close(transports=tuple(self._transports))
         self._transports.clear()
         super().closeEvent(event)

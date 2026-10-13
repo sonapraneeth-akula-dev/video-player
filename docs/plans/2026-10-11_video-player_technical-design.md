@@ -543,7 +543,9 @@ with "Open folder" after mpv reports completion.
 `close()` (tab/window close, app exit): on the Qt thread, free the render context (§4.6) and
 cancel the stream (§4.2); then mpv `terminate()` on a worker thread — this destroys the core,
 which calls the stream's `close` → SFTP channel closed. Same contract for tab, window and app
-shutdown. An `SshConnection` closes 60 s after its last channel/browser user is gone.
+shutdown. The window also closes its owned transports on that worker; `wait_closed(timeout)`
+joins it when callers need to await cleanup. An `SshConnection` closes 60 s after its last
+channel/browser user is gone.
 Signals: `position(float, int frame)`, `duration`, `paused`, `speed`, `fps`, `cache(float s)`,
 `error(str)`, `reconnecting(int)`, `reconnected()`, `connection_failed(float last_position_s)`.
 

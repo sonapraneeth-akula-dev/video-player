@@ -393,6 +393,7 @@ class SftpStream(QObject):
         self._position = 0
         self._block_offset = -1
         self._block = b""
+        self._close_lock = threading.Lock()
         self._closed = False
         self._cancelled = False
         self.failed = False
@@ -514,12 +515,18 @@ class SftpStream(QObject):
         return position
 
     def close(self) -> None:
-        if not self._closed:
+        with self._close_lock:
+            if self._closed:
+                return
             self._closed = True
             self._block = b""
-            self.remote_file.close()
+            remote_file = self.remote_file
+        remote_file.close()
 
     def cancel(self) -> None:
+        self.request_cancel()
+        self.close()
+
+    def request_cancel(self) -> None:
         self._cancelled = True
         self._cancel_event.set()
-        self.close()
