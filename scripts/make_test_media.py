@@ -124,6 +124,27 @@ def generate_vfr(directory: Path = MEDIA) -> Path:
     return target
 
 
+def generate_4k_backstep(directory: Path = MEDIA) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "hevc_4k_gop250.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=s=3840x2160:r=25",
+            "-f", "lavfi", "-i", f"nullsrc=s={SIZE}:r=25",
+            "-frames:v", str(FRAMES),
+            "-filter_complex", f"[1:v]{INDEX}[index];[0:v][index]overlay=0:0:shortest=1",
+            "-c:v", "libx265", "-preset", "ultrafast",
+            "-x265-params", "log-level=error:pools=none",
+            "-pix_fmt", "yuv420p", "-crf", "18",
+            "-g", "250", "-keyint_min", "250", "-sc_threshold", "0",
+            str(target),
+        ],
+        check=True,
+    )
+    return target
+
+
 def generate_multitrack(directory: Path = MEDIA) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     external = directory / "tracks_external.srt"
@@ -175,8 +196,13 @@ def generate_corrupt(directory: Path = MEDIA, seed: int = 20261011) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--corrupt", action="store_true")
-    if parser.parse_args().corrupt:
+    variant = parser.add_mutually_exclusive_group()
+    variant.add_argument("--corrupt", action="store_true")
+    variant.add_argument("--backstep", action="store_true")
+    args = parser.parse_args()
+    if args.corrupt:
         generate_corrupt()
+    elif args.backstep:
+        generate_4k_backstep()
     else:
         generate()

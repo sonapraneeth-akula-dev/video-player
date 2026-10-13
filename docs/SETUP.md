@@ -95,6 +95,23 @@ docker info
 .\.venv\Scripts\python.exe -m pytest -q -s tests\test_sftp_perf.py
 ```
 
+The strict local 4K HEVC back-step gate uses a separate ignored, indexed
+300-frame/GOP-250 fixture and measures 50 deterministic positions. Generate
+it and run the benchmark on each target desktop (on Ubuntu, substitute
+`./.venv/bin/python`):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\make_test_media.py --backstep
+$env:VPLAYER_4K_PERF = "1"
+.\.venv\Scripts\python.exe -m pytest -q -s tests\test_backstep_perf.py
+```
+
+The gate remains open: on this Windows RDP session, decoder
+`hwdec-current=no` gave about 2.0 s p95 against the required 300 ms. An
+unavailable GPU decoder and a headless Ubuntu container cannot validate the
+desktop performance target; a representative Windows/Ubuntu GPU run is still
+required.
+
 The SFTP fixture builds and later removes a disposable OpenSSH container.
 If Docker is missing, its daemon is unavailable, or it is running Windows
 containers, pytest **skips** those tests; check `docker info --format '{{.OSType}}'`

@@ -10,6 +10,7 @@ from scripts.make_test_media import (
     MEDIA,
     SIZE,
     generate,
+    generate_4k_backstep,
     generate_corrupt,
     generate_multitrack,
     passthrough_sync,
@@ -32,6 +33,20 @@ def test_passthrough_sync_requires_supported_ffmpeg_option(monkeypatch):
     monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: "")
     with pytest.raises(RuntimeError, match="passthrough"):
         passthrough_sync()
+
+
+def test_4k_hevc_fixture_uses_long_gop_and_burned_frame_index(tmp_path, monkeypatch):
+    commands = []
+    monkeypatch.setattr(subprocess, "run", lambda command, **_kwargs: commands.append(command))
+    target = generate_4k_backstep(tmp_path)
+    assert target == tmp_path / "hevc_4k_gop250.mp4"
+    command, = commands
+    assert command[command.index("-c:v") + 1] == "libx265"
+    assert command[command.index("-frames:v") + 1] == "300"
+    assert command[command.index("-g") + 1] == "250"
+    assert "testsrc2=s=3840x2160:r=25" in command
+    assert "[1:v]geq=" in command[command.index("-filter_complex") + 1]
+    assert "overlay=0:0" in command[command.index("-filter_complex") + 1]
 
 
 def test_frame_indexed_clips(tmp_path):
