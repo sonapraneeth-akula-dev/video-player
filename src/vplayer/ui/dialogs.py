@@ -39,7 +39,7 @@ from vplayer.sftp import (
 class PreferencesDialog(QDialog):
     def __init__(
         self, pitch_correction: bool, parent=None, *, resume_enabled: bool = False,
-        background_tabs: str = "pause",
+        background_tabs: str = "pause", hwdec: str = "auto-safe",
     ):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
@@ -48,6 +48,15 @@ class PreferencesDialog(QDialog):
         self.pitch_correction.setAccessibleName("Preserve audio pitch")
         self.pitch_correction.setChecked(pitch_correction)
         layout.addWidget(self.pitch_correction)
+        self.hwdec = QComboBox(self)
+        self.hwdec.setAccessibleName("Hardware decoding")
+        self.hwdec.addItem("Automatic hardware decoding (software fallback)", "auto-safe")
+        self.hwdec.addItem("Software decoding only", "no")
+        hwdec_index = self.hwdec.findData(hwdec)
+        if hwdec_index < 0:
+            raise ValueError("Invalid hardware decoding mode")
+        self.hwdec.setCurrentIndex(hwdec_index)
+        layout.addWidget(self.hwdec)
         self.resume_enabled = QCheckBox("Resume local files from the last position", self)
         self.resume_enabled.setAccessibleName("Resume local files")
         self.resume_enabled.setChecked(resume_enabled)

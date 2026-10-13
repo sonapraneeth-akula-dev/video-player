@@ -94,7 +94,7 @@
 |---|------|------|-------------|---------|--------------|-------|
 | 1.1.1.2.1 | Debug | Spike — hwdec with the OpenGL render API on Windows: CPU/RSS for 4K HEVC under `d3d11va` / `d3d11va-copy` / `dxva2`, plus local back-step p95 | 02:00 | 00:30 | Findings and decision (keep render API, or `wid` on Windows only) written into design §13 | Design §13; result feeds US-024 perf target |
 | 1.1.1.2.2 | Debug | Spike — Ubuntu 22.04 VAAPI zero-copy: `QT_XCB_GL_INTEGRATION=xcb_egl`, pass `x11_display` / `wl_display` from Qt's native interface to `MpvRenderContext` | 02:00 | 00:30 | `hwdec-current` = `vaapi` on the owner's GPU under X11 and Wayland; recorded in design §13 | Design §13 |
-| 1.1.1.2.3 | Task | Apply spike outcome in `mpv_widget.py` / `player.py`; log `hwdec-current`; software fallback is silent | 01:30 | 00:15 | Forcing an unavailable hwdec plays in software with no dialog | `hwdec` setting `auto-safe`/`no` |
+| 1.1.1.2.3 | Task | [x] Apply spike outcome in `mpv_widget.py` / `player.py`; log `hwdec-current`; software fallback is silent | 01:30 | 00:15 | Forcing an unavailable hwdec plays in software with no dialog | v0.49.0: retain the safe render path, persist/apply `auto-safe`/`no` across windows, preserve it after the software probe, and log `hwdec-current`; forced unavailable `vaapi` decodes in software without a playback error. Device-specific GPU spikes remain open. |
 
 #### Feature 1.1.2 (FEAT-001.1.2): Basic transport controls
 - **Est. Manual**: 06:30 | **Est. AI**: 01:00

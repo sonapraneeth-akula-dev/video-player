@@ -1,7 +1,9 @@
+import logging
 import warnings
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import QApplication
 
@@ -30,6 +32,42 @@ def test_load_and_observe_on_gui_thread(qtbot):
         qtbot.waitUntil(lambda: player.state()["pause"] is False)
     finally:
         player.close()
+
+
+def test_software_decoding_mode_survives_probe_reload(qtbot, caplog):
+    player = Player(video_output="null", hwdec="no")
+    errors = []
+    player.error.connect(errors.append)
+    try:
+        with caplog.at_level(logging.INFO, logger="vplayer.player"):
+            with qtbot.waitSignal(player.file_loaded, timeout=10000):
+                player.load(MEDIA)
+            qtbot.waitUntil(lambda: "hwdec-current: no" in caplog.text, timeout=5000)
+        assert player.mpv["hwdec"] in ("no", ["no"])
+        assert player.mpv.hwdec_current == "no"
+        assert not errors
+    finally:
+        player.close()
+
+
+def test_unavailable_hardware_decoder_falls_back_without_error(qtbot):
+    player = Player(video_output="null")
+    errors = []
+    player.error.connect(errors.append)
+    try:
+        with qtbot.waitSignal(player.file_loaded, timeout=10000):
+            player.mpv.loadfile(str(MEDIA.parent / "matrix_h264_mp4.mp4"), hwdec="vaapi")
+        player.mpv.pause = False
+        qtbot.waitUntil(lambda: player.mpv.eof_reached, timeout=10000)
+        assert player.mpv.hwdec_current == "no"
+        assert not errors
+    finally:
+        player.close()
+
+
+def test_hardware_decoder_mode_rejects_unsupported_configuration():
+    with pytest.raises(ValueError, match="Hardware decoding"):
+        Player(hwdec="vaapi")
 
 
 def test_close_during_probe_reload_does_not_touch_freed_handle(qtbot):

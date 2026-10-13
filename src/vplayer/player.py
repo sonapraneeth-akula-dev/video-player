@@ -78,7 +78,7 @@ class Player(QObject):
     def __init__(
         self, parent: QObject | None = None, *, video_output: str = "libmpv",
         readahead_mb: int = 64, backbuffer_mb: int = 256, retry_max: int = 6,
-        snapshot_dir: Path | None = None, jpeg_quality: int = 90,
+        snapshot_dir: Path | None = None, jpeg_quality: int = 90, hwdec: str = "auto-safe",
     ):
         super().__init__(parent)
         if (
@@ -90,6 +90,8 @@ class Player(QObject):
             raise ValueError("SFTP retry count must be between 0 and 20")
         if type(jpeg_quality) is not int or not 50 <= jpeg_quality <= 100:
             raise ValueError("JPEG quality must be between 50 and 100")
+        if hwdec not in ("auto-safe", "no"):
+            raise ValueError("Hardware decoding must be auto-safe or no")
         self._closed = False
         self._close_lock = threading.Lock()
         self._shutdown_thread: threading.Thread | None = None
@@ -119,6 +121,7 @@ class Player(QObject):
             QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation),
         ) / "vplayer"
         self.jpeg_quality = jpeg_quality
+        self.hwdec = hwdec
         self._sftp_sources: dict[
             str, tuple[
                 paramiko.Transport, str,
@@ -131,7 +134,7 @@ class Player(QObject):
         self._update.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
         self.mpv = mpv.MPV(
             vo=video_output,
-            hwdec="auto-safe",
+            hwdec=hwdec,
             config=False,
             load_scripts=False,
             ytdl=False,
@@ -179,7 +182,7 @@ class Player(QObject):
                     return
                 if self.mpv.__getitem__("force-media-title", file_local=True) == PROBE_TITLE:
                     # Software probe finished: reload for real, with hwdec only if software could open the video.
-                    options = {"hwdec": "auto-safe" if self.mpv.video_codec else "no"}
+                    options = {"hwdec": self.hwdec if self.mpv.video_codec else "no"}
                     if self._start_position is not None:
                         options["start"] = str(self._start_position)
                     self.mpv.loadfile(self.mpv.path, **options)
@@ -239,7 +242,7 @@ class Player(QObject):
             self.playback_restarted.emit()
         elif name == "hwdec-current":
             if value is not None:
-                log.info("Decoder: %s", value)
+                log.info("hwdec-current: %s", value)
             self.hwdec_current.emit(value)
         elif name == "error":
             self.error.emit(value)

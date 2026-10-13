@@ -51,6 +51,13 @@ commit its `vendor\` directory. `-e '.[dev]'` installs the application plus
 pytest, pytest-qt, coverage, Ruff, and test utilities into this virtual
 environment. The media command creates ignored files in `tests\media\`.
 Use **File > Open** to load a local recording.
+In Preferences, Hardware decoding defaults to **Automatic** (`auto-safe`).
+Select **Software decoding only** (`no`) if a device has a problematic
+hardware decoder; the choice applies to open windows and persists for new
+tabs. The log records `hwdec-current` for decoded video. An unavailable
+hardware decoder falls back to software without a dialog. GPU-specific
+zero-copy performance and Ubuntu X11/Wayland hardware decoding remain
+unverified on the owner's devices.
 
 ## Ubuntu 22.04 (shell)
 

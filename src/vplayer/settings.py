@@ -51,6 +51,7 @@ class Settings:
         self.seek_long_s = 60
         self.speed_step = 0.05
         self.pitch_correction = True
+        self.hwdec = "auto-safe"
         self.background_tabs = "pause"
         self.resume_enabled = False
         self.skip_frames = 10
@@ -119,6 +120,11 @@ class Settings:
             self.store.setValue("playback/speed_step", step)
         self.speed_step = step
         self.pitch_correction = self._bool("playback/pitch_correction", True)
+        self.hwdec = self.store.value("playback/hwdec", "auto-safe")
+        if self.hwdec not in ("auto-safe", "no"):
+            log.warning("Invalid playback/hwdec setting %r; using auto-safe", self.hwdec)
+            self.hwdec = "auto-safe"
+            self.store.setValue("playback/hwdec", self.hwdec)
         self.background_tabs = self.store.value("playback/background_tabs", "pause")
         if self.background_tabs not in ("pause", "muted", "play"):
             log.warning("Invalid playback/background_tabs setting %r; using pause", self.background_tabs)
@@ -137,6 +143,15 @@ class Settings:
         if self.store.status() != QSettings.Status.NoError:
             raise OSError(f"Could not save pitch correction: {self.store.fileName()}")
         self.pitch_correction = enabled
+
+    def set_hwdec(self, mode: str) -> None:
+        if mode not in ("auto-safe", "no"):
+            raise ValueError("Hardware decoding must be auto-safe or no")
+        self.store.setValue("playback/hwdec", mode)
+        self.store.sync()
+        if self.store.status() != QSettings.Status.NoError:
+            raise OSError(f"Could not save hardware decoding: {self.store.fileName()}")
+        self.hwdec = mode
 
     def set_background_tabs(self, mode: str) -> None:
         if mode not in ("pause", "muted", "play"):

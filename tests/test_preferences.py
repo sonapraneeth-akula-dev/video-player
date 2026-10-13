@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
@@ -7,6 +9,8 @@ from vplayer.app import AppController
 from vplayer.settings import Settings
 from vplayer.ui.dialogs import PreferencesDialog
 from vplayer.ui.main_window import MainWindow
+
+MEDIA = Path(__file__).resolve().parent / "media" / "matrix_h264_mp4.mp4"
 
 
 def test_pitch_preference_controls_live_mpv_and_persists(qtbot, tmp_path):
@@ -96,3 +100,40 @@ def test_background_preference_persists_and_updates_all_windows(qtbot, tmp_path,
 def test_background_preferences_reject_invalid_mode():
     with pytest.raises(ValueError, match="Invalid background tab mode"):
         PreferencesDialog(True, background_tabs="unexpected")
+
+
+def test_hardware_decoding_applies_to_existing_and_new_tabs(qtbot, tmp_path, monkeypatch):
+    path = tmp_path / "settings.ini"
+    monkeypatch.setattr("vplayer.ui.main_window.Settings", lambda: Settings(path))
+    controller = AppController(QApplication.instance())
+    first = controller.new_window()
+    second = controller.new_window()
+    qtbot.addWidget(first)
+    qtbot.addWidget(second)
+    try:
+        first._add_player_tab("First")
+        second._add_player_tab("Second")
+        first.show_preferences()
+        dialog = first.findChild(PreferencesDialog)
+        assert dialog.hwdec.currentData() == "auto-safe"
+        dialog.hwdec.setCurrentIndex(dialog.hwdec.findData("no"))
+        dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Cancel).click()
+        assert first.settings.hwdec == "auto-safe"
+        first.show_preferences()
+        dialog = first.findChild(PreferencesDialog)
+        dialog.hwdec.setCurrentIndex(dialog.hwdec.findData("no"))
+        dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Ok).click()
+        for window in (first, second):
+            assert window.settings.hwdec == "no"
+            assert window.tabs.widget(0).player.hwdec == "no"
+            assert window.tabs.widget(0).player.mpv["hwdec"] in ("no", ["no"])
+        first._add_player_tab("Another")
+        assert first.player.hwdec == "no"
+        with qtbot.waitSignal(first.player.file_loaded, timeout=10000):
+            first.player.load(MEDIA)
+        assert first.player.mpv["hwdec"] in ("no", ["no"])
+        assert first.banner.isHidden()
+        assert Settings(path).store.value("playback/hwdec") == "no"
+    finally:
+        for window in controller.windows[:]:
+            window.close()

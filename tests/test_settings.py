@@ -143,6 +143,25 @@ def test_background_tabs_setting_persists(tmp_path):
         assert restored.background_tabs == mode
 
 
+def test_hardware_decoding_setting_validates_and_persists(tmp_path, caplog):
+    path = tmp_path / "settings.ini"
+    settings = Settings(path)
+    settings.load()
+    assert settings.hwdec == "auto-safe"
+    settings.set_hwdec("no")
+    restored = Settings(path)
+    restored.load()
+    assert restored.hwdec == "no"
+    with pytest.raises(ValueError, match="Hardware decoding"):
+        restored.set_hwdec("vaapi")
+    settings.store.setValue("playback/hwdec", "invalid")
+    with caplog.at_level(logging.WARNING):
+        settings.load()
+    assert settings.hwdec == "auto-safe"
+    assert settings.store.value("playback/hwdec") == "auto-safe"
+    assert "Invalid playback/hwdec" in caplog.text
+
+
 def test_resume_settings_are_opt_in_validated_and_persist(tmp_path, caplog):
     path = tmp_path / "settings.ini"
     file = tmp_path / "movie.mp4"

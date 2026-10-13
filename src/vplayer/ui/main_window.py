@@ -385,6 +385,7 @@ class MainWindow(QMainWindow):
             self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
             retry_max=self.settings.retry_max,
             snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
+            hwdec=self.settings.hwdec,
         )
         player.mpv.audio_pitch_correction = self.settings.pitch_correction
         tab = PlayerTab(player, owner=self)
@@ -683,13 +684,29 @@ class MainWindow(QMainWindow):
             return
         dialog = PreferencesDialog(
             self.settings.pitch_correction, self, resume_enabled=self.settings.resume_enabled,
-            background_tabs=self.settings.background_tabs,
+            background_tabs=self.settings.background_tabs, hwdec=self.settings.hwdec,
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.accepted.connect(lambda: self._save_pitch_preference(dialog.pitch_correction.isChecked()))
         dialog.accepted.connect(lambda: self._save_resume_preference(dialog.resume_enabled.isChecked()))
         dialog.accepted.connect(lambda: self._save_background_preference(dialog.background_tabs.currentData()))
+        dialog.accepted.connect(lambda: self._save_hwdec_preference(dialog.hwdec.currentData()))
         dialog.open()
+
+    def _save_hwdec_preference(self, mode: str):
+        try:
+            self.settings.set_hwdec(mode)
+            windows = self.controller.windows if self.controller is not None else [self]
+            for window in windows:
+                if window._closing:
+                    continue
+                window.settings.hwdec = mode
+                for index in range(window.tabs.count()):
+                    player = window.tabs.widget(index).player
+                    player.hwdec = mode
+                    player.mpv.hwdec = mode
+        except (OSError, RuntimeError, SystemError, mpv.PropertyUnavailableError) as error:
+            self.show_error(f"Could not apply hardware decoding preference: {error}")
 
     def _save_pitch_preference(self, enabled: bool):
         try:
