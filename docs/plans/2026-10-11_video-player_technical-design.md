@@ -388,14 +388,14 @@ Two routes, one code path: drag a tab onto another window's tab bar, or action
 `move_tab_new_window` (Ctrl+Shift+N; also in the tab's context menu), which moves the current
 tab into a new window (keyboard route, NFR-011). A window's only tab can be moved too; the
 emptied source window then follows the 0-tabs rule below.
-The `Player` (mpv core, cache, SFTP stream) stays alive; only its `MpvWidget` changes. On drop:
-target window creates a new tab and reparents the `PlayerTab`. Moving a `QOpenGLWidget` to
-another top-level window destroys and recreates its GL context:
-1. `aboutToBeDestroyed` (emitted while the widget is still alive) → `MpvWidget` calls
-   `makeCurrent()`, frees the mpv render context, then `doneCurrent()`. mpv then disables video
-   output, but playback position, pause state and cache stay.
-2. `initializeGL` in the new window → new mpv render context → re-enable video (`video-reload`,
-   or set `vid` back to the saved track; exact call confirmed by spike, §13).
+The `Player` (mpv core, cache, SFTP stream) stays alive; the target reparents the
+`PlayerTab`. Set `Qt.AA_ShareOpenGLContexts` **before** constructing `QApplication`:
+Qt then keeps the widget's GL context on cross-window reparent, so the mpv render
+context and video track stay live without any re-enable call or media reload.
+`MpvWidget.release()` still frees the render context on actual context destruction
+and on close. Without shared contexts, freeing an active mpv render context
+disables video; an audio/video file can recover by reselecting `vid` and seeking
+to its saved position, but a video-only file loses its loaded state (§13).
 
 No reload, no re-buffering. Dropping outside any window creates a new window. Dropping onto a
 window that already has 4 tabs is refused ("not allowed" cursor; the tab stays where it was). A
@@ -870,10 +870,18 @@ responsibility in §3; split a module only when it passes ~600 lines.
   250. Ubuntu 22.04/libmpv 0.34: the existing `test_skip_frames_is_exact_and_clamps_to_file_bounds`
   verifies exact seeks to 10/fps, 0 and the final frame across the same seven
   fixtures (CI run 38247248799). No seek-formula change needed.
-- [ ] **Spike — tab move between windows (AD-009)**: confirm that freeing and recreating the mpv
-  render context on reparent keeps position/pause/cache, and which call re-enables video on
-  mpv 0.34 and the Windows build (`video-reload` vs resetting `vid`). If neither works, fall
-  back to reloading the file at the saved position (re-buffers once).
+- [x] **Spike — tab move between windows (AD-009)**: on Windows with mpv
+  v0.41.0-1122-gaccb7b282 and Qt 6.8.3, freeing the render context stopped
+  video-only playback entirely. For audio/video media, `video-reload` failed
+  (not an external track); reselecting `vid` restored frames without another
+  `file-loaded` event but moved the paused position back ~0.4 s, requiring an
+  exact seek. With `Qt.AA_ShareOpenGLContexts` set before `QApplication`,
+  reparenting instead kept the *same* GL/mpv render contexts: video-only
+  playback, paused position and frame survived, without a `file-loaded` event
+  or any mpv track command (`tests/test_tab_move.py`). Qt 6.8 documents this
+  context-sharing guarantee; no version-specific mpv recovery call is needed.
+  The mpv 0.34 and Linux display-server runtime checks remain for cross-platform
+  UAT, not claimed as locally verified.
 - [ ] **Installer size**: PyInstaller + Qt + libmpv may exceed NFR-013's 120 MB. Mitigation:
   exclude unused Qt modules (QtWebEngine, Qt3D, QtQuick).
 - [ ] **VFR files in compare**: `container-fps` is nominal; two VFR files with equal nominal fps
