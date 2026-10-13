@@ -30,6 +30,7 @@ def test_seek_bar_paints_both_loop_markers(qtbot):
 
 def test_ab_loop_actions_repeat_segment_clear_and_reset_on_new_file(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:

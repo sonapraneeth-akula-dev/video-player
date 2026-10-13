@@ -181,14 +181,20 @@ def main(argv: list[str] | None = None) -> int:
             windows.append(window)
             if file is not None:
                 path = file if file.startswith("sftp://") else os.path.abspath(file)
-                window.video.ready.connect(
-                    lambda window=window, path=path: window.open_file(path),
-                    Qt.ConnectionType.SingleShotConnection,
-                )
+                if args.codec_probe or (not path.startswith("sftp://") and Path(path).is_file()):
+                    tab = window._add_player_tab(Path(path).name)
+                    tab.video.ready.connect(
+                        lambda window=window, path=path: window.open_file(path),
+                        Qt.ConnectionType.SingleShotConnection,
+                    )
+                elif path.startswith("sftp://"):
+                    QTimer.singleShot(0, lambda window=window, path=path: window.open_file(path))
+                else:
+                    window.open_file(path)
             if args.codec_probe:
                 return _probe_codec(app, window, args.codec_probe)
             window.show()
-        # ponytail: until tabs/IPC exist, separate windows keep every CLI file reachable.
+        # ponytail: until IPC routing exists, separate windows keep every CLI file reachable.
         return app.exec()
     finally:
         restore()

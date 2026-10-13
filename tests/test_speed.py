@@ -38,6 +38,7 @@ def test_speed_rejects_invalid_values_and_clamps(qtbot):
 
 def test_speed_actions_update_status_label(qtbot, tmp_path: Path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -82,6 +83,7 @@ def test_action_to_painted_acknowledgement_p95(qtbot, tmp_path: Path):
                 self.painted_at = perf_counter()
 
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     observer = PaintObserver(window.speed_label)
@@ -128,6 +130,7 @@ def test_speed_adjustment_actions_use_setting(qtbot, tmp_path: Path):
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("playback/speed_step", "0.1")
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:

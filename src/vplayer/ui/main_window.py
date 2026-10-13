@@ -3,6 +3,7 @@
 import math
 import threading
 from pathlib import Path
+from typing import ClassVar
 
 import mpv
 import paramiko
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFocusFrame,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QPushButton,
@@ -25,12 +27,12 @@ from PySide6.QtWidgets import (
 )
 
 from vplayer import APP_NAME
-from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
 from vplayer.settings import Settings
 from vplayer.sftp import KnownHosts, SshPool
 from vplayer.ui.browser import BrowserDock
 from vplayer.ui.dialogs import ConnectDialog, PreferencesDialog
+from vplayer.ui.tabs import DetachableTabWidget, PlayerTab
 
 
 class SeekBar(QSlider):
@@ -105,23 +107,34 @@ class SeekBar(QSlider):
 
 
 class ControlBar(QToolBar):
-    def __init__(self, player: Player, parent=None):
+    def __init__(self, parent):
         super().__init__(parent)
         self.setMovable(False)
         self.play_action = QAction("Play", self)
         self.play_action.setShortcut("Space")
         self.play_action.setEnabled(False)
-        self.play_action.triggered.connect(player.play_pause)
+        self.play_action.triggered.connect(lambda: parent.player.play_pause())
         self.addAction(self.play_action)
         self.play_button = self.widgetForAction(self.play_action)
         self.play_button.setAccessibleName("Play or pause")
         self.play_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        player.file_loaded.connect(lambda: self.play_action.setEnabled(True))
-        player.paused.connect(lambda paused: self.play_action.setText("Play" if paused else "Pause"))
 
 
 class MainWindow(QMainWindow):
-    _retry_completed = Signal(object, object, object)
+    _retry_completed = Signal(object, object, object, object)
+    _tab_fields: ClassVar[dict[str, str]] = {
+        "_current_file": "current_file",
+        "_active_transport": "active_transport",
+        "_transports": "transports",
+        "_pending_recent": "pending_recent",
+        "_remote_details": "remote_details",
+        "_failed_position": "failed_position",
+        "_retry_cancel": "retry_cancel",
+        "_reconnect_attempt": "reconnect_attempt",
+        "_cache_paused": "cache_paused",
+        "_duration": "duration",
+        "_position": "position",
+    }
 
     def __init__(self, settings: Settings | None = None):
         super().__init__()
@@ -140,27 +153,13 @@ class MainWindow(QMainWindow):
         self._closing = False
         self._reconnect_attempt = None
         self._cache_paused = False
-        self.player = Player(
-            self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
-            retry_max=self.settings.retry_max,
-            snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
-        )
-        if self.player.mpv.audio_pitch_correction != self.settings.pitch_correction:
-            self.player.mpv.audio_pitch_correction = self.settings.pitch_correction
+        self.player = None
+        self.video = None
+        self._active_tab = None
         self.speed_label = QLabel("1×", self)
         self.speed_label.setAccessibleName("Playback speed")
         self.statusBar().addPermanentWidget(self.speed_label)
-        self.player.speed_changed.connect(lambda speed: self.speed_label.setText(f"{speed:g}×"))
-        self.player.file_loaded.connect(self._file_opened)
-        self.player.sftp_open_failed.connect(self._remote_open_failed)
-        self.player.sftp_reconnecting.connect(self._remote_reconnecting)
-        self.player.sftp_reconnected.connect(self._remote_reconnected)
-        self.player.sftp_retry_failed.connect(self._remote_retry_failed)
-        self.player.connection_failed.connect(self._connection_failed)
-        self.player.sftp_transport_changed.connect(self._transport_reconnected)
         self._retry_completed.connect(self._finish_remote_retry)
-        self.player.cache_paused.connect(self._cache_pause_changed)
-        self.player.skip_status.connect(self.statusBar().showMessage)
         self.connection_status = QLabel(self)
         self.connection_status.setAccessibleName("Remote connection status")
         self.connection_status.hide()
@@ -188,10 +187,12 @@ class MainWindow(QMainWindow):
         self.retry_button.clicked.connect(self._retry_remote)
         self.retry_button.hide()
         layout.addWidget(self.retry_button)
-        self.video = MpvWidget(self.player, content)
-        self.video.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.video.setAccessibleName("Video playback")
-        layout.addWidget(self.video, 1)
+        self.tabs = DetachableTabWidget(content)
+        self.tabs.currentChanged.connect(self._tab_changed)
+        self.tabs.tabCloseRequested.connect(self._close_tab_at)
+        self.tabs.open_requested.connect(self.choose_file)
+        self.tabs.connect_requested.connect(self._ask_remote_uri)
+        layout.addWidget(self.tabs, 1)
         self.video_focus = QFocusFrame(content)
         self.video_focus.hide()
         QApplication.instance().focusChanged.connect(self._focus_changed)
@@ -202,14 +203,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.time_label)
         self.setCentralWidget(content)
 
-        self.controls = ControlBar(self.player, self)
+        self.controls = ControlBar(self)
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.controls)
         self.browser = BrowserDock(self)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.browser)
         self.browser.file_activated.connect(self.open_file)
         QWidget.setTabOrder(self.browser.all_files, self.browser.tree)
-        QWidget.setTabOrder(self.browser.tree, self.video)
-        QWidget.setTabOrder(self.video, self.seek_bar)
+        QWidget.setTabOrder(self.browser.tree, self.tabs)
+        QWidget.setTabOrder(self.tabs, self.seek_bar)
         QWidget.setTabOrder(self.seek_bar, self.controls.play_button)
         QWidget.setTabOrder(self.controls.play_button, self.browser.all_files)
         open_action = QAction("&Open...", self)
@@ -223,6 +224,22 @@ class MainWindow(QMainWindow):
         preferences_action = QAction("Preferences...", self)
         preferences_action.triggered.connect(self.show_preferences)
         self.file_menu.addAction(preferences_action)
+        new_tab_action = QAction("New tab...", self)
+        new_tab_action.setShortcut("Ctrl+T")
+        new_tab_action.triggered.connect(self.new_tab)
+        self.file_menu.addAction(new_tab_action)
+        close_tab_action = QAction("Close tab", self)
+        close_tab_action.setShortcut("Ctrl+W")
+        close_tab_action.triggered.connect(self.close_tab)
+        self.file_menu.addAction(close_tab_action)
+        for label, shortcut, callback in (
+            ("Next tab", "Ctrl+Tab", self.next_tab),
+            ("Previous tab", "Ctrl+Shift+Tab", self.prev_tab),
+        ):
+            action = QAction(label, self)
+            action.setShortcut(shortcut)
+            action.triggered.connect(callback)
+            self.file_menu.addAction(action)
         snapshot_action = QAction("Snapshot", self)
         snapshot_action.setObjectName("snapshot")
         snapshot_action.setShortcut("S")
@@ -249,7 +266,6 @@ class MainWindow(QMainWindow):
         self.cycle_sub.triggered.connect(lambda: self._cycle_track("sub", "sid"))
         self.audio_menu.aboutToShow.connect(self._refresh_tracks)
         self.subtitle_menu.aboutToShow.connect(self._refresh_tracks)
-        self.player.file_loaded.connect(self._refresh_tracks)
         self._refresh_tracks()
         overlay_action = QAction("Show position overlay", self)
         overlay_action.setObjectName("toggle_overlay")
@@ -281,15 +297,14 @@ class MainWindow(QMainWindow):
         self.frame_next.setShortcut(".")
         self.frame_next.setEnabled(False)
         self.frame_next.triggered.connect(lambda: self.player.frame_step())
-        self.player.file_loaded.connect(lambda: self.frame_next.setEnabled(True))
         self.playback_menu.addAction(self.frame_next)
         self.frame_prev = QAction("Previous frame", self)
         self.frame_prev.setObjectName("frame_prev")
         self.frame_prev.setShortcut(",")
         self.frame_prev.setEnabled(False)
         self.frame_prev.triggered.connect(lambda: self.player.frame_step(-1))
-        self.player.file_loaded.connect(lambda: self.frame_prev.setEnabled(True))
         self.playback_menu.addAction(self.frame_prev)
+        self.skip_actions = []
         for name, label, key, direction in (
             ("skip_n_fwd", "Skip frames forward", "Ctrl+.", 1),
             ("skip_n_back", "Skip frames back", "Ctrl+,", -1),
@@ -301,7 +316,7 @@ class MainWindow(QMainWindow):
             action.triggered.connect(
                 lambda checked=False, sign=direction: self.player.skip_frames(sign * self.settings.skip_frames),
             )
-            self.player.file_loaded.connect(lambda enabled_action=action: enabled_action.setEnabled(True))
+            self.skip_actions.append(action)
             self.playback_menu.addAction(action)
         for label, key, amount in (
             ("Seek forward", "Right", self.settings.seek_short_s),
@@ -316,7 +331,7 @@ class MainWindow(QMainWindow):
         for label, key, callback in (
             ("Volume up", "Up", lambda: self.player.adjust_volume(5)),
             ("Volume down", "Down", lambda: self.player.adjust_volume(-5)),
-            ("Mute", "M", self.player.toggle_mute),
+            ("Mute", "M", lambda: self.player.toggle_mute()),
             ("Fullscreen", "F", self.toggle_fullscreen),
             ("Exit fullscreen", "Esc", self.exit_fullscreen),
         ):
@@ -324,25 +339,173 @@ class MainWindow(QMainWindow):
             action.setShortcut(key)
             action.triggered.connect(callback)
             self.playback_menu.addAction(action)
-        self.player.error.connect(self.show_error)
-        self.player.file_loaded.connect(self.banner.hide)
         self._duration = 0.0
         self._position = 0.0
-        self.player.duration.connect(self._duration_changed)
-        self.player.loop_points_changed.connect(self._update_loop_markers)
-        self.player.position.connect(self._position_changed)
-        self.player.vfr_detected.connect(self._update_time)
         self.seek_bar.seek_requested.connect(self._seek_from_bar)
         for name, label, shortcut, callback in (
             ("ab_set_a", "Set loop start (A)", "Ctrl+Alt+1", lambda: self.player.set_ab_point("a")),
             ("ab_set_b", "Set loop end (B)", "Ctrl+Alt+2", lambda: self.player.set_ab_point("b")),
-            ("ab_clear", "Clear A-B loop", "Ctrl+Alt+0", self.player.clear_ab_loop),
+            ("ab_clear", "Clear A-B loop", "Ctrl+Alt+0", lambda: self.player.clear_ab_loop()),
         ):
             action = QAction(label, self)
             action.setObjectName(name)
             action.setShortcut(shortcut)
             action.triggered.connect(callback)
             self.playback_menu.addAction(action)
+        self._tab_changed(-1)
+
+    def _add_player_tab(self, name: str) -> PlayerTab:
+        player = Player(
+            self, readahead_mb=self.settings.readahead_mb, backbuffer_mb=self.settings.backbuffer_mb,
+            retry_max=self.settings.retry_max,
+            snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
+        )
+        player.mpv.audio_pitch_correction = self.settings.pitch_correction
+        tab = PlayerTab(player)
+
+        def active(signal, callback, hidden=None):
+            signal.connect(
+                lambda *args: callback(*args) if self._active_tab is tab
+                else hidden(*args) if hidden is not None and shiboken6.isValid(tab) else None,
+            )
+
+        active(player.speed_changed, lambda speed: self.speed_label.setText(f"{speed:g}×"))
+        active(player.file_loaded, self._refresh_tracks)
+        player.file_loaded.connect(lambda: self._file_opened(tab))
+        active(player.file_loaded, self.banner.hide, lambda: setattr(tab, "banner_visible", False))
+        active(player.file_loaded, lambda: self.controls.play_action.setEnabled(True))
+        active(player.file_loaded, lambda: self.frame_next.setEnabled(True))
+        active(player.file_loaded, lambda: self.frame_prev.setEnabled(True))
+        for action in self.skip_actions:
+            active(player.file_loaded, lambda action=action: action.setEnabled(True))
+        active(player.paused, lambda paused: self.controls.play_action.setText("Play" if paused else "Pause"))
+        player.sftp_open_failed.connect(lambda uri: self._remote_open_failed(uri, tab))
+        active(
+            player.sftp_reconnecting, self._remote_reconnecting,
+            lambda uri, attempt: setattr(tab, "reconnect_attempt", attempt) if uri == player._uri else None,
+        )
+        active(
+            player.sftp_reconnected, self._remote_reconnected,
+            lambda uri: setattr(tab, "reconnect_attempt", None) if uri == player._uri else None,
+        )
+        active(
+            player.sftp_retry_failed, self._remote_retry_failed,
+            lambda uri: self._remote_retry_failed_for_tab(tab, uri),
+        )
+        active(
+            player.connection_failed, self._connection_failed,
+            lambda position: self._connection_failed_for_tab(tab, position),
+        )
+        player.sftp_transport_changed.connect(
+            lambda uri, previous, replacement: self._transport_reconnected(
+                uri, previous, replacement, tab,
+            ),
+        )
+        active(player.cache_paused, self._cache_pause_changed, lambda paused: setattr(tab, "cache_paused", bool(paused)))
+        active(player.skip_status, self.statusBar().showMessage)
+        active(
+            player.error, self.show_error,
+            lambda message: self._show_tab_error(tab, message),
+        )
+        player.duration.connect(self._duration_changed)
+        active(player.loop_points_changed, self._update_loop_markers)
+        active(player.position, self._position_changed)
+        active(player.vfr_detected, self._update_time)
+        self.tabs.new_tab(tab, name)
+        QWidget.setTabOrder(self.browser.tree, tab.video)
+        QWidget.setTabOrder(tab.video, self.seek_bar)
+        return tab
+
+    def _store_active_tab_state(self):
+        if self._active_tab is None:
+            return
+        for field, attribute in self._tab_fields.items():
+            setattr(self._active_tab, attribute, getattr(self, field))
+        self._active_tab.banner_text = self.banner.text()
+        self._active_tab.banner_visible = not self.banner.isHidden()
+        self._active_tab.retry_visible = not self.retry_button.isHidden()
+
+    def _tab_changed(self, index):
+        previous = self._active_tab
+        self._store_active_tab_state()
+        tab = self.tabs.widget(index)
+        if previous is not None and previous is not tab and previous.retry_cancel is not None:
+            previous.retry_cancel.set()
+            previous.retry_cancel = None
+            self.retry_button.setEnabled(True)
+        self._active_tab = tab
+        self.player = tab.player if tab else None
+        self.video = tab.video if tab else None
+        if tab is None:
+            self.banner.hide()
+            self.retry_button.hide()
+            self.connection_status.hide()
+            self._duration = self._position = 0.0
+            self._current_file = self._active_transport = self._pending_recent = None
+            self._remote_details = self._failed_position = self._retry_cancel = None
+            self._reconnect_attempt = None
+            self._transports = []
+            self._cache_paused = False
+            self.speed_label.setText("1×")
+            self.time_label.setText("00:00:00.000 / 00:00:00.000 · f —")
+            self.seek_bar.set_loop_points(None, None, 0)
+        else:
+            for field, attribute in self._tab_fields.items():
+                setattr(self, field, getattr(tab, attribute))
+            self._position = tab.player.mpv.time_pos or self._position
+            self._duration = tab.player.mpv.duration or self._duration
+            self.banner.setText(tab.banner_text)
+            self.banner.setVisible(tab.banner_visible)
+            self.retry_button.setVisible(tab.retry_visible)
+            self._update_connection_status()
+            self.speed_label.setText(f"{self.player.mpv.speed:g}×")
+            self._update_time()
+            self._update_loop_markers()
+            if previous is not None and self.video.isVisible():
+                self.video.setFocus()
+        loaded = tab is not None and self.player.mpv.duration is not None
+        self.seek_bar.setEnabled(loaded)
+        for action in self.playback_menu.actions():
+            if action.text() not in ("Fullscreen", "Exit fullscreen"):
+                action.setEnabled(tab is not None)
+        for action in (self.controls.play_action, self.frame_next, self.frame_prev, *self.skip_actions):
+            action.setEnabled(loaded)
+        if tab is not None:
+            self.controls.play_action.setText("Play" if self.player.mpv.pause else "Pause")
+        self._refresh_tracks()
+
+    def new_tab(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        if path:
+            if not Path(path).is_file():
+                self.show_error(f"File not found: {path}")
+                return
+            self._add_player_tab(Path(path).name)
+            self.open_file(path)
+
+    def close_tab(self):
+        index = self.tabs.currentIndex()
+        if index < 0:
+            return
+        self._save_position()
+        if self._retry_cancel is not None:
+            self._retry_cancel.set()
+        self.tabs.close_tab(index)
+
+    def _close_tab_at(self, index):
+        self.tabs.setCurrentIndex(index)
+        self.close_tab()
+
+    def next_tab(self):
+        self.tabs.next_tab()
+
+    def prev_tab(self):
+        self.tabs.prev_tab()
+
+    def _ask_remote_uri(self):
+        uri, accepted = QInputDialog.getText(self, "Connect to server", "SFTP URI")
+        if accepted and uri:
+            self.open_file(uri)
 
     @staticmethod
     def _clock(seconds: float) -> str:
@@ -361,6 +524,8 @@ class MainWindow(QMainWindow):
         self.time_label.setText(f"{self._clock(self._position)} / {self._clock(self._duration)} · {frame}")
 
     def _duration_changed(self, duration):
+        if self.sender() is not None and self.sender() is not self.player:
+            return
         self._duration = duration or 0.0
         self.seek_bar.setEnabled(self._duration > 0)
         self._update_time()
@@ -380,7 +545,7 @@ class MainWindow(QMainWindow):
             self.player.seek(value / self.seek_bar.maximum() * self._duration)
 
     def _focus_changed(self, _previous, current):
-        if current is self.video:
+        if self.video is not None and current is self.video:
             self.video_focus.setWidget(self.video)
             self.video_focus.show()
         else:
@@ -406,7 +571,8 @@ class MainWindow(QMainWindow):
 
     def _save_pitch_preference(self, enabled: bool):
         try:
-            self.player.mpv.audio_pitch_correction = enabled
+            for index in range(self.tabs.count()):
+                self.tabs.widget(index).player.mpv.audio_pitch_correction = enabled
             self.settings.set_pitch_correction(enabled)
         except (OSError, RuntimeError, SystemError, mpv.PropertyUnavailableError) as error:
             self.show_error(f"Could not save pitch correction: {error}")
@@ -417,14 +583,16 @@ class MainWindow(QMainWindow):
         except OSError as error:
             self.show_error(f"Could not save resume preference: {error}")
 
-    def _save_position(self):
-        if not self.settings.resume_enabled or self._current_file is None:
+    def _save_position(self, tab=None):
+        player = tab.player if tab is not None else self.player
+        current_file = tab.current_file if tab is not None else self._current_file
+        if player is None or not self.settings.resume_enabled or current_file is None:
             return
-        if self.player.mpv.path != str(self._current_file):
+        if player.mpv.path != str(current_file):
             return
-        position = self.player.mpv.time_pos
+        position = player.mpv.time_pos
         if isinstance(position, (int, float)) and math.isfinite(position) and position >= 0:
-            self.settings.set_resume_position(self._current_file, position)
+            self.settings.set_resume_position(current_file, position)
 
     def open_file(self, path: str | Path):
         self.banner.hide()
@@ -442,16 +610,21 @@ class MainWindow(QMainWindow):
                 self.show_error(f"Could not open SFTP file: {error}")
                 return
             self._connect_dialog = dialog
+            tab = self._active_tab
             dialog.connected.connect(
-                lambda transport: self._open_remote(path, dialog.remote_path, transport, dialog.pool),
+                lambda transport: self._open_connected_remote(
+                    tab, path, dialog.remote_path, transport, dialog.pool,
+                ),
             )
             dialog.finished.connect(lambda: setattr(self, "_connect_dialog", None))
             dialog.open()
             return
         file = Path(path)
         if not file.is_file():
-            self.player.load(path)
+            self.show_error(f"File not found: {path}")
             return
+        if self.player is None:
+            self._add_player_tab(file.name)
         self._save_position()
         if self._retry_cancel is not None:
             self._retry_cancel.set()
@@ -465,6 +638,18 @@ class MainWindow(QMainWindow):
         start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
         self.player.load(self._current_file, start_position=start)
         self._pending_recent = (self.player._uri, str(self._current_file))
+        self.tabs.setTabText(self.tabs.currentIndex(), file.name)
+        self._store_active_tab_state()
+
+    def _open_connected_remote(self, tab, uri, remote_path, transport, pool):
+        if tab is not None and self.tabs.indexOf(tab) < 0:
+            transport.close()
+            return
+        if tab is None:
+            self._add_player_tab(Path(remote_path).name)
+        elif tab is not self._active_tab:
+            self.tabs.setCurrentWidget(tab)
+        self._open_remote(uri, remote_path, transport, pool)
 
     def _open_remote(
         self, uri: str, remote_path: str, transport, pool: SshPool,
@@ -488,6 +673,8 @@ class MainWindow(QMainWindow):
             start_position=start_position,
         )
         self._pending_recent = (self.player._uri, uri)
+        self.tabs.setTabText(self.tabs.currentIndex(), Path(remote_path).name)
+        self._store_active_tab_state()
 
     def _connection_failed(self, position: float):
         if self._remote_details is None:
@@ -498,6 +685,16 @@ class MainWindow(QMainWindow):
         self.retry_button.setEnabled(True)
         self.retry_button.show()
 
+    def _show_tab_error(self, tab, message):
+        tab.banner_text = message
+        tab.banner_visible = True
+
+    def _connection_failed_for_tab(self, tab, position):
+        if tab.remote_details is not None:
+            tab.failed_position = position
+            self._show_tab_error(tab, f"Connection lost at {self._clock(position)}")
+            tab.retry_visible = True
+
     def _retry_remote(self):
         if self._remote_details is None or self._failed_position is None or self._active_transport is None:
             self.show_error("No remote playback is available to retry")
@@ -506,6 +703,7 @@ class MainWindow(QMainWindow):
             return
         details = (*self._remote_details, self._failed_position)
         previous = self._active_transport
+        tab = self._active_tab
         cancel = threading.Event()
         self._retry_cancel = cancel
         self.retry_button.setEnabled(False)
@@ -519,12 +717,12 @@ class MainWindow(QMainWindow):
                 if isinstance(result, paramiko.Transport):
                     result.close()
                 return
-            self._retry_completed.emit(details, result, cancel)
+            self._retry_completed.emit(tab, details, result, cancel)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _finish_remote_retry(self, details, result, cancel):
-        if self._closing or self._retry_cancel is not cancel or cancel.is_set() or (
+    def _finish_remote_retry(self, tab, details, result, cancel):
+        if self._closing or tab is not self._active_tab or self._retry_cancel is not cancel or cancel.is_set() or (
             self._remote_details != details[:3]
         ):
             if isinstance(result, paramiko.Transport):
@@ -569,47 +767,81 @@ class MainWindow(QMainWindow):
             self._cache_paused = False
             self.connection_status.hide()
 
+    @staticmethod
+    def _remote_retry_failed_for_tab(tab, uri):
+        if uri == tab.player._uri:
+            tab.reconnect_attempt = None
+            tab.cache_paused = False
+
     def _cache_pause_changed(self, paused):
         self._cache_paused = bool(paused)
         self._update_connection_status()
 
-    def _transport_reconnected(self, uri: str, previous, replacement):
-        if uri == self.player._uri and self._active_transport is replacement:
-            return
-        if uri != self.player._uri or self._active_transport is not previous:
+    def _transport_reconnected(self, uri: str, previous, replacement, tab=None):
+        tab = tab or self._active_tab
+        if tab is None or not shiboken6.isValid(tab) or self.tabs.indexOf(tab) < 0:
             replacement.close()
             return
-        self._transports.append(replacement)
-        self._active_transport = replacement
-        self._transports.remove(previous)
+        transport = self._active_transport if tab is self._active_tab else tab.active_transport
+        transports = self._transports if tab is self._active_tab else tab.transports
+        if uri == tab.player._uri and transport is replacement:
+            return
+        if uri != tab.player._uri or transport is not previous:
+            replacement.close()
+            return
+        transports.append(replacement)
+        if tab is self._active_tab:
+            self._active_transport = replacement
+        tab.active_transport = replacement
+        transports.remove(previous)
         previous.close()
 
-    def _file_opened(self):
-        for transport in self._transports[:]:
-            if transport is not self._active_transport:
+    def _file_opened(self, tab):
+        if tab.player._closed:
+            return
+        transports = self._transports if tab is self._active_tab else tab.transports
+        active_transport = self._active_transport if tab is self._active_tab else tab.active_transport
+        for transport in transports[:]:
+            if transport is not active_transport:
                 transport.close()
-                self._transports.remove(transport)
-        if self._pending_recent is not None and self._pending_recent[0] == self.player._uri:
+                transports.remove(transport)
+        pending = self._pending_recent if tab is self._active_tab else tab.pending_recent
+        if pending is not None and pending[0] == tab.player._uri:
             try:
-                self.settings.add_recent_item(self._pending_recent[1])
+                self.settings.add_recent_item(pending[1])
                 self._refresh_recent_menu()
             except OSError as error:
-                self.show_error(str(error))
-            self._pending_recent = None
+                if tab is self._active_tab:
+                    self.show_error(str(error))
+                else:
+                    tab.banner_text, tab.banner_visible = str(error), True
+            tab.pending_recent = None
+            if tab is self._active_tab:
+                self._pending_recent = None
 
-    def _remote_open_failed(self, failed_uri: str):
+    def _remote_open_failed(self, failed_uri: str, tab=None):
+        tab = tab or self._active_tab
+        if tab is None or tab.player._closed:
+            return
+        active = tab is self._active_tab
+        pending = self._pending_recent if active else tab.pending_recent
+        transport = self._active_transport if active else tab.active_transport
+        transports = self._transports if active else tab.transports
         if (
-            self._active_transport is not None
-            and self._pending_recent is not None
-            and self._pending_recent[0] == failed_uri
+            transport is not None
+            and pending is not None
+            and pending[0] == failed_uri
         ):
-            transport = self._active_transport
-            self._active_transport = None
-            self._reconnect_attempt = None
-            self._update_connection_status()
-            self._pending_recent = None
+            tab.active_transport = None
+            tab.reconnect_attempt = None
+            tab.pending_recent = None
+            if active:
+                self._active_transport = None
+                self._reconnect_attempt = None
+                self._update_connection_status()
+                self._pending_recent = None
             transport.close()
-            self._transports.remove(transport)
+            transports.remove(transport)
 
     def _refresh_recent_menu(self):
         self.recent_menu.clear()
@@ -626,7 +858,7 @@ class MainWindow(QMainWindow):
             self.recent_menu.addAction("(empty)").setEnabled(False)
 
     def _refresh_tracks(self):
-        tracks = self.player.mpv.track_list
+        tracks = self.player.mpv.track_list if self.player is not None else []
         for menu, kind, prop, cycle in (
             (self.audio_menu, "audio", "aid", self.cycle_audio),
             (self.subtitle_menu, "sub", "sid", self.cycle_sub),
@@ -636,7 +868,7 @@ class MainWindow(QMainWindow):
             menu.addSeparator()
             available = [track for track in tracks if track["type"] == kind]
             cycle.setEnabled(bool(available))
-            selected = getattr(self.player.mpv, prop)
+            selected = getattr(self.player.mpv, prop) if self.player is not None else False
             off = menu.addAction("Off")
             off.setEnabled(bool(available))
             off.setCheckable(True)
@@ -692,6 +924,9 @@ class MainWindow(QMainWindow):
         self._save_snapshot(path)
 
     def _save_snapshot(self, path: str | None = None):
+        if self.player is None:
+            self.show_error("Cannot take a snapshot before a file is loaded")
+            return
         try:
             saved = self.player.snapshot(path)
         except (OSError, SystemError, ValueError) as error:
@@ -723,14 +958,20 @@ class MainWindow(QMainWindow):
             self.showNormal()
 
     def closeEvent(self, event):
+        if self._closing:
+            super().closeEvent(event)
+            return
         self._closing = True
+        QApplication.instance().focusChanged.disconnect(self._focus_changed)
         if self._retry_cancel is not None:
             self._retry_cancel.set()
         if self._connect_dialog is not None:
             self._connect_dialog.reject()
-        self._save_position()
-        if shiboken6.isValid(self.video):
-            self.video.dispose()
-        self.player.close(transports=tuple(self._transports))
-        self._transports.clear()
+        self._store_active_tab_state()
+        while self.tabs.count():
+            tab = self.tabs.widget(0)
+            self._save_position(tab)
+            if tab.retry_cancel is not None:
+                tab.retry_cancel.set()
+            self.tabs.close_tab(0)
         super().closeEvent(event)

@@ -22,14 +22,18 @@ For the native crash history and remaining investigation, see
 [Native crash investigation](docs/CRASHES.md).
 
 Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
+The window starts with an Open file / Connect to server placeholder. **Ctrl+T**
+opens a file in a new tab, **Ctrl+W** closes the active tab, and **Ctrl+Tab** /
+**Ctrl+Shift+Tab** switch tabs. Closing the last tab restores the placeholder;
+each tab keeps its own playback position, speed, volume and track selection.
 Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).
 You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
 `vplayer --version` to print the version, or `vplayer --new-window FILE`. Until
-tabs and single-instance routing are added, each CLI file opens in its own
-window; every launch already creates a new window.
+single-instance routing is added, each CLI file opens in its own window;
+every launch already creates a new window.
 Use `vplayer sftp://user@host:port/path` to authenticate and play a remote
 file without downloading a local copy. **File > Recent Files** reopens the
 last 20 successfully loaded local or SFTP files, newest first. Remote entries
@@ -81,7 +85,7 @@ remember updates the application's known-hosts file without editing
 `~/.ssh/known_hosts`. Remote playback retries socket errors and timeouts
 without reloading the file, reauthenticating against the originally approved
 host key. A status indicator shows the retry attempt or cache buffering in
-the current single-player window; tab-specific placement awaits tabs.
+the current active tab's window; placement in tab headers is pending.
 Retry count defaults to 6 (`network/retry_max`, 0–20); cancellation interrupts
 connection attempts. Exhausted retries show the last playback time and a
 **Retry** button; Retry reauthenticates and resumes from that time. SFTP

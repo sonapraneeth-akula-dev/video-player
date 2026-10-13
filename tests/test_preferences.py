@@ -10,6 +10,7 @@ from vplayer.ui.main_window import MainWindow
 def test_pitch_preference_controls_live_mpv_and_persists(qtbot, tmp_path):
     path = tmp_path / "settings.ini"
     window = MainWindow(Settings(path))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -38,6 +39,7 @@ def test_pitch_preference_controls_live_mpv_and_persists(qtbot, tmp_path):
         window.close()
 
     reopened = MainWindow(Settings(path))
+    reopened._add_player_tab("Video")
     qtbot.addWidget(reopened)
     try:
         assert reopened.settings.pitch_correction is False

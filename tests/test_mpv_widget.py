@@ -68,15 +68,17 @@ def test_rendered_widgets_are_destroyed_on_gui_thread_before_player_shutdown(qtb
 
 def test_closing_window_destroys_render_surface_on_gui_thread(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     window.show()
     destroyed_on = []
-    window.video.destroyed.connect(lambda: destroyed_on.append(QThread.currentThread() == QApplication.instance().thread()))
+    video = window.video
+    video.destroyed.connect(lambda: destroyed_on.append(QThread.currentThread() == QApplication.instance().thread()))
     try:
         qtbot.waitUntil(lambda: window.video._render is not None, timeout=10000)
     finally:
         window.close()
     assert destroyed_on == [True]
-    assert not shiboken6.isValid(window.video)
+    assert not shiboken6.isValid(video)
     window.close()
 
 
@@ -154,7 +156,10 @@ def test_close_playing_video_frees_surface_before_worker_termination(qtbot, monk
 
 def test_window_close_does_not_wait_for_remote_transport(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     window.show()
+    player = window.player
+    video = window.video
     release_transport = Event()
     transport = Mock()
     transport.close.side_effect = lambda: release_transport.wait(5)
@@ -164,9 +169,9 @@ def test_window_close_does_not_wait_for_remote_transport(qtbot, tmp_path):
         start = perf_counter()
         window.close()
         assert perf_counter() - start < 1
-        assert not shiboken6.isValid(window.video)
+        assert not shiboken6.isValid(video)
     finally:
         release_transport.set()
-        assert window.player.wait_closed(10)
+        assert player.wait_closed(10)
     transport.close.assert_called_once_with()
-    assert not window.player._shutdown_thread.is_alive()
+    assert not player._shutdown_thread.is_alive()

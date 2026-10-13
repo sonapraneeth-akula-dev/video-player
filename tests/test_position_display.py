@@ -5,6 +5,7 @@ from vplayer.ui.main_window import MainWindow
 
 def test_position_formats_milliseconds_frame_number_and_unknown_fps(qtbot, tmp_path, monkeypatch):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -36,6 +37,7 @@ def test_position_formats_milliseconds_frame_number_and_unknown_fps(qtbot, tmp_p
 
 def test_vfr_clip_shows_approximate_frame_label(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.show()

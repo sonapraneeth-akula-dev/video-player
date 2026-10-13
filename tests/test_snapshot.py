@@ -39,6 +39,7 @@ def test_snapshot_saves_native_video_without_overlay_and_never_overwrites(qtbot,
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("snapshot/dir", str(tmp_path / "snapshots"))
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.show()
@@ -113,6 +114,7 @@ def test_snapshot_as_uses_extension_for_jpeg_and_cancel_writes_nothing(qtbot, tm
     settings.store.setValue("snapshot/dir", str(tmp_path))
     settings.store.setValue("snapshot/jpeg_quality", 73)
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.show()

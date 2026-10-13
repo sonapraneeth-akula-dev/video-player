@@ -47,6 +47,7 @@ def test_corrupt_worker(qtbot, tmp_path):
     files = sorted(CORPUS.glob("corrupt_*"))
     assert len(files) >= 50
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     window.player.mpv.ao = "null"
     window.show()
     errors = []

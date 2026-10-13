@@ -13,6 +13,7 @@ from vplayer.ui.main_window import MainWindow
 
 def test_uncaught_qt_slot_is_logged_and_shown_without_exiting(qtbot, tmp_path: Path, caplog):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     button = QPushButton("Raise", window)
@@ -40,6 +41,7 @@ def test_uncaught_qt_slot_is_logged_and_shown_without_exiting(qtbot, tmp_path: P
 
 def test_worker_exception_is_logged_and_shown_on_gui_thread(qtbot, tmp_path: Path, caplog):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     restore = entry._install_exception_handlers([window])
@@ -89,6 +91,7 @@ def test_uncaught_error_targets_active_window(qtbot, tmp_path: Path):
 
 def test_mpv_callback_exception_is_contained_and_reported(qtbot, monkeypatch, tmp_path: Path, caplog):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
 

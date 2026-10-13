@@ -32,6 +32,7 @@ def long_media(tmp_path_factory):
 def test_resume_at_two_minutes_and_disabled_starts_at_zero(qtbot, tmp_path, long_media):
     path = tmp_path / "settings.ini"
     window = MainWindow(Settings(path))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.player.mpv.pause = True
@@ -52,6 +53,7 @@ def test_resume_at_two_minutes_and_disabled_starts_at_zero(qtbot, tmp_path, long
     assert abs(Settings(path).resume_position(long_media) - 120) < 1
 
     reopened = MainWindow(Settings(path))
+    reopened._add_player_tab("Video")
     qtbot.addWidget(reopened)
     reopened.player.mpv.ao = "null"
     reopened.player.mpv.pause = True
@@ -69,6 +71,7 @@ def test_resume_at_two_minutes_and_disabled_starts_at_zero(qtbot, tmp_path, long
         reopened.close()
 
     disabled = MainWindow(Settings(path))
+    disabled._add_player_tab("Video")
     qtbot.addWidget(disabled)
     disabled.player.mpv.ao = "null"
     disabled.player.mpv.pause = True
@@ -97,6 +100,7 @@ def test_opening_another_local_file_saves_the_previous_position(qtbot, tmp_path,
     settings = Settings(path)
     settings.set_resume_enabled(True)
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.player.mpv.pause = True

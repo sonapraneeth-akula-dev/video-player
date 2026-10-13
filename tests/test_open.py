@@ -15,6 +15,7 @@ MEDIA = Path(__file__).resolve().parent / "media" / "h264_25.mp4"
 
 def test_file_menu_opens_frame_and_errors_are_nonblocking(qtbot, monkeypatch, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -71,6 +72,7 @@ def test_seek_actions_use_configured_short_and_long_steps(qtbot, tmp_path, monke
     settings.store.setValue("playback/seek_short_s", 9)
     settings.store.setValue("playback/seek_long_s", 75)
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     calls = []
     monkeypatch.setattr(window.player, "seek", lambda seconds, relative: calls.append((seconds, relative)))

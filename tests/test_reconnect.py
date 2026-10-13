@@ -174,6 +174,7 @@ def test_two_streams_share_replacement_transport(qtbot, connected_pool, monkeypa
 
 def test_remote_status_follows_reconnect_and_cache_pause(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     uri = "vpsftp://reconnect/test.mp4"
@@ -244,6 +245,7 @@ def test_exhausted_retry_emits_before_read_error_and_not_on_eof(qtbot, monkeypat
 
 def test_connection_failure_banner_uses_last_playback_time(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     uri = "vpsftp://reconnect/test.mp4"
@@ -265,6 +267,7 @@ def test_retry_failure_keeps_error_and_allows_another_attempt(qtbot, tmp_path):
             raise OSError("server offline")
 
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     window._remote_details = ("sftp://user@host/test.mp4", "/test.mp4", OfflinePool())
@@ -283,12 +286,13 @@ def test_retry_failure_keeps_error_and_allows_another_attempt(qtbot, tmp_path):
 
 def test_stale_retry_result_does_not_replace_current_attempt(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window._remote_details = ("sftp://user@host/test.mp4", "/test.mp4", object())
     current = Event()
     window._retry_cancel = current
     try:
-        window._finish_remote_retry((*window._remote_details, 2.5), OSError("stale"), Event())
+        window._finish_remote_retry(window._active_tab, (*window._remote_details, 2.5), OSError("stale"), Event())
         assert window._retry_cancel is current
         assert "stale" not in window.banner.text()
     finally:
@@ -304,6 +308,7 @@ def test_docker_pause_resumes_same_media_without_reload(
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("network/readahead_mb", 16)
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.player.mpv.pause = True
@@ -371,6 +376,7 @@ def test_exhausted_outage_shows_retry_and_resumes_from_banner_position(
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("network/retry_max", 0)
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.player.mpv.ao = "null"
     window.player.mpv.pause = True

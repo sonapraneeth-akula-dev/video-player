@@ -54,6 +54,7 @@ def snapshot_name(source: str, time_s: float, fps: float | None = None, collisio
 
 
 class Player(QObject):
+    shutdown_finished = Signal()
     file_loaded = Signal()
     position = Signal(object)
     duration = Signal(object)
@@ -727,6 +728,7 @@ class Player(QObject):
                 self._sftp_sources.clear()
                 self._sftp_callbacks = None
                 self._shutdown_done.set()
+                self.shutdown_finished.emit()
 
         self._shutdown_thread = threading.Thread(target=shutdown, name="vplayer-mpv-shutdown")
         self._shutdown_thread.start()

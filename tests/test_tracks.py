@@ -11,6 +11,7 @@ MEDIA = Path(__file__).resolve().parent / "media"
 
 def test_audio_subtitle_menus_select_tracks_and_cycle_with_shortcuts(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -63,6 +64,7 @@ def test_audio_subtitle_menus_select_tracks_and_cycle_with_shortcuts(qtbot, tmp_
 
 def test_track_menus_refresh_current_mpv_selection_on_open(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:

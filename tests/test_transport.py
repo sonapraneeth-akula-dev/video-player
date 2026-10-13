@@ -11,6 +11,7 @@ MEDIA = Path(__file__).resolve().parent / "media" / "h264_25.mp4"
 
 def test_play_pause_and_click_drag_seek(qtbot, tmp_path, monkeypatch):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -59,6 +60,7 @@ def test_play_pause_and_click_drag_seek(qtbot, tmp_path, monkeypatch):
 
 def test_volume_mute_and_fullscreen_shortcuts(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -94,6 +96,7 @@ def test_frame_actions_are_available_after_load(qtbot, tmp_path, monkeypatch):
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("playback/skip_frames", 7)
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:

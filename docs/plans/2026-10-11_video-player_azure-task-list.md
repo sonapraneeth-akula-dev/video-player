@@ -537,7 +537,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 6.1.1.1.1 | Task | `ui/tabs.py` — `PlayerTab` (Player + MpvWidget + state) in `DetachableTabWidget`; `new_tab` / `close_tab` / `next_tab` / `prev_tab`; 0-tab placeholder | 03:00 | 00:30 | `tests/test_tabs.py`: per-tab position/speed/volume/tracks independent; closing the last tab → placeholder | FR-035/037/038 |
+| 6.1.1.1.1 | Task | [x] `ui/tabs.py` — `PlayerTab` (Player + MpvWidget + state) in `DetachableTabWidget`; `new_tab` / `close_tab` / `next_tab` / `prev_tab`; 0-tab placeholder | 03:00 | 00:30 | `tests/test_tabs.py`: per-tab position/speed/volume/tracks independent; closing the last tab → placeholder | Tabs own their mpv and GL lifetimes; active controls and CLI opens follow the selected tab. Local tab module coverage 100%, playing-tab close < 1 s and worker/player cleanup verified; v0.36.0. Cross-window dragging remains in 6.2.2.1.2 |
 | 6.1.1.1.2 | Task | [x] `Player.close()` contract — free render context on the Qt thread, cancel stream, `terminate()` on a worker thread | 01:30 | 00:15 | Closing a playing tab returns < 1 s; no leaked threads | Verified local render and remote-read close < 1 s, transport cleanup and joined worker; tests in `test_mpv_widget.py` and `test_sftp_mpv.py`. v0.35.1 |
 
 ##### User Story 6.1.1.2 (US-035): Actions to apply only to the active tab

@@ -14,6 +14,7 @@ MEDIA = Path(__file__).resolve().parent / "media" / "h264_25.mp4"
 def test_recent_menu_reopens_local_media_and_survives_restart(qtbot, tmp_path):
     settings = Settings(tmp_path / "settings.ini")
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -28,6 +29,7 @@ def test_recent_menu_reopens_local_media_and_survives_restart(qtbot, tmp_path):
         window.close()
 
     reopened = MainWindow(Settings(tmp_path / "settings.ini"))
+    reopened._add_player_tab("Video")
     qtbot.addWidget(reopened)
     reopened.show()
     try:
@@ -40,6 +42,7 @@ def test_recent_menu_reopens_local_media_and_survives_restart(qtbot, tmp_path):
 def test_recent_menu_rejects_sftp_uri_with_password(qtbot, tmp_path):
     settings = Settings(tmp_path / "settings.ini")
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -54,6 +57,7 @@ def test_recent_menu_rejects_sftp_uri_with_password(qtbot, tmp_path):
 
 def test_closing_window_cancels_pending_sftp_connection(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     window.open_file("sftp://viewer@host.example/media/clip.mp4")
@@ -77,6 +81,7 @@ def test_failed_remote_open_does_not_keep_transport_or_recent_item(qtbot, sftp_s
     monkeypatch.setattr("vplayer.ui.main_window.KnownHosts", lambda: known)
     settings = Settings(tmp_path / "settings.ini")
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:
@@ -115,6 +120,7 @@ def test_recent_sftp_uri_connects_plays_and_reopens(qtbot, sftp_server, tmp_path
     settings = Settings(tmp_path / "settings.ini")
     uri = f"sftp://password@{sftp_server.host}:{sftp_server.port}/media/h264_25.mp4"
     window = MainWindow(settings)
+    window._add_player_tab("Video")
     qtbot.addWidget(window)
     window.show()
     try:

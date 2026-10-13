@@ -581,6 +581,9 @@ browser's "Open in new window", FR-043). If the active tab is a compare tab, `op
 for the chosen file (both compare players close); cancelling the picker changes nothing.
 Closing the last tab leaves the placeholder; the
 window stays open.
+Each `PlayerTab` owns its player and render surface; closing detaches the player
+from Qt's tab parent before asynchronous native shutdown, then schedules
+deletion on the Qt thread. Window-level controls reflect the selected tab.
 
 `copy_position` (FR-050) copies `<HH:MM:SS.mmm> f<frame>` of the current tab, e.g.
 `00:12:34.567 f22213`, or only `<HH:MM:SS.mmm>` when fps is unknown (§4.3); in compare view,

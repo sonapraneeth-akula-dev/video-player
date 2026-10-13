@@ -112,8 +112,11 @@ def test_cli_opens_relative_file_and_reports_missing_file(qtbot, monkeypatch, tm
     def exit_after_show(self):
         windows = [w for w in self.topLevelWidgets() if isinstance(w, MainWindow) and w.isVisible()]
         assert len(windows) == 2
-        qtbot.waitUntil(lambda: any(w.player.state()["duration"] for w in windows), timeout=10000)
-        playing = next(w for w in windows if w.player.state()["duration"])
+        qtbot.waitUntil(
+            lambda: any(w.player is not None and w.player.state()["duration"] for w in windows),
+            timeout=10000,
+        )
+        playing = next(w for w in windows if w.player is not None and w.player.state()["duration"])
         failed = next(w for w in windows if w is not playing)
         assert playing.player._uri == str(media)
         assert failed.banner.isVisible()
