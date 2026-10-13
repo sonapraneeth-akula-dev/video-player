@@ -83,6 +83,8 @@ class AppController(QObject):
         source.limit_message.hide()
         source.limit_button.hide()
         source._overflow_path = None
+        if source.tabs.count() == 0 and len(self.windows) > 1:
+            source.close()
         return True
 
     def window_closed(self, window):

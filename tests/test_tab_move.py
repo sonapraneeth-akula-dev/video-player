@@ -88,7 +88,8 @@ def test_move_playing_tab_to_another_window_preserves_state_and_signal_routing(q
 
         assert target.receive_tab(source, tab)
         qtbot.waitUntil(lambda: has_video_frame(target.video), timeout=10000)
-        assert source.tabs.count() == 0 and source.tabs.placeholder.isVisible()
+        assert source.tabs.count() == 0 and not source.isVisible()
+        assert source not in controller.windows
         assert target.tabs.count() == 1 and target.player is player
         assert tab.owner is target
         assert tab.video.context() is context and tab.video._render is render
@@ -180,7 +181,7 @@ def test_dragging_tab_out_creates_window_without_reloading(qtbot, monkeypatch):
             QEvent.Type.MouseMove, outside, outside, Qt.MouseButton.NoButton,
             Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
         ))
-        assert len(controller.windows) == 2
+        assert len(controller.windows) == 1 and source not in controller.windows
         target = controller.windows[-1]
         qtbot.addWidget(target)
         assert target.tabs.currentWidget() is tab and target.player is player
@@ -235,6 +236,34 @@ def test_move_cancels_inflight_manual_retry_so_target_can_retry(qtbot):
         assert cancel.is_set()
         assert tab.retry_cancel is None and target._retry_cancel is None
         assert target.retry_button.isEnabled()
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_moving_last_tab_closes_source_but_last_empty_window_stays(qtbot):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    target = controller.new_window()
+    qtbot.addWidget(source)
+    qtbot.addWidget(target)
+    try:
+        first = source._add_player_tab("First")
+        last = source._add_player_tab("Last")
+        assert target.receive_tab(source, first)
+        assert source in controller.windows and source.isVisible()
+        assert source.tabs.currentWidget() is last
+
+        assert target.receive_tab(source, last)
+        assert source not in controller.windows and not source.isVisible()
+        assert target in controller.windows and target.tabs.count() == 2
+        assert not first.player._closed and not last.player._closed
+        target.close_tab()
+        target.close_tab()
+        assert target.tabs.count() == 0
+        assert target.tabs.placeholder.isVisible() and target.isVisible()
+        assert controller.windows == [target]
+        assert first.player.wait_closed(10) and last.player.wait_closed(10)
     finally:
         for window in controller.windows[:]:
             window.close()
