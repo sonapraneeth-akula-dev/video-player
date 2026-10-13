@@ -74,6 +74,7 @@ def generate(directory: Path = MEDIA) -> None:
 
     generate_vfr(directory)
     generate_multitrack(directory)
+    generate_snapshot_edge_cases(directory)
 
     for codec, containers in VIDEO_CONTAINERS.items():
         for ext in containers:
@@ -143,6 +144,39 @@ def generate_4k_backstep(directory: Path = MEDIA) -> Path:
         check=True,
     )
     return target
+
+
+def generate_snapshot_edge_cases(directory: Path = MEDIA) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    hdr_filter = (
+        "zscale=transferin=bt709:matrixin=bt709:primariesin=bt709:"
+        "transfer=smpte2084:matrix=bt2020nc:primaries=bt2020,format=yuv420p10le"
+    )
+    rotation_option = "-display_rotation" in subprocess.check_output(
+        ["ffmpeg", "-hide_banner", "-h", "full"], text=True, stderr=subprocess.STDOUT,
+    )
+    subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            *(["-display_rotation", "90"] if rotation_option else []),
+            "-i", str(directory / "h264_25.mp4"), "-t", "1", "-c:v", "copy",
+            *([] if rotation_option else ["-metadata:s:v:0", "rotate=90"]),
+            str(directory / "h264_rotated.mp4"),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "color=c=0x800000:s=256x144:r=25:d=1",
+            "-vf", hdr_filter,
+            "-c:v", "libx265", "-preset", "ultrafast",
+            "-x265-params", "log-level=error:pools=none",
+            "-color_primaries", "bt2020", "-color_trc", "smpte2084",
+            "-colorspace", "bt2020nc", str(directory / "hevc_hdr_pq.mp4"),
+        ],
+        check=True,
+    )
 
 
 def generate_multitrack(directory: Path = MEDIA) -> Path:

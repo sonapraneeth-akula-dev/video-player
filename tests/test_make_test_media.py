@@ -51,6 +51,20 @@ def test_4k_hevc_fixture_uses_long_gop_and_burned_frame_index(tmp_path, monkeypa
 
 def test_frame_indexed_clips(tmp_path):
     generate(tmp_path)
+    rotated = json.loads(subprocess.check_output([
+        "ffprobe", "-v", "error", "-show_streams", "-of", "json",
+        str(tmp_path / "h264_rotated.mp4"),
+    ], text=True))["streams"][0]
+    assert (rotated["width"], rotated["height"]) == (256, 144)
+    assert any(abs(side["rotation"]) == 90 for side in rotated["side_data_list"])
+    hdr = json.loads(subprocess.check_output([
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=pix_fmt,color_space,color_transfer,color_primaries",
+        "-of", "json", str(tmp_path / "hevc_hdr_pq.mp4"),
+    ], text=True))["streams"][0]
+    assert (hdr["pix_fmt"], hdr["color_space"], hdr["color_transfer"], hdr["color_primaries"]) == (
+        "yuv420p10le", "bt2020nc", "smpte2084", "bt2020",
+    )
     width, height = map(int, SIZE.split("x"))
     for name, rate in (
         ("h264_25.mp4", "25/1"),

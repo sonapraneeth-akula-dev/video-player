@@ -887,9 +887,11 @@ responsibility in §3; split a module only when it passes ~600 lines.
   exclude unused Qt modules (QtWebEngine, Qt3D, QtQuick).
 - [ ] **VFR files in compare**: `container-fps` is nominal; two VFR files with equal nominal fps
   are allowed but steps may drift. Accept for v1 (see §4.4 VFR heuristic).
-- [ ] **Snapshot edge cases**: confirm `screenshot-to-file … video` applies rotation metadata
-  and tone-maps HDR to SDR for PNG; add rotated and HDR clips to the snapshot test. If not, pass
-  the needed filters for screenshots only.
+- [x] **Snapshot edge cases**: `screenshot-to-file … video` saves the unrotated
+  video frame; when rotation metadata is present, transform the saved image with
+  Qt and replace it atomically without adding overlays. A generated 10-bit
+  BT.2020/PQ clip produces a visible SDR PNG. Rotated PNG/JPEG and HDR
+  snapshot checks run alongside the existing snapshot tests.
 - [ ] **Remote file changes during playback**: a truncated remote file makes reads hit EOF early
   → mpv ends playback normally; a growing file isn't followed. Accept for v1.
 - [ ] **Hardware decoder session limits**: one window can hold 5 players (3 tabs + 1 compare

@@ -80,6 +80,37 @@ def test_snapshot_saves_native_video_without_overlay_and_never_overwrites(qtbot,
         window.close()
 
 
+@pytest.mark.parametrize(
+    ("source", "expected_size"),
+    (("h264_rotated.mp4", (144, 256)), ("hevc_hdr_pq.mp4", (256, 144))),
+)
+def test_snapshot_respects_rotation_and_maps_hdr_to_sdr(qtbot, tmp_path, source, expected_size):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
+    qtbot.addWidget(window)
+    window.player.mpv.ao = "null"
+    window.show()
+    try:
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA.parent / source)
+        qtbot.waitUntil(lambda: window.player.mpv.time_pos is not None, timeout=10000)
+        window.player.mpv.pause = True
+        image = QImage(str(window.player.snapshot(tmp_path / "edge.png")))
+        assert (image.width(), image.height()) == expected_size
+        if source == "h264_rotated.mp4":
+            jpeg = tmp_path / "edge.jpg"
+            window.player.snapshot(jpeg)
+            assert jpeg.read_bytes().startswith(b"\xff\xd8")
+            assert (QImage(str(jpeg)).width(), QImage(str(jpeg)).height()) == expected_size
+        else:
+            color = image.pixelColor(128, 72)
+            assert 60 < color.red() < 240
+            assert color.green() < color.red()
+            assert color.blue() < color.green()
+    finally:
+        window.close()
+
+
 def test_snapshot_failure_removes_only_the_empty_reserved_file(qtbot, tmp_path, monkeypatch):
     player = Player(video_output="null", snapshot_dir=tmp_path)
     try:

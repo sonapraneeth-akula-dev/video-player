@@ -447,7 +447,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 4.1.1.1.1 | Task | [x] `Player.snapshot(None)` — reserve the target with `open(path, "x")` (`_2`, `_3`… on collision), `screenshot-to-file <path> video`, delete the empty file on failure; toast with "Open folder"; `snapshot` (S) | 02:00 | 00:20 | `tests/test_snapshot.py`: PNG size == video size, no overlay; existing file never overwritten | FR-018/019; native 256×144 PNG and collision/failure tests; final naming in US-055; v0.23.0 |
-| 4.1.1.1.2 | Debug | Snapshot edge cases — rotation metadata and HDR→SDR tone-mapping with `screenshot-to-file … video` | 01:00 | 00:15 | Rotated and HDR clips added to the snapshot test; extra filters only if needed | Design §13 |
+| 4.1.1.1.2 | Debug | [x] Snapshot edge cases — rotation metadata and HDR→SDR tone-mapping with `screenshot-to-file … video` | 01:00 | 00:15 | Rotated and HDR clips added to the snapshot test; extra filters only if needed | Design §13; mpv `video` screenshots omit display rotation, so only rotated snapshots are rewritten through Qt's atomic image save. HDR PQ snapshot retains visible SDR color. Rotated PNG/JPEG and 10-bit BT.2020 PQ tests pass on Windows; Ubuntu 22.04 FFmpeg fixture generation verified; v0.50.1 |
 
 ##### User Story 4.1.1.2 (US-029): A "Save As" snapshot
 - **Est. Manual**: 01:30 | **Est. AI**: 00:15

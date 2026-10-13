@@ -15,7 +15,18 @@ from pathlib import Path
 import mpv
 import paramiko
 import shiboken6
-from PySide6.QtCore import QObject, QStandardPaths, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import (
+    QIODevice,
+    QObject,
+    QSaveFile,
+    QStandardPaths,
+    Qt,
+    QThread,
+    QTimer,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import QImage, QTransform
 
 from vplayer.sftp import SftpStream
 
@@ -676,6 +687,21 @@ class Player(QObject):
             if target.suffix.lower() in (".jpg", ".jpeg"):
                 self.mpv["screenshot-jpeg-quality"] = self.jpeg_quality
             self.mpv.command("screenshot-to-file", str(target), "video")
+            rotation = (self.mpv.video_params or {}).get("rotate", 0)
+            if rotation:
+                image = QImage(str(target))
+                if image.isNull():
+                    raise OSError(f"Could not read snapshot for rotation: {target}")
+                output = QSaveFile(str(target))
+                if not output.open(QIODevice.OpenModeFlag.WriteOnly):
+                    raise OSError(output.errorString())
+                format_name = "JPEG" if target.suffix.lower() in (".jpg", ".jpeg") else "PNG"
+                quality = self.jpeg_quality if format_name == "JPEG" else -1
+                if not image.transformed(QTransform().rotate(rotation)).save(output, format_name, quality):
+                    output.cancelWriting()
+                    raise OSError(f"Could not rotate snapshot: {target}")
+                if not output.commit():
+                    raise OSError(output.errorString())
         except Exception:
             try:
                 if target.exists() and target.stat().st_size == 0:
