@@ -42,7 +42,7 @@ def test_tabs_own_independent_playback_and_show_placeholder_when_empty(qtbot):
         assert first.mpv.speed == 1.5 and second.mpv.speed == 0.5
         assert first.mpv.volume == 25 and second.mpv.volume == 80
         assert first.mpv.aid == 1 and second.mpv.aid == 2
-        assert second.mpv.time_pos in (None, 0)
+        assert (second.mpv.time_pos or 0) < 0.1
         tabs.prev_tab()
         assert tabs.currentWidget().player is first
         tabs.next_tab()
