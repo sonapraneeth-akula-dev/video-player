@@ -2,9 +2,9 @@ from pathlib import Path
 from threading import Event
 
 from PySide6.QtCore import QCoreApplication, QEvent, QMimeData, QPointF, Qt
-from PySide6.QtGui import QDrag, QMouseEvent
-from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PySide6.QtGui import QContextMenuEvent, QDrag, QMouseEvent
+from PySide6.QtTest import QSignalSpy, QTest
+from PySide6.QtWidgets import QApplication, QMenu, QVBoxLayout, QWidget
 
 from vplayer.app import AppController
 from vplayer.mpv_widget import MpvWidget
@@ -264,6 +264,75 @@ def test_moving_last_tab_closes_source_but_last_empty_window_stays(qtbot):
         assert target.tabs.placeholder.isVisible() and target.isVisible()
         assert controller.windows == [target]
         assert first.player.wait_closed(10) and last.player.wait_closed(10)
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_ctrl_shift_n_moves_active_playback_to_new_window(qtbot):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    qtbot.addWidget(source)
+    try:
+        assert not source.move_tab_action.isEnabled()
+        source.open_file(VIDEO_ONLY)
+        player = source.player
+        qtbot.waitUntil(lambda: player.mpv.duration is not None, timeout=10000)
+        source._add_player_tab("Other")
+        other = source.player
+        source.tabs.setCurrentIndex(0)
+        tab = source.tabs.currentWidget()
+        player.mpv.pause = True
+        player.mpv.seek(2, reference="absolute", precision="exact")
+        qtbot.waitUntil(lambda: not player.mpv.seeking and (player.mpv.time_pos or 0) >= 1.9)
+        player.set_speed(1.25)
+        player.mpv.volume = 22
+        position = player.mpv.time_pos
+        loaded = QSignalSpy(player.file_loaded)
+
+        source.activateWindow()
+        qtbot.waitUntil(source.isActiveWindow)
+        source.video.setFocus()
+        qtbot.waitUntil(source.video.hasFocus)
+        qtbot.wait(50)
+        QTest.keyClick(
+            source.video, Qt.Key.Key_N,
+            Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+        )
+        qtbot.waitUntil(lambda: len(controller.windows) == 2 and controller.windows[-1] is not source)
+        target = controller.windows[-1]
+        qtbot.addWidget(target)
+        assert target.tabs.currentWidget() is tab and target.player is player
+        assert source.tabs.count() == 1 and source.player is other
+        assert loaded.count() == 0 and not player._closed
+        assert player.mpv.pause is True
+        assert abs((player.mpv.time_pos or 0) - position) < 0.1
+        assert player.mpv.speed == 1.25 and player.mpv.volume == 22
+        assert target.move_tab_action.isEnabled()
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_tab_context_menu_moves_selected_tab_to_new_window(qtbot, monkeypatch):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    qtbot.addWidget(source)
+    try:
+        tab = source._add_player_tab("Video")
+        bar = source.tabs.tabBar()
+        menus = []
+        monkeypatch.setattr(QMenu, "popup", lambda menu, _point: menus.append(menu))
+        point = bar.tabRect(0).center()
+        bar.contextMenuEvent(QContextMenuEvent(
+            QContextMenuEvent.Reason.Mouse, point, bar.mapToGlobal(point),
+        ))
+        assert len(menus) == 1
+        action, = menus[0].actions()
+        assert action.text() == "Move tab to new window"
+        action.trigger()
+        assert len(controller.windows) == 1 and controller.windows[0] is not source
+        assert controller.windows[0].tabs.currentWidget() is tab
     finally:
         for window in controller.windows[:]:
             window.close()

@@ -589,7 +589,7 @@
 
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
-| 6.2.2.2.1 | Task | `move_tab_new_window` (Ctrl+Shift+N) using the same move path | 00:45 | 00:10 | Test: state preserved in the new window \|\| |  |
+| 6.2.2.2.1 | Task | [x] `move_tab_new_window` (Ctrl+Shift+N) using the same move path | 00:45 | 00:10 | Shortcut and tab context menu share drag-out move path; playback state and no-reload behavior verified with another tab left in source (`test_tab_move.py`); v0.43.0 |  |
 
 **Milestone Exit Criteria** (Verification Plan, from the PRD):
 - [ ] **Integration tests**: tab move keeps state (render context freed and recreated, no

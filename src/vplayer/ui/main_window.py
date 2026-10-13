@@ -245,6 +245,10 @@ class MainWindow(QMainWindow):
         new_tab_action.setShortcut("Ctrl+T")
         new_tab_action.triggered.connect(self.new_tab)
         self.file_menu.addAction(new_tab_action)
+        self.move_tab_action = QAction("Move tab to new window", self)
+        self.move_tab_action.setShortcut("Ctrl+Shift+N")
+        self.move_tab_action.triggered.connect(lambda: self._detach_tab(self.tabs.currentWidget()))
+        self.file_menu.addAction(self.move_tab_action)
         close_tab_action = QAction("Close tab", self)
         close_tab_action.setShortcut("Ctrl+W")
         close_tab_action.triggered.connect(self.close_tab)
@@ -479,6 +483,7 @@ class MainWindow(QMainWindow):
             if previous is not None and self.video.isVisible():
                 self.video.setFocus()
         loaded = tab is not None and self.player.mpv.duration is not None
+        self.move_tab_action.setEnabled(tab is not None)
         self.seek_bar.setEnabled(loaded)
         for action in self.playback_menu.actions():
             if action.text() not in ("Fullscreen", "Exit fullscreen"):
@@ -529,7 +534,7 @@ class MainWindow(QMainWindow):
         return self.controller.move_tab(source, self, tab)
 
     def _detach_tab(self, tab):
-        if self._closing or self.tabs.indexOf(tab) < 0:
+        if self._closing or not isinstance(tab, PlayerTab) or not shiboken6.isValid(tab) or self.tabs.indexOf(tab) < 0:
             return
         target = self.new_window()
         self.controller.move_tab(self, target, tab)

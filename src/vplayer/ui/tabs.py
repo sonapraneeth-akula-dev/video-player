@@ -5,6 +5,7 @@ from PySide6.QtGui import QCursor, QDrag
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
+    QMenu,
     QPushButton,
     QTabBar,
     QTabWidget,
@@ -127,6 +128,16 @@ class DetachableTabBar(QTabBar):
                 event.acceptProposedAction()
                 return
         event.ignore()
+
+    def contextMenuEvent(self, event):
+        tab = self.parentWidget().widget(self.tabAt(event.pos()))
+        if tab is None:
+            return
+        menu = QMenu(self)
+        action = menu.addAction("Move tab to new window")
+        action.triggered.connect(lambda: self.parentWidget().detach_requested.emit(tab))
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        menu.popup(event.globalPos())
 
 
 class DetachableTabWidget(QTabWidget):
