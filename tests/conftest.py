@@ -11,6 +11,9 @@ from uuid import uuid4
 
 import paramiko
 import pytest
+from PySide6.QtCore import QCoreApplication, Qt
+
+QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
 
 if sys.platform == "win32":
     vendor = Path(__file__).resolve().parents[1] / "vendor"

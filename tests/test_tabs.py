@@ -18,6 +18,8 @@ def test_tabs_own_independent_playback_and_show_placeholder_when_empty(qtbot):
     tabs.show()
     players = [Player(), Player()]
     try:
+        for player in players:
+            player.mpv.ao = "null"
         assert tabs.count() == 0
         assert tabs.placeholder.isVisible()
         assert tabs.close_tab(0) is None
@@ -72,6 +74,8 @@ def test_window_starts_empty_switches_independent_tabs_and_returns_to_placeholde
     assert window.tabs.placeholder.isVisible()
     assert not window.speed_actions[1.0].isEnabled()
     try:
+        window._add_player_tab("Video")
+        window.player.mpv.ao = "null"
         window.open_file(MEDIA)
         first = window.player
         qtbot.waitUntil(lambda: first.mpv.duration is not None, timeout=10000)
@@ -83,6 +87,14 @@ def test_window_starts_empty_switches_independent_tabs_and_returns_to_placeholde
             "vplayer.ui.main_window.QFileDialog.getOpenFileName",
             lambda *_args: (str(MEDIA), ""),
         )
+        add_tab = window._add_player_tab
+
+        def add_tab_without_audio_device(name):
+            tab = add_tab(name)
+            tab.player.mpv.ao = "null"
+            return tab
+
+        monkeypatch.setattr(window, "_add_player_tab", add_tab_without_audio_device)
         window.new_tab()
         second = window.player
         qtbot.waitUntil(lambda: second.mpv.duration is not None, timeout=10000)

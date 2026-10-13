@@ -1,15 +1,25 @@
 """Independent playback tabs and the empty-window placeholder."""
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QPushButton, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtCore import QMimeData, Qt, Signal
+from PySide6.QtGui import QCursor, QDrag
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QPushButton,
+    QTabBar,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
 
 
 class PlayerTab(QWidget):
-    def __init__(self, player: Player, parent=None):
+    def __init__(self, player: Player, parent=None, *, owner=None):
         super().__init__(parent)
+        self.owner = owner
         self.player = player
         player.setParent(self)
         player.shutdown_finished.connect(player.deleteLater)
@@ -41,9 +51,88 @@ class PlayerTab(QWidget):
         self.transports.clear()
 
 
+class DetachableTabBar(QTabBar):
+    _mime_type = "application/x-vplayer-tab"
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self._pressed_tab = None
+        self._press_pos = None
+        self._dragged_tab = None
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed_tab = self.parentWidget().widget(self.tabAt(event.position().toPoint()))
+            self._press_pos = event.position().toPoint()
+
+    def mouseReleaseEvent(self, event):
+        self._pressed_tab = None
+        super().mouseReleaseEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (
+            self._pressed_tab is not None
+            and event.buttons() & Qt.MouseButton.LeftButton
+            and not self.rect().contains(event.position().toPoint())
+            and (event.position().toPoint() - self._press_pos).manhattanLength() >= QApplication.startDragDistance()
+        ):
+            tab = self._pressed_tab
+            self._pressed_tab = None
+            self._dragged_tab = tab
+            drag = QDrag(self)
+            mime = QMimeData()
+            mime.setData(self._mime_type, b"")
+            drag.setMimeData(mime)
+            try:
+                if (
+                    drag.exec(Qt.DropAction.MoveAction) != Qt.DropAction.MoveAction
+                    and not QApplication.mouseButtons() & Qt.MouseButton.LeftButton
+                    and QApplication.widgetAt(QCursor.pos()) is None
+                ):
+                    self.parentWidget().detach_requested.emit(tab)
+            finally:
+                self._dragged_tab = None
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def _can_receive(self, event):
+        source = event.source()
+        return (
+            event.mimeData().hasFormat(self._mime_type)
+            and isinstance(source, DetachableTabBar)
+            and source is not self
+            and source._dragged_tab is not None
+            and self.count() < 4
+        )
+
+    def dragEnterEvent(self, event):
+        if self._can_receive(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self._can_receive(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        if self._can_receive(event):
+            source = event.source()
+            if self.parentWidget().receive_tab(source.parentWidget().window(), source._dragged_tab):
+                event.acceptProposedAction()
+                return
+        event.ignore()
+
+
 class DetachableTabWidget(QTabWidget):
     open_requested = Signal()
     connect_requested = Signal()
+    detach_requested = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -52,6 +141,7 @@ class DetachableTabWidget(QTabWidget):
         self.setDocumentMode(True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setAccessibleName("Video tabs")
+        self.setTabBar(DetachableTabBar(self))
         self.tabBar().setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tabBar().setAccessibleName("Video tab bar")
         self.placeholder = QWidget(self)
@@ -90,11 +180,19 @@ class DetachableTabWidget(QTabWidget):
         tab = self.widget(index)
         if not isinstance(tab, PlayerTab):
             return None
-        self.removeTab(index)
+        self.take_tab(index)
         tab.close_player()
         tab.deleteLater()
+        return tab
+
+    def take_tab(self, index: int) -> PlayerTab:
+        tab = self.widget(index)
+        self.removeTab(index)
         self._show_placeholder()
         return tab
+
+    def receive_tab(self, source, tab):
+        return self.window().receive_tab(source, tab)
 
     def next_tab(self):
         if self.count():

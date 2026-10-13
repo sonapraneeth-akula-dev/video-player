@@ -204,6 +204,7 @@ class MainWindow(QMainWindow):
         self.tabs.tabCloseRequested.connect(self._close_tab_at)
         self.tabs.open_requested.connect(self.choose_file)
         self.tabs.connect_requested.connect(self._ask_remote_uri)
+        self.tabs.detach_requested.connect(self._detach_tab)
         layout.addWidget(self.tabs, 1)
         self.video_focus = QFocusFrame(content)
         self.video_focus.hide()
@@ -377,49 +378,54 @@ class MainWindow(QMainWindow):
             snapshot_dir=self.settings.snapshot_dir, jpeg_quality=self.settings.jpeg_quality,
         )
         player.mpv.audio_pitch_correction = self.settings.pitch_correction
-        tab = PlayerTab(player)
+        tab = PlayerTab(player, owner=self)
 
         def active(signal, callback, hidden=None):
             signal.connect(
-                lambda *args: callback(*args) if self._active_tab is tab
-                else hidden(*args) if hidden is not None and shiboken6.isValid(tab) else None,
+                lambda *args: callback(tab.owner, *args) if tab.owner._active_tab is tab
+                else hidden(tab.owner, *args) if hidden is not None and shiboken6.isValid(tab) else None,
             )
 
-        active(player.speed_changed, lambda speed: self.speed_label.setText(f"{speed:g}×"))
-        active(player.file_loaded, self._refresh_tracks)
-        player.file_loaded.connect(lambda: self._file_opened(tab))
-        active(player.file_loaded, self.banner.hide, lambda: setattr(tab, "banner_visible", False))
-        active(player.file_loaded, lambda: self.controls.play_action.setEnabled(True))
-        active(player.file_loaded, lambda: self.frame_next.setEnabled(True))
-        active(player.file_loaded, lambda: self.frame_prev.setEnabled(True))
-        for action in self.skip_actions:
-            active(player.file_loaded, lambda action=action: action.setEnabled(True))
-        active(player.paused, lambda paused: self.controls.play_action.setText("Play" if paused else "Pause"))
-        player.sftp_open_failed.connect(lambda uri: self._remote_open_failed(uri, tab))
-        player.sftp_reconnecting.connect(
-            lambda uri, attempt: self._remote_reconnecting(uri, attempt, tab),
-        )
-        player.sftp_reconnected.connect(lambda uri: self._remote_reconnected(uri, tab))
-        player.sftp_retry_failed.connect(lambda uri: self._remote_retry_failed(uri, tab))
+        active(player.speed_changed, lambda window, speed: window.speed_label.setText(f"{speed:g}×"))
+        active(player.file_loaded, lambda window: window._refresh_tracks())
+        player.file_loaded.connect(lambda: tab.owner._file_opened(tab))
+        active(player.file_loaded, lambda window: window.banner.hide(), lambda _window: setattr(tab, "banner_visible", False))
+        active(player.file_loaded, lambda window: window.controls.play_action.setEnabled(True))
+        active(player.file_loaded, lambda window: window.frame_next.setEnabled(True))
+        active(player.file_loaded, lambda window: window.frame_prev.setEnabled(True))
+        for index in range(len(self.skip_actions)):
+            active(player.file_loaded, lambda window, index=index: window.skip_actions[index].setEnabled(True))
         active(
-            player.connection_failed, self._connection_failed,
-            lambda position: self._connection_failed_for_tab(tab, position),
+            player.paused,
+            lambda window, paused: window.controls.play_action.setText("Play" if paused else "Pause"),
+        )
+        player.sftp_open_failed.connect(lambda uri: tab.owner._remote_open_failed(uri, tab))
+        player.sftp_reconnecting.connect(
+            lambda uri, attempt: tab.owner._remote_reconnecting(uri, attempt, tab),
+        )
+        player.sftp_reconnected.connect(lambda uri: tab.owner._remote_reconnected(uri, tab))
+        player.sftp_retry_failed.connect(lambda uri: tab.owner._remote_retry_failed(uri, tab))
+        active(
+            player.connection_failed,
+            lambda window, position: window._connection_failed(position),
+            lambda window, position: window._connection_failed_for_tab(tab, position),
         )
         player.sftp_transport_changed.connect(
-            lambda uri, previous, replacement: self._transport_reconnected(
+            lambda uri, previous, replacement: tab.owner._transport_reconnected(
                 uri, previous, replacement, tab,
             ),
         )
-        player.cache_paused.connect(lambda paused: self._cache_pause_changed(paused, tab))
-        active(player.skip_status, self.statusBar().showMessage)
+        player.cache_paused.connect(lambda paused: tab.owner._cache_pause_changed(paused, tab))
+        active(player.skip_status, lambda window, message: window.statusBar().showMessage(message))
         active(
-            player.error, self.show_error,
-            lambda message: self._show_tab_error(tab, message),
+            player.error,
+            lambda window, message: window.show_error(message),
+            lambda window, message: window._show_tab_error(tab, message),
         )
-        player.duration.connect(self._duration_changed)
-        active(player.loop_points_changed, self._update_loop_markers)
-        active(player.position, self._position_changed)
-        active(player.vfr_detected, self._update_time)
+        active(player.duration, lambda window, duration: window._duration_changed(duration))
+        active(player.loop_points_changed, lambda window, *_args: window._update_loop_markers())
+        active(player.position, lambda window, position: window._position_changed(position))
+        active(player.vfr_detected, lambda window, *_args: window._update_time())
         self.tabs.new_tab(tab, name)
         QWidget.setTabOrder(self.browser.tree, tab.video)
         QWidget.setTabOrder(tab.video, self.seek_bar)
@@ -512,6 +518,21 @@ class MainWindow(QMainWindow):
             self.controller = AppController(QApplication.instance())
             self.controller.register(self)
         return self.controller.new_window()
+
+    def receive_tab(self, source, tab):
+        if source is self or self._closing or source._closing:
+            return False
+        if self.tabs.count() >= 4:
+            return False
+        if self.controller is None or source.controller is not self.controller:
+            raise RuntimeError("Tab moves require windows owned by the same application")
+        return self.controller.move_tab(source, self, tab)
+
+    def _detach_tab(self, tab):
+        if self._closing or self.tabs.indexOf(tab) < 0:
+            return
+        target = self.new_window()
+        self.controller.move_tab(self, target, tab)
 
     def close_tab(self):
         index = self.tabs.currentIndex()

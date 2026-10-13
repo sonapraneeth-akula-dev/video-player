@@ -1,14 +1,15 @@
 from pathlib import Path
+from threading import Event
 
-import pytest
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QMimeData, QPointF, Qt
+from PySide6.QtGui import QDrag, QMouseEvent
 from PySide6.QtTest import QSignalSpy
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
+from vplayer.app import AppController
 from vplayer.mpv_widget import MpvWidget
 from vplayer.player import Player
 
-MEDIA = Path(__file__).parent / "media" / "tracks_multi.mkv"
 VIDEO_ONLY = Path(__file__).parent / "media" / "h264_25.mp4"
 
 
@@ -21,86 +22,8 @@ def has_video_frame(widget):
     ) > 35
 
 
-@pytest.mark.skipif(
-    QCoreApplication.testAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts),
-    reason="Recreation only occurs without shared OpenGL contexts",
-)
-def test_reparent_render_surface_keeps_core_and_video(qtbot):
-    first = QWidget()
-    second = QWidget()
-    first.setLayout(QVBoxLayout())
-    second.setLayout(QVBoxLayout())
-    first.resize(256, 144)
-    second.resize(256, 144)
-    player = Player()
-    player.mpv.ao = "null"
-    widget = MpvWidget(player, first)
-    first.layout().addWidget(widget)
-    loaded = QSignalSpy(player.file_loaded)
-    first.show()
-    second.show()
-    try:
-        qtbot.waitUntil(lambda: widget._render is not None, timeout=10000)
-        with qtbot.waitSignal(player.file_loaded, timeout=10000):
-            player.load(MEDIA)
-        player.mpv.pause = True
-        player.mpv.seek(1, reference="absolute", precision="exact")
-        qtbot.waitUntil(
-            lambda: not player.mpv.seeking and (player.mpv.time_pos or 0) >= 0.9,
-            timeout=10000,
-        )
-        position = player.mpv.time_pos
-        player.set_speed(1.5)
-        player.mpv.volume = 37
-        qtbot.waitUntil(lambda: has_video_frame(widget), timeout=10000)
-        video_track = next(
-            track["id"] for track in player.mpv.track_list
-            if track["type"] == "video" and track["selected"]
-        )
-        old_context = widget.context()
-        widget.release()
-        assert widget._render is None
-        first.layout().removeWidget(widget)
-        second.layout().addWidget(widget)
-        widget.show()
-        qtbot.waitUntil(
-            lambda: widget._render is not None and widget.context() is not old_context,
-            timeout=10000,
-        )
-        player.mpv.vid = "no"
-        qtbot.waitUntil(
-            lambda: not any(
-                track["selected"] for track in player.mpv.track_list if track["type"] == "video"
-            ),
-            timeout=10000,
-        )
-        player.mpv.vid = video_track
-        qtbot.waitUntil(lambda: any(
-            track["selected"] for track in player.mpv.track_list if track["type"] == "video"
-        ), timeout=10000)
-        player.mpv.seek(position, reference="absolute", precision="exact")
-        qtbot.waitUntil(lambda: has_video_frame(widget), timeout=10000)
-        qtbot.waitUntil(
-            lambda: not player.mpv.seeking and abs((player.mpv.time_pos or 0) - position) < 0.1,
-            timeout=5000,
-        )
-        assert loaded.count() == 1
-        assert player.mpv.path == str(MEDIA.resolve())
-        assert player.mpv.pause is True
-        assert player.mpv.speed == 1.5 and player.mpv.volume == 37
-    finally:
-        widget.dispose()
-        player.close()
-        assert player.wait_closed(10)
-        first.close()
-        second.close()
-
-
-@pytest.mark.skipif(
-    not QCoreApplication.testAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts),
-    reason="Shared contexts must be enabled before QApplication construction",
-)
 def test_shared_context_reparent_keeps_video_only_playing(qtbot):
+    assert QCoreApplication.testAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     first = QWidget()
     second = QWidget()
     first.setLayout(QVBoxLayout())
@@ -139,3 +62,179 @@ def test_shared_context_reparent_keeps_video_only_playing(qtbot):
         assert player.wait_closed(10)
         first.close()
         second.close()
+
+
+def test_move_playing_tab_to_another_window_preserves_state_and_signal_routing(qtbot):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    target = controller.new_window()
+    qtbot.addWidget(source)
+    qtbot.addWidget(target)
+    try:
+        source.open_file(VIDEO_ONLY)
+        player = source.player
+        tab = source.tabs.currentWidget()
+        qtbot.waitUntil(lambda: player.mpv.duration is not None, timeout=10000)
+        player.mpv.pause = True
+        player.mpv.seek(2, reference="absolute", precision="exact")
+        qtbot.waitUntil(lambda: not player.mpv.seeking and (player.mpv.time_pos or 0) >= 1.9)
+        qtbot.waitUntil(lambda: has_video_frame(tab.video))
+        player.set_speed(1.5)
+        player.mpv.volume = 37
+        position = player.mpv.time_pos
+        context = tab.video.context()
+        render = tab.video._render
+        loaded = QSignalSpy(player.file_loaded)
+
+        assert target.receive_tab(source, tab)
+        qtbot.waitUntil(lambda: has_video_frame(target.video), timeout=10000)
+        assert source.tabs.count() == 0 and source.tabs.placeholder.isVisible()
+        assert target.tabs.count() == 1 and target.player is player
+        assert tab.owner is target
+        assert tab.video.context() is context and tab.video._render is render
+        assert loaded.count() == 0 and player.mpv.path == str(VIDEO_ONLY.resolve())
+        assert player.mpv.pause is True
+        assert abs((player.mpv.time_pos or 0) - position) < 0.1
+        assert player.mpv.speed == 1.5 and player.mpv.volume == 37
+        player.error.emit("Moved-tab error")
+        assert target.banner.text() == "Moved-tab error" and target.banner.isVisible()
+        assert not source.banner.isVisible()
+        player.set_speed(0.75)
+        qtbot.waitUntil(lambda: target.speed_label.text() == "0.75×")
+        assert source.speed_label.text() == "1×"
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_full_target_refuses_drop_without_losing_source_tab(qtbot):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    target = controller.new_window()
+    qtbot.addWidget(source)
+    qtbot.addWidget(target)
+    try:
+        source._add_player_tab("Moving")
+        tab = source.tabs.currentWidget()
+        for index in range(4):
+            target._add_player_tab(f"Tab {index}")
+        assert not target.receive_tab(source, tab)
+        assert source.tabs.currentWidget() is tab and target.tabs.count() == 4
+        source_bar = source.tabs.tabBar()
+        source_bar._dragged_tab = tab
+
+        class Drop:
+            accepted = False
+
+            def source(self):
+                return source_bar
+
+            def mimeData(self):
+                mime = QMimeData()
+                mime.setData(source_bar._mime_type, b"")
+                return mime
+
+            def acceptProposedAction(self):
+                self.accepted = True
+
+            def ignore(self):
+                self.accepted = False
+
+        drop = Drop()
+        target.tabs.tabBar().dragEnterEvent(drop)
+        assert not drop.accepted
+        target.tabs.tabBar().dropEvent(drop)
+        assert not drop.accepted
+        assert source.tabs.currentWidget() is tab and target.tabs.count() == 4
+        target.close_tab()
+        target.tabs.tabBar().dragEnterEvent(drop)
+        assert drop.accepted
+        target.tabs.tabBar().dropEvent(drop)
+        assert drop.accepted
+        assert target.player is tab.player and source.tabs.count() == 0
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_dragging_tab_out_creates_window_without_reloading(qtbot, monkeypatch):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    qtbot.addWidget(source)
+    try:
+        source.open_file(VIDEO_ONLY)
+        player = source.player
+        qtbot.waitUntil(lambda: player.mpv.duration is not None, timeout=10000)
+        tab = source.tabs.currentWidget()
+        loaded = QSignalSpy(player.file_loaded)
+        bar = source.tabs.tabBar()
+        monkeypatch.setattr(QDrag, "exec", lambda *_args: Qt.DropAction.IgnoreAction)
+        monkeypatch.setattr(QApplication, "widgetAt", lambda *_args: None)
+        press = QPointF(bar.tabRect(0).center())
+        bar.mousePressEvent(QMouseEvent(
+            QEvent.Type.MouseButtonPress, press, press, Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+        ))
+        outside = QPointF(-60, press.y())
+        bar.mouseMoveEvent(QMouseEvent(
+            QEvent.Type.MouseMove, outside, outside, Qt.MouseButton.NoButton,
+            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier,
+        ))
+        assert len(controller.windows) == 2
+        target = controller.windows[-1]
+        qtbot.addWidget(target)
+        assert target.tabs.currentWidget() is tab and target.player is player
+        assert source.tabs.count() == 0 and loaded.count() == 0
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_moving_hidden_tab_restores_its_state_without_changing_active_source(qtbot):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    target = controller.new_window()
+    qtbot.addWidget(source)
+    qtbot.addWidget(target)
+    try:
+        hidden = source._add_player_tab("Hidden")
+        active = source._add_player_tab("Active")
+        original = target._add_player_tab("Original")
+        hidden.player.error.emit("Hidden error")
+        assert not source.banner.isVisible()
+        assert target.receive_tab(source, hidden)
+        assert source.tabs.currentWidget() is active and source.player is active.player
+        assert target.tabs.currentWidget() is hidden and target.banner.text() == "Hidden error"
+        assert target.banner.isVisible()
+        hidden.player.error.emit("Target error")
+        assert target.banner.text() == "Target error"
+        assert not source.banner.isVisible()
+        target.tabs.setCurrentWidget(original)
+        hidden.player.error.emit("Hidden again")
+        assert not target.banner.isVisible()
+        target.tabs.setCurrentWidget(hidden)
+        assert target.banner.text() == "Hidden again"
+    finally:
+        for window in controller.windows[:]:
+            window.close()
+
+
+def test_move_cancels_inflight_manual_retry_so_target_can_retry(qtbot):
+    controller = AppController(QApplication.instance())
+    source = controller.new_window()
+    target = controller.new_window()
+    qtbot.addWidget(source)
+    qtbot.addWidget(target)
+    try:
+        tab = source._add_player_tab("Retrying")
+        cancel = Event()
+        source._retry_cancel = cancel
+        source._store_active_tab_state()
+        assert tab.retry_cancel is cancel
+        assert target.receive_tab(source, tab)
+        assert cancel.is_set()
+        assert tab.retry_cancel is None and target._retry_cancel is None
+        assert target.retry_button.isEnabled()
+    finally:
+        for window in controller.windows[:]:
+            window.close()

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
 
 
 def open_in_window(window, path: str | Path, *, new_tab: bool = False) -> bool:
@@ -60,6 +60,30 @@ class AppController(QObject):
             self.windows.append(window)
         if self.last_used_window is None:
             self.last_used_window = window
+
+    def move_tab(self, source, target, tab):
+        if source is target or source not in self.windows or target not in self.windows:
+            raise ValueError("Tab move requires two registered windows")
+        if not QCoreApplication.testAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts):
+            raise RuntimeError("Cross-window playback requires shared OpenGL contexts")
+        if source._closing or target._closing or source.tabs.indexOf(tab) < 0:
+            return False
+        if target.tabs.count() >= 4:
+            return False
+        source._store_active_tab_state()
+        if tab.retry_cancel is not None:
+            tab.retry_cancel.set()
+            tab.retry_cancel = None
+        if source._active_tab is tab:
+            source._active_tab = None
+        source.tabs.take_tab(source.tabs.indexOf(tab))
+        tab.owner = target
+        target.tabs.new_tab(tab, tab.title)
+        target._update_tab_status(tab)
+        source.limit_message.hide()
+        source.limit_button.hide()
+        source._overflow_path = None
+        return True
 
     def window_closed(self, window):
         self.windows.remove(window)

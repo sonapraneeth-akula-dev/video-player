@@ -581,7 +581,7 @@
 | # | Type | Item | Est. Manual | Est. AI | Verification | Notes |
 |---|------|------|-------------|---------|--------------|-------|
 | 6.2.2.1.1 | Debug | [x] Spike — tab move: test render-context recreation and video recovery; check whether shared contexts avoid it | 01:30 | 00:20 | Recorded in design §13; Windows shared-context move preserves video-only playback and position without reload; mpv 0.34/Linux runtime UAT still pending | AD-009 |
-| 6.2.2.1.2 | Task | `DetachableTabWidget` drag-out (new window) and drop onto another window's tab bar; reparent `PlayerTab`, keep mpv core; refuse when target has 4 tabs | 03:00 | 00:35 | `tests/test_tab_move.py`: state equal before/after, no `file-loaded` event; full target refused | FR-041 |
+| 6.2.2.1.2 | Task | [x] `DetachableTabWidget` drag-out (new window) and drop onto another window's tab bar; reparent `PlayerTab`, keep mpv core; refuse when target has 4 tabs | 03:00 | 00:35 | Shared OpenGL context keeps video-only playback, paused offset and per-tab signals without `file-loaded`; full-target drop refused; drag-out, hidden-tab state and retry cancellation tested in `test_tab_move.py`; v0.41.0 | FR-041 |
 | 6.2.2.1.3 | Task | Close an emptied source window unless it is the only window | 00:30 | 00:10 | Tests for both cases \|\| |  |
 
 ##### User Story 6.2.2.2 (US-039): "Move tab to new window" (Ctrl+Shift+N)

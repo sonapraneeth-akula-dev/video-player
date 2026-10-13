@@ -12,7 +12,16 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import shiboken6
-from PySide6.QtCore import QObject, QStandardPaths, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import (
+    QCoreApplication,
+    QObject,
+    QStandardPaths,
+    Qt,
+    QThread,
+    QTimer,
+    Signal,
+    Slot,
+)
 from PySide6.QtWidgets import QApplication
 
 from vplayer import APP_NAME, __version__
@@ -162,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         find = ctypes.util.find_library
         ctypes.util.find_library = lambda name: bundled if name == "mpv" else find(name)
 
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication([sys.argv[0]])
     app.setApplicationName(APP_NAME)
     locale.setlocale(locale.LC_NUMERIC, "C")
