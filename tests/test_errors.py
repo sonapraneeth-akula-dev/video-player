@@ -131,7 +131,9 @@ def test_end_file_error_includes_mpv_reason(qtbot):
 
 
 def test_unplayable_tab_shows_reason_without_interrupting_other_tab(qtbot, tmp_path: Path):
-    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    settings = Settings(tmp_path / "settings.ini")
+    settings.set_background_tabs("play")
+    window = MainWindow(settings)
     window.show()
     media = Path(__file__).parent / "media" / "h264_25.mp4"
     broken = tmp_path / "broken.mp4"
