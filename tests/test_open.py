@@ -51,6 +51,8 @@ def test_entrypoint_creates_rotating_log(qtbot, monkeypatch, tmp_path):
     def exit_after_show(self):
         windows = [w for w in self.topLevelWidgets() if isinstance(w, MainWindow) and w.isVisible()]
         assert len(windows) == 1
+        assert not self.windowIcon().isNull()
+        assert not windows[0].windowIcon().isNull()
         windows[0].close()
         return 0
 

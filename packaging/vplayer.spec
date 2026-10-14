@@ -27,6 +27,7 @@ a = Analysis(
     [str(root / "src" / "vplayer" / "__main__.py")],
     pathex=[str(root / "src")],
     binaries=binaries,
+    datas=[(str(root / "packaging" / "linux" / "vplayer.png"), ".")],
     excludes=[
         "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets",
         "PySide6.Qt3DCore", "PySide6.QtQuick",

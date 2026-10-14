@@ -43,6 +43,7 @@ def test_spec_bundles_libmpv_without_unused_qt_modules(tmp_path, monkeypatch):
     assert recorded["scripts"] == [str(root / "src" / "vplayer" / "__main__.py")]
     binaries = recorded["analysis"]["binaries"]
     assert binaries[0] == (str(libmpv), ".")
+    assert recorded["analysis"]["datas"] == [(str(root / "packaging" / "linux" / "vplayer.png"), ".")]
     if sys.platform == "linux":
         assert {Path(src).name for src, _ in binaries[1:]} == {
             "libwayland-client.so.0", "libwayland-cursor.so.0", "libwayland-egl.so.1",
@@ -113,4 +114,3 @@ def test_linux_desktop_entries_declare_comprehensive_video_mime_types():
         lines = (root / filename).read_text(encoding="utf-8").splitlines()
         assert "Categories=AudioVideo;Video;Player;" in lines
         assert expected_mime_line in lines
-

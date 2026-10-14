@@ -22,6 +22,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from vplayer import APP_NAME, __version__
@@ -187,6 +188,11 @@ def main(argv: list[str] | None = None) -> int:
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication([sys.argv[0]])
     app.setApplicationName(APP_NAME)
+    icon_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2] / "packaging" / "linux")) / "vplayer.png"
+    icon = QIcon(str(icon_path))
+    if icon.isNull():
+        raise FileNotFoundError(f"Application icon not found: {icon_path}")
+    app.setWindowIcon(icon)
     locale.setlocale(locale.LC_NUMERIC, "C")
     log_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation))
     log_dir.mkdir(parents=True, exist_ok=True)
