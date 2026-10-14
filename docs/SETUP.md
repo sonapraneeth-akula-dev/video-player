@@ -158,6 +158,9 @@ from PATH on to off, and uninstall, and uploads the results. Run `38243446517`
 passed all of these checks for version `0.27.0`.
 The manually triggered **Linux and macOS packages** workflow builds and uploads
 the portable and installable artifacts on their respective hosted OS runners.
+For version `0.51.1`, Windows run `38597864862` passed the packaged codec
+matrix and installer smoke test; Linux/macOS run `38597864641` built both
+packages on each OS and passed archive/launch checks.
 
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
@@ -210,7 +213,7 @@ using the distro `libmpv1`; the 25-case packaged codec matrix passed under
 Xvfb and the artifact was launched in a separate clean Ubuntu 22.04 container.
 The Linux installer script passed install/upgrade/uninstall and ownership checks
 in an Ubuntu 22.04 container using a dummy AppImage. Interactive Ubuntu
-X11/Wayland VM UAT and all macOS packaging remain untested. The Linux installer
+X11/Wayland VM UAT and macOS GUI playback remain untested. The Linux installer
 refuses to overwrite an unmanaged VPlayer path; remove any earlier unmanaged
 installation explicitly before using it.
 
