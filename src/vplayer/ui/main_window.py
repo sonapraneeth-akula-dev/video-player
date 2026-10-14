@@ -1,6 +1,7 @@
 """Main window for local and remote playback."""
 
 import math
+import sys
 import threading
 from pathlib import Path
 from typing import ClassVar
@@ -39,192 +40,232 @@ from vplayer.ui.tabs import DetachableTabWidget, PlayerTab
 
 SPEED_OPTIONS = (0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0)
 
-MOCKUP_STYLE = """
-QMainWindow, QWidget#central_content {
+if sys.platform == "win32":
+    UI_FONT = '"Segoe UI", sans-serif'
+    MONO_FONT = '"Cascadia Code", "Cascadia Mono", "Consolas", monospace'
+    SYMBOL_FONT = '"Segoe UI Symbol", "Segoe UI", sans-serif'
+else:
+    UI_FONT = '"Ubuntu", "Cantarell", "Noto Sans", "DejaVu Sans", sans-serif'
+    MONO_FONT = '"Ubuntu Mono", "DejaVu Sans Mono", "Liberation Mono", monospace'
+    SYMBOL_FONT = '"Ubuntu", "Noto Sans Symbols 2", "DejaVu Sans", sans-serif'
+
+MOCKUP_STYLE = f"""
+QMainWindow, QWidget#central_content {{
     background-color: #141518;
     color: #e6e6e6;
-    font-family: "Segoe UI", Roboto, sans-serif;
+    font-family: {UI_FONT};
     font-size: 13px;
-}
-QMenuBar {
+}}
+QMenuBar {{
     background-color: #1d1f23;
     color: #e6e6e6;
     max-height: 0px;
     border: none;
     padding: 0px;
     margin: 0px;
-}
-QWidget#top_toolbar {
+}}
+QWidget#top_toolbar {{
     background-color: #1d1f23;
     border-bottom: 1px solid #2a2d33;
-}
-QPushButton[role="tbtn"] {
-    background: transparent;
-    border: none;
+}}
+QPushButton[role="tbtn"] {{
+    background-color: transparent;
+    border: 1px solid transparent;
     color: #e6e6e6;
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 4px 7px;
+    font-family: {UI_FONT};
     font-size: 15px;
-}
-QPushButton[role="tbtn"]:hover {
+}}
+QPushButton[role="tbtn"]:hover {{
     background-color: #2c2f36;
-}
-QPushButton[role="tbtn"]:pressed {
+    border-color: #2c2f36;
+}}
+QPushButton[role="tbtn"]:pressed {{
     background-color: #363a42;
-}
-QFrame[role="tsep"] {
+    border-color: #363a42;
+}}
+QFrame[role="tsep"] {{
     background-color: #2a2d33;
     min-width: 1px;
     max-width: 1px;
     min-height: 24px;
     max-height: 24px;
     margin: 0px 2px;
-}
-QLineEdit#location_bar {
+}}
+QLineEdit#location_bar {{
     background-color: #101114;
     border: 1px solid #2f333a;
     border-radius: 6px;
     padding: 5px 9px;
     color: #e6e6e6;
-    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-family: {MONO_FONT};
     font-size: 12px;
     min-width: 300px;
-}
-QLineEdit#location_bar:focus {
+}}
+QLineEdit#location_bar:focus {{
     border-color: #4c8dff;
-}
-QTabWidget::pane {
+}}
+QTabWidget::pane {{
     border: none;
     background-color: #000000;
-}
-QWidget#canvas_placeholder {
+}}
+QWidget#canvas_placeholder {{
     background-color: #000000;
-}
-QLabel#placeholder_label {
+}}
+QLabel#placeholder_label {{
     color: #8b9099;
+    font-family: {UI_FONT};
     font-size: 14px;
     background: transparent;
-}
-QWidget#bottom_panel {
+}}
+QWidget#bottom_panel {{
     background-color: #1d1f23;
     border-top: 1px solid #2a2d33;
-}
-QLabel[role="time_text"] {
-    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+}}
+QLabel[role="time_text"] {{
+    font-family: {MONO_FONT};
     color: #c9cdd4;
     font-size: 12px;
     min-width: 96px;
     background: transparent;
-}
-QSlider#seek_bar {
+}}
+QSlider#seek_bar {{
     min-height: 18px;
     max-height: 18px;
     background: transparent;
-}
-QSlider#seek_bar::groove:horizontal {
+}}
+QSlider#seek_bar::groove:horizontal {{
     height: 6px;
     background: #2f333a;
     border-radius: 3px;
-}
-QSlider#seek_bar::sub-page:horizontal {
+}}
+QSlider#seek_bar::sub-page:horizontal {{
     height: 6px;
     background: #4c8dff;
     border-radius: 3px;
-}
-QSlider#seek_bar::add-page:horizontal {
+}}
+QSlider#seek_bar::add-page:horizontal {{
     height: 6px;
     background: #2f333a;
     border-radius: 3px;
-}
-QSlider#seek_bar::handle:horizontal {
+}}
+QSlider#seek_bar::handle:horizontal {{
     width: 14px;
     height: 14px;
     margin: -4px 0px;
     background: #ffffff;
     border-radius: 7px;
     border: none;
-}
-QPushButton[role="cbtn"] {
-    background: transparent;
-    border: none;
+}}
+QPushButton[role="cbtn"], QPushButton[role="cbtn_sm"] {{
+    background-color: transparent;
+    border: 1px solid transparent;
     color: #e6e6e6;
     border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 15px;
-}
-QPushButton[role="cbtn"]:hover {
+    min-width: 28px;
+    min-height: 26px;
+    padding: 2px 6px;
+    font-family: {SYMBOL_FONT};
+    font-size: 16px;
+}}
+QPushButton[role="cbtn_sm"] {{
+    font-size: 11px;
+}}
+QPushButton[role="cbtn"]:hover, QPushButton[role="cbtn_sm"]:hover {{
     background-color: #2c2f36;
-}
-QPushButton[role="cbtn"]:pressed {
+    border-color: #2c2f36;
+}}
+QPushButton[role="cbtn"]:pressed, QPushButton[role="cbtn_sm"]:pressed {{
     background-color: #363a42;
-}
-QPushButton#play_btn {
+    border-color: #363a42;
+}}
+QPushButton#play_btn {{
     background-color: #4c8dff;
     color: #ffffff;
-    border: none;
+    border: 1px solid #4c8dff;
     border-radius: 14px;
     min-width: 34px;
     max-width: 34px;
-    min-height: 28px;
-    max-height: 28px;
+    min-height: 26px;
+    max-height: 26px;
     padding: 0px;
-    margin: 0px 4px;
-    font-size: 15px;
-}
-QPushButton#play_btn:hover {
+    font-family: {SYMBOL_FONT};
+    font-size: 12px;
+}}
+QPushButton#play_btn:hover {{
     background-color: #6aa1ff;
-}
-QPushButton#play_btn:pressed {
+    border-color: #6aa1ff;
+}}
+QPushButton#play_btn:pressed {{
     background-color: #363a42;
-}
-QComboBox#speed_sel {
+    border-color: #363a42;
+}}
+QComboBox#speed_sel {{
     background-color: #24262b;
     border: 1px solid #2f333a;
     border-radius: 6px;
     color: #e6e6e6;
-    padding: 4px 10px;
+    padding: 3px 22px 3px 10px;
+    min-height: 20px;
+    font-family: {UI_FONT};
     font-size: 12px;
-    margin-left: 12px;
-}
-QComboBox#speed_sel QAbstractItemView {
+}}
+QComboBox#speed_sel:hover {{
+    background-color: #2c2f36;
+    border-color: #3a3f48;
+}}
+QComboBox#speed_sel::drop-down {{
+    border: none;
+    background: transparent;
+    width: 18px;
+}}
+QComboBox#speed_sel::down-arrow {{
+    image: none;
+    border: none;
+}}
+QComboBox#speed_sel QAbstractItemView {{
     background-color: #24262b;
     color: #e6e6e6;
     selection-background-color: #4c8dff;
     border: 1px solid #2f333a;
-}
-QLabel#frame_label {
-    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+}}
+QLabel#frame_label {{
+    font-family: {MONO_FONT};
     font-weight: bold;
     color: #ffffff;
     padding: 0px 6px;
     font-size: 12px;
     background: transparent;
-}
-QLabel#meta_label {
+}}
+QLabel#meta_label {{
+    font-family: {UI_FONT};
     color: #8b9099;
     font-size: 12px;
     background: transparent;
-}
-QStatusBar {
+}}
+QStatusBar {{
     background-color: #141518;
     border-top: 1px solid #2a2d33;
     color: #8b9099;
+    font-family: {UI_FONT};
     font-size: 12px;
-}
-QStatusBar::item {
+}}
+QStatusBar::item {{
     border: none;
-}
-QLabel#coords_label {
-    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+}}
+QLabel#coords_label {{
+    font-family: {MONO_FONT};
     color: #8b9099;
     font-size: 12px;
     padding: 0px 8px;
-}
-QLabel#zoom_label {
+}}
+QLabel#zoom_label {{
+    font-family: {UI_FONT};
     color: #8b9099;
     font-size: 12px;
     padding: 0px 8px;
-}
+}}
 """
 
 
@@ -319,6 +360,18 @@ class ControlBar(QWidget):
 
     def widgetForAction(self, action):
         return self.play_button if action is self.play_action else None
+
+
+class SpeedCombo(QComboBox):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setPen(QPen(self.palette().text().color()))
+        painter.drawText(
+            self.rect().adjusted(0, 0, -8, 0),
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+            "▾",
+        )
 
 
 def _make_btn(text: str, tooltip: str, accessible_name: str, role: str, parent: QWidget) -> QPushButton:
@@ -507,25 +560,27 @@ class MainWindow(QMainWindow):
         ctrl_row = QHBoxLayout()
         ctrl_row.setContentsMargins(0, 0, 0, 0)
         ctrl_row.setSpacing(2)
-        self.first_frame_btn = _make_btn("⏮", "First frame (Home)", "First frame", "cbtn", self.bottom_panel)
+        self.first_frame_btn = _make_btn("⏮\ufe0e", "First frame (Home)", "First frame", "cbtn", self.bottom_panel)
         ctrl_row.addWidget(self.first_frame_btn)
-        self.step_back_10_btn = _make_btn("⏪", "−10 frames (Shift+←)", "Skip frames back", "cbtn", self.bottom_panel)
+        self.step_back_10_btn = _make_btn("⏪\ufe0e", "−10 frames (Shift+←)", "Skip frames back", "cbtn", self.bottom_panel)
         ctrl_row.addWidget(self.step_back_10_btn)
-        self.step_back_1_btn = _make_btn("◀", "−1 frame (←)", "Previous frame", "cbtn", self.bottom_panel)
+        self.step_back_1_btn = _make_btn("◀\ufe0e", "−1 frame (←)", "Previous frame", "cbtn_sm", self.bottom_panel)
         ctrl_row.addWidget(self.step_back_1_btn)
-        play_btn = QPushButton("▶", self.bottom_panel)
+        ctrl_row.addSpacing(4)
+        play_btn = QPushButton("▶\ufe0e", self.bottom_panel)
         play_btn.setObjectName("play_btn")
         play_btn.setToolTip("Play / pause (Space)")
         play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         ctrl_row.addWidget(play_btn)
-        self.step_fwd_1_btn = _make_btn("▶", "+1 frame (→)", "Next frame", "cbtn", self.bottom_panel)
+        ctrl_row.addSpacing(4)
+        self.step_fwd_1_btn = _make_btn("▶\ufe0e", "+1 frame (→)", "Next frame", "cbtn_sm", self.bottom_panel)
         ctrl_row.addWidget(self.step_fwd_1_btn)
-        self.step_fwd_10_btn = _make_btn("⏩", "+10 frames (Shift+→)", "Skip frames forward", "cbtn", self.bottom_panel)
+        self.step_fwd_10_btn = _make_btn("⏩\ufe0e", "+10 frames (Shift+→)", "Skip frames forward", "cbtn", self.bottom_panel)
         ctrl_row.addWidget(self.step_fwd_10_btn)
-        self.last_frame_btn = _make_btn("⏭", "Last frame (End)", "Last frame", "cbtn", self.bottom_panel)
+        self.last_frame_btn = _make_btn("⏭\ufe0e", "Last frame (End)", "Last frame", "cbtn", self.bottom_panel)
         ctrl_row.addWidget(self.last_frame_btn)
-        ctrl_row.addSpacing(12)
-        self.speed_combo = QComboBox(self.bottom_panel)
+        ctrl_row.addSpacing(20)
+        self.speed_combo = SpeedCombo(self.bottom_panel)
         self.speed_combo.setObjectName("speed_sel")
         self.speed_combo.setToolTip("Playback speed ( [ / ] )")
         self.speed_combo.setAccessibleName("Playback speed selector")
@@ -535,7 +590,8 @@ class MainWindow(QMainWindow):
         self.speed_combo.setCurrentIndex(SPEED_OPTIONS.index(1.0))
         self.speed_combo.activated.connect(self._select_speed_from_combo)
         ctrl_row.addWidget(self.speed_combo)
-        self.goto_frame_btn = _make_btn("↗", "Go to frame (G)", "Go to frame", "cbtn", self.bottom_panel)
+        ctrl_row.addSpacing(4)
+        self.goto_frame_btn = _make_btn("↗\ufe0e", "Go to frame (G)", "Go to frame", "cbtn", self.bottom_panel)
         ctrl_row.addWidget(self.goto_frame_btn)
         self.frame_label = QLabel("frame — / —", self.bottom_panel)
         self.frame_label.setObjectName("frame_label")
