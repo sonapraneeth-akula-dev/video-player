@@ -137,3 +137,56 @@ def test_cli_opens_relative_file_and_reports_missing_file(qtbot, monkeypatch, tm
             if handler not in old_handlers:
                 logger.removeHandler(handler)
                 handler.close()
+
+
+def test_cli_install_and_uninstall_dispatch_and_validation(monkeypatch):
+    from vplayer import installer
+
+    monkeypatch.setattr(entry, "QApplication", lambda argv: pytest.fail("Qt started for --install/--uninstall"))
+    calls = []
+    monkeypatch.setattr(installer, "run_install", lambda *, set_default=False: calls.append(("install", set_default)) or 0)
+    monkeypatch.setattr(installer, "run_uninstall", lambda: calls.append(("uninstall", None)) or 0)
+
+    assert entry.main(["--install"]) == 0
+    assert entry.main(["--install", "--default"]) == 0
+    assert entry.main(["--uninstall"]) == 0
+    assert calls == [("install", False), ("install", True), ("uninstall", None)]
+
+    for bad_args in (["--install", "--uninstall"], ["--default"], ["--install", "clip.mp4"]):
+        with pytest.raises(SystemExit) as exc_info:
+            entry.main(bad_args)
+        assert exc_info.value.code == 2
+
+
+def test_linux_per_user_install_and_uninstall(tmp_path, monkeypatch):
+    from vplayer import installer
+
+    commands = []
+    monkeypatch.setattr(installer.shutil, "which", lambda tool: f"/usr/bin/{tool}")
+    monkeypatch.setattr(installer.subprocess, "run", lambda cmd, **kw: commands.append(cmd))
+
+    assert installer.install_linux(tmp_path, set_default=True) == 0
+    opt_bin = tmp_path / ".local" / "opt" / "vplayer" / "vplayer"
+    bin_link = tmp_path / ".local" / "bin" / "vplayer"
+    desktop = tmp_path / ".local" / "share" / "applications" / "vplayer.desktop"
+    png_icon = tmp_path / ".local" / "share" / "icons" / "hicolor" / "256x256" / "apps" / "vplayer.png"
+    svg_icon = tmp_path / ".local" / "share" / "icons" / "hicolor" / "scalable" / "apps" / "vplayer.svg"
+
+    assert opt_bin.is_file()
+    assert bin_link.exists() or bin_link.is_symlink()
+    assert desktop.is_file()
+    assert png_icon.is_file() and svg_icon.is_file()
+    desktop_text = desktop.read_text(encoding="utf-8")
+    assert "Categories=AudioVideo;Video;Player;" in desktop_text
+    for mime in installer.MIME_TYPES:
+        assert mime in desktop_text
+    assert any(cmd[0] == "update-desktop-database" for cmd in commands)
+    assert any(cmd[0] == "gtk-update-icon-cache" for cmd in commands)
+    assert any(cmd[:3] == ["xdg-mime", "default", "vplayer.desktop"] for cmd in commands)
+
+    assert installer.uninstall_linux(tmp_path) == 0
+    assert not opt_bin.exists()
+    assert not bin_link.exists() and not bin_link.is_symlink()
+    assert not desktop.exists()
+    assert not png_icon.exists() and not svg_icon.exists()
+

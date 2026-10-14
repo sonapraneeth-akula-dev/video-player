@@ -156,9 +156,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vplayer")
     parser.add_argument("files", metavar="FILE", nargs="*")
     parser.add_argument("--new-window", action="store_true")
+    parser.add_argument("--install", action="store_true", help="Install VPlayer for the current user")
+    parser.add_argument("--uninstall", action="store_true", help="Uninstall per-user VPlayer installation")
+    parser.add_argument("--default", action="store_true", help="Register as default video handler with --install")
     parser.add_argument("--codec-probe", choices=("video", "audio"), help=argparse.SUPPRESS)
     parser.add_argument("--version", action="version", version=f"{APP_NAME} {__version__}")
     args = parser.parse_args(argv)
+    if args.install and args.uninstall:
+        parser.error("--install and --uninstall cannot be used together")
+    if args.default and not args.install:
+        parser.error("--default requires --install")
+    if (args.install or args.uninstall) and args.files:
+        parser.error("--install/--uninstall do not accept FILE arguments")
+    if args.install or args.uninstall:
+        from vplayer.installer import run_install, run_uninstall
+
+        return run_install(set_default=args.default) if args.install else run_uninstall()
     if args.codec_probe and len(args.files) != 1:
         parser.error("--codec-probe requires exactly one FILE")
 
