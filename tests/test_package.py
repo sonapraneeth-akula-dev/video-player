@@ -102,3 +102,15 @@ def test_linux_package_requires_all_deploy_tools(tmp_path, monkeypatch, missing)
     with pytest.raises(SystemExit, match="needs appimagetool, linuxdeploy and linuxdeploy-plugin-qt"):
         package.linux("0.1.0", tmp_path / "vplayer")
     assert not package.BUILD.exists()
+
+
+def test_linux_desktop_entries_declare_comprehensive_video_mime_types():
+    from vplayer.installer import MIME_TYPES
+
+    root = Path(__file__).resolve().parents[1] / "packaging" / "linux"
+    expected_mime_line = "MimeType=" + ";".join(MIME_TYPES) + ";"
+    for filename in ("vplayer.desktop", "vplayer-new-window.desktop"):
+        lines = (root / filename).read_text(encoding="utf-8").splitlines()
+        assert "Categories=AudioVideo;Video;Player;" in lines
+        assert expected_mime_line in lines
+

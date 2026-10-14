@@ -6,5 +6,5 @@ Exec=vplayer --new-window %F
 Icon=vplayer
 Terminal=false
 Categories=AudioVideo;Video;Player;
-MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mp2t;video/x-m4v;video/x-ms-wmv;video/x-flv;video/mpeg;
+MimeType=video/mp4;video/x-m4v;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/avi;video/msvideo;video/mpeg;video/x-mpeg;video/mp2t;video/x-flv;video/x-ms-wmv;video/ogg;video/x-ogm+ogg;video/3gpp;video/3gpp2;video/h264;video/x-h264;video/h265;video/x-theora+ogg;application/x-matroska;
 NoDisplay=true

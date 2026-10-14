@@ -19,7 +19,7 @@ refresh() {
 }
 
 if [ "${1:-}" = "--uninstall" ]; then
-    if [ "$#" -ne 1 ]; then echo "Usage: install.sh [--uninstall]" >&2; exit 2; fi
+    if [ "$#" -ne 1 ]; then echo "Usage: install.sh [--default|--uninstall]" >&2; exit 2; fi
     if [ ! -f "$stamp" ]; then
         echo "No VPlayer installation managed by this script."
         exit 0
@@ -31,7 +31,14 @@ if [ "${1:-}" = "--uninstall" ]; then
     echo "VPlayer removed."
     exit 0
 fi
-if [ "$#" -ne 0 ]; then echo "Usage: install.sh [--uninstall]" >&2; exit 2; fi
+set_default=0
+if [ "${1:-}" = "--default" ]; then
+    if [ "$#" -ne 1 ]; then echo "Usage: install.sh [--default|--uninstall]" >&2; exit 2; fi
+    set_default=1
+elif [ "$#" -ne 0 ]; then
+    echo "Usage: install.sh [--default|--uninstall]" >&2
+    exit 2
+fi
 
 set -- "$here"/VPlayer-*.AppImage
 if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
@@ -62,6 +69,12 @@ exec_line=$(printf '"%s"' "$quoted" | sed 's/[\\&|]/\\&/g')
 sed "s|^Exec=vplayer|Exec=$exec_line|" "$here/vplayer.desktop" > "$apps/vplayer.desktop"
 sed "s|^Exec=vplayer|Exec=$exec_line|" "$here/vplayer-new-window.desktop" > "$apps/vplayer-new-window.desktop"
 refresh
+if [ "$set_default" -eq 1 ] && command -v xdg-mime >/dev/null 2>&1; then
+    mimes=$(sed -n 's/^MimeType=//p' "$apps/vplayer.desktop" | tr ';' ' ')
+    for mime in $mimes; do
+        xdg-mime default vplayer.desktop "$mime" || true
+    done
+fi
 
 case ":$PATH:" in
     *":$HOME/.local/bin:"*) ;;
