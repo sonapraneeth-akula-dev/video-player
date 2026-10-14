@@ -1,3 +1,3 @@
 APP_NAME = "VPlayer"
-__version__ = "0.50.4"
+__version__ = "0.50.5"
 MEDIA_EXTS = (".mp4", ".mkv", ".webm", ".mov", ".avi", ".ts", ".m4v")

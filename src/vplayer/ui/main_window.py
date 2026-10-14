@@ -598,7 +598,7 @@ class MainWindow(QMainWindow):
         self.frame_label.setAccessibleName("Frame counter")
         ctrl_row.addWidget(self.frame_label)
         ctrl_row.addStretch(1)
-        self.meta_label = QLabel("1920×1080 @ 29.970 fps · h264", self.bottom_panel)
+        self.meta_label = QLabel("—", self.bottom_panel)
         self.meta_label.setObjectName("meta_label")
         self.meta_label.setAccessibleName("Video metadata")
         ctrl_row.addWidget(self.meta_label)
@@ -832,6 +832,7 @@ class MainWindow(QMainWindow):
 
         active(player.speed_changed, lambda window, speed: window._sync_speed_ui(speed))
         active(player.file_loaded, lambda window: window._refresh_tracks())
+        active(player.file_loaded, lambda window: window._update_metadata())
         player.file_loaded.connect(lambda: tab.owner._file_opened(tab))
         active(player.file_loaded, lambda window: window.banner.hide(), lambda _window: setattr(tab, "banner_visible", False))
         active(player.file_loaded, lambda window: window.controls.play_action.setEnabled(True))
@@ -872,6 +873,7 @@ class MainWindow(QMainWindow):
         active(player.loop_points_changed, lambda window, *_args: window._update_loop_markers())
         active(player.position, lambda window, position: window._position_changed(position))
         active(player.vfr_detected, lambda window, *_args: window._update_time())
+        active(player.vfr_detected, lambda window, *_args: window._update_metadata())
         self.tabs.new_tab(tab, name)
         QWidget.setTabOrder(self.browser.tree, tab.video)
         QWidget.setTabOrder(tab.video, self.seek_bar)
@@ -940,6 +942,7 @@ class MainWindow(QMainWindow):
             if previous is not None and self.video.isVisible():
                 self.video.setFocus()
         loaded = tab is not None and self.player.mpv.duration is not None
+        self._update_metadata()
         self.move_tab_action.setEnabled(tab is not None)
         self.copy_position_action.setEnabled(tab is not None)
         self.seek_bar.setEnabled(loaded)
@@ -1099,6 +1102,29 @@ class MainWindow(QMainWindow):
             self.frame_label.setText(f"{prefix} {cur_frame} / {total_frames}")
         self.time_label.setText(f"{pos_text} / {dur_text} · {frame}")
 
+    def _update_metadata(self):
+        if self.player is None or self.player.mpv.duration is None:
+            self.meta_label.setText("—")
+            return
+        params = self.player.mpv.video_params or {}
+        if not params:
+            self.meta_label.setText("—")
+            return
+        details = []
+        if params.get("w") and params.get("h"):
+            details.append(f"{params['w']}×{params['h']}")
+        fps = self.player.frame_rate()
+        if fps is not None:
+            details.append(f"{'≈ ' if self.player.variable_frame_rate else ''}{fps:.3f} fps")
+        codec = next(
+            (track.get("codec") for track in self.player.mpv.track_list
+             if track.get("type") == "video" and track.get("selected")),
+            None,
+        )
+        if codec:
+            details.append(codec)
+        self.meta_label.setText(" · ".join(details) or "—")
+
     def _duration_changed(self, duration):
         if self.sender() is not None and self.sender() is not self.player:
             return
@@ -1249,6 +1275,7 @@ class MainWindow(QMainWindow):
         self.connection_status.hide()
         start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
         self.player.load(self._current_file, start_position=start)
+        self.meta_label.setText("—")
         self._pending_recent = (self.player._uri, str(self._current_file))
         self.location_bar.setText(str(self._current_file))
         self._active_tab.title = file.name
@@ -1290,6 +1317,7 @@ class MainWindow(QMainWindow):
             remote_path, transport=transport, reconnect=pool.reopen_transport,
             start_position=start_position,
         )
+        self.meta_label.setText("—")
         self._pending_recent = (self.player._uri, uri)
         self.location_bar.setText(uri)
         self._active_tab.title = Path(remote_path).name

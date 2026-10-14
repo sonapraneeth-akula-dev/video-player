@@ -128,3 +128,24 @@ def test_vfr_clip_shows_approximate_frame_label(qtbot, tmp_path):
         assert window.time_label.text().startswith(window._clock(window._position))
     finally:
         window.close()
+
+
+def test_metadata_shows_loaded_video_instead_of_placeholder(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
+    window.player.mpv.ao = "null"
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        assert window.meta_label.text() == "—"
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        assert window.meta_label.text().endswith("25.000 fps · h264")
+        params = window.player.mpv.video_params
+        assert window.meta_label.text().startswith(f"{params['w']}×{params['h']}")
+        window._add_player_tab("Empty")
+        assert window.meta_label.text() == "—"
+        window.prev_tab()
+        assert window.meta_label.text().endswith("25.000 fps · h264")
+    finally:
+        window.close()
