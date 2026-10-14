@@ -128,3 +128,17 @@ def test_location_directory_suggests_only_media_and_opens_selected_file(qtbot, t
         assert not popup.isVisible()
     finally:
         window.close()
+
+
+def test_open_file_button_selects_and_plays_video(qtbot, tmp_path, monkeypatch):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        assert window.open_btn.text() == "Open File"
+        monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(MEDIA), ""))
+        window.open_btn.click()
+        qtbot.waitUntil(lambda: window.player is not None and window.player.mpv.duration is not None, timeout=10000)
+        assert window.player._uri == str(MEDIA)
+    finally:
+        window.close()

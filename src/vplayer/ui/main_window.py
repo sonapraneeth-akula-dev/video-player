@@ -472,7 +472,7 @@ class MainWindow(QMainWindow):
         toolbar_layout = QHBoxLayout(self.top_toolbar)
         toolbar_layout.setContentsMargins(6, 4, 6, 4)
         toolbar_layout.setSpacing(4)
-        self.open_btn = _make_btn("📂", "Open file (Ctrl+O)", "Open file", "tbtn", self.top_toolbar)
+        self.open_btn = _make_btn("Open File", "Open file (Ctrl+O)", "Open file", "tbtn", self.top_toolbar)
         self.open_btn.clicked.connect(self.choose_file)
         toolbar_layout.addWidget(self.open_btn)
         self.location_bar = QLineEdit(self.top_toolbar)

@@ -25,7 +25,8 @@ For the native crash history and remaining investigation, see
 For open checklist items, dependencies, and release blockers, see
 [Remaining work and blockers](docs/REMAINING_WORK.md).
 
-Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
+Run `vplayer` or `python -m vplayer`, then click **Open File** or press
+**Ctrl+O** to select a local video.
 Typing a local directory into the path bar lists its video files; choose one
 from the dropdown to play it.
 The window starts with an Open file / Connect to server placeholder. **Ctrl+T**
@@ -42,6 +43,7 @@ Preferences > Background tabs** can instead keep hidden tabs playing muted
 or with audio; the choice applies to all open windows.
 Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
+Use **Home/End** or the first/last-frame buttons to pause on a video boundary.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).
 You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
