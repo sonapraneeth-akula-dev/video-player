@@ -128,3 +128,35 @@ def test_frame_actions_are_available_after_load(qtbot, tmp_path, monkeypatch):
         assert calls == [7, -7]
     finally:
         window.close()
+
+
+def test_first_and_last_frame_buttons_pause_and_seek(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
+    window.player.mpv.ao = "null"
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        assert not window.first_frame_action.isEnabled()
+        assert not window.last_frame_action.isEnabled()
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        assert window.first_frame_action.shortcut().toString() == "Home"
+        assert window.last_frame_action.shortcut().toString() == "End"
+        window.last_frame_btn.click()
+        last = window.player.mpv.duration - 1 / window.player.frame_rate()
+        qtbot.waitUntil(lambda: abs((window.player.mpv.time_pos or 0) - last) < 0.05, timeout=10000)
+        assert window.player.mpv.pause is True
+        window.first_frame_btn.click()
+        qtbot.waitUntil(lambda: (window.player.mpv.time_pos or 0) < 0.05, timeout=10000)
+        window.player.seek(0.5)
+        qtbot.waitUntil(lambda: (window.player.mpv.time_pos or 0) >= 0.4, timeout=10000)
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
+        window.video.setFocus()
+        QTest.keyClick(window.video, Qt.Key.Key_End)
+        qtbot.waitUntil(lambda: abs((window.player.mpv.time_pos or 0) - last) < 0.05, timeout=10000)
+        QTest.keyClick(window.video, Qt.Key.Key_Home)
+        qtbot.waitUntil(lambda: (window.player.mpv.time_pos or 0) < 0.05, timeout=10000)
+    finally:
+        window.close()

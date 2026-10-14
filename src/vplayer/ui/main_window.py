@@ -725,6 +725,16 @@ class MainWindow(QMainWindow):
         self.frame_prev.setEnabled(False)
         self.frame_prev.triggered.connect(lambda: self.player.frame_step(-1))
         self.playback_menu.addAction(self.frame_prev)
+        self.first_frame_action = QAction("First frame", self)
+        self.first_frame_action.setShortcut("Home")
+        self.first_frame_action.setEnabled(False)
+        self.first_frame_action.triggered.connect(lambda: self._seek_edge(False))
+        self.playback_menu.addAction(self.first_frame_action)
+        self.last_frame_action = QAction("Last frame", self)
+        self.last_frame_action.setShortcut("End")
+        self.last_frame_action.setEnabled(False)
+        self.last_frame_action.triggered.connect(lambda: self._seek_edge(True))
+        self.playback_menu.addAction(self.last_frame_action)
         self.skip_actions = []
         for name, label, key, direction in (
             ("skip_n_fwd", "Skip frames forward", "Ctrl+.", 1),
@@ -777,6 +787,8 @@ class MainWindow(QMainWindow):
         self.step_back_1_btn.clicked.connect(self.frame_prev.trigger)
         self.step_fwd_10_btn.clicked.connect(self.skip_actions[0].trigger)
         self.step_back_10_btn.clicked.connect(self.skip_actions[1].trigger)
+        self.first_frame_btn.clicked.connect(self.first_frame_action.trigger)
+        self.last_frame_btn.clicked.connect(self.last_frame_action.trigger)
         for menu in (self.file_menu, self.view_menu, self.playback_menu, self.audio_menu, self.subtitle_menu):
             for action in menu.actions():
                 self.addAction(action)
@@ -786,6 +798,10 @@ class MainWindow(QMainWindow):
         target = self.location_bar.text().strip()
         if target:
             self.open_file(target)
+
+    def _seek_edge(self, last: bool):
+        self.player.mpv.pause = True
+        self.player.seek(self.player.mpv.duration if last else 0)
 
     def _select_speed_from_combo(self, index: int):
         if self.player is not None:
@@ -821,6 +837,8 @@ class MainWindow(QMainWindow):
         active(player.file_loaded, lambda window: window.controls.play_action.setEnabled(True))
         active(player.file_loaded, lambda window: window.frame_next.setEnabled(True))
         active(player.file_loaded, lambda window: window.frame_prev.setEnabled(True))
+        active(player.file_loaded, lambda window: window.first_frame_action.setEnabled(True))
+        active(player.file_loaded, lambda window: window.last_frame_action.setEnabled(True))
         for index in range(len(self.skip_actions)):
             active(player.file_loaded, lambda window, index=index: window.skip_actions[index].setEnabled(True))
         active(
@@ -928,7 +946,10 @@ class MainWindow(QMainWindow):
         for action in self.playback_menu.actions():
             if action.text() not in ("Fullscreen", "Exit fullscreen"):
                 action.setEnabled(tab is not None)
-        for action in (self.controls.play_action, self.frame_next, self.frame_prev, *self.skip_actions):
+        for action in (
+            self.controls.play_action, self.frame_next, self.frame_prev,
+            self.first_frame_action, self.last_frame_action, *self.skip_actions,
+        ):
             action.setEnabled(loaded)
         if tab is not None:
             self.controls.play_action.setText("Play" if self.player.mpv.pause else "Pause")
