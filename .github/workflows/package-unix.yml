@@ -1,0 +1,67 @@
+name: Linux and macOS packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+      VPLAYER_PYTHON: python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpv1 qmake6 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxkbcommon-x11-0
+      - run: python -m pip install -e ".[package]"
+      - name: Install AppImage tools
+        run: |
+          curl -fL --retry 3 -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
+          curl -fL --retry 3 -o linuxdeploy-plugin-qt https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage
+          curl -fL --retry 3 -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x linuxdeploy linuxdeploy-plugin-qt appimagetool
+          echo "$PWD" >> "$GITHUB_PATH"
+      - run: sh packaging/linux/build-appimage.sh
+      - name: Smoke-test packages
+        run: |
+          dist/VPlayer-*-linux-*.AppImage --version
+          tar -tzf dist/VPlayer-*-linux-*.tar.gz | grep -q '/install.sh$'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            dist/VPlayer-*-linux-*.AppImage
+            dist/VPlayer-*-linux-*.tar.gz
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: brew install mpv
+      - run: python -m pip install -e ".[package]"
+      - run: python scripts/package.py
+      - name: Smoke-test packages
+        run: |
+          unzip -tq dist/VPlayer-*-macos-*.zip
+          hdiutil verify dist/VPlayer-*-macos-*.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-packages
+          path: |
+            dist/VPlayer-*-macos-*.zip
+            dist/VPlayer-*-macos-*.dmg
+          if-no-files-found: error

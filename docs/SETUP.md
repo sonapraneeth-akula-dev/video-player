@@ -156,6 +156,8 @@ both Windows artifacts, checks the installer size, runs the packaged
 codec/container matrix, smoke-tests fresh installs with PATH on/off, an upgrade
 from PATH on to off, and uninstall, and uploads the results. Run `38243446517`
 passed all of these checks for version `0.27.0`.
+The manually triggered **Linux and macOS packages** workflow builds and uploads
+the portable and installable artifacts on their respective hosted OS runners.
 
 | OS | Prerequisites | Portable | Installable |
 |---|---|---|---|
