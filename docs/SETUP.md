@@ -1,5 +1,7 @@
 # Development setup and build
 
+![VPlayer UI](ui-screenshot.png)
+
 VPlayer can be run from source or built as a portable Windows bundle;
 the Windows installer passes hosted install/upgrade/uninstall smoke tests.
 The Linux AppImage is built and codec-tested locally on Ubuntu 22.04,
