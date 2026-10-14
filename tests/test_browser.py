@@ -36,6 +36,7 @@ def test_media_filter_hides_text_until_all_files_enabled(qtbot, tmp_path):
 def test_ctrl_b_toggles_browser_dock(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
     window._add_player_tab("Video")
+    window.browser.show()
     qtbot.addWidget(window)
     window.show()
     try:
@@ -62,6 +63,7 @@ def test_browser_double_click_folder_then_enter_file(qtbot, tmp_path):
     copyfile(MEDIA, clip)
     window = MainWindow(Settings(tmp_path / "settings.ini"))
     window._add_player_tab("Video")
+    window.browser.show()
     qtbot.addWidget(window)
     tree = window.browser.tree
     model = window.browser.model
@@ -111,6 +113,7 @@ def test_keyboard_only_opens_file_and_reaches_video_focus(qtbot, tmp_path):
     copyfile(MEDIA, clip)
     window = MainWindow(Settings(tmp_path / "settings.ini"))
     window._add_player_tab("Video")
+    window.browser.show()
     qtbot.addWidget(window)
     tree = window.browser.tree
     model = window.browser.model

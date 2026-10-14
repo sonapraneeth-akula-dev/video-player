@@ -50,6 +50,7 @@ def test_visible_keyboard_controls_have_accessible_names(qtbot, tmp_path: Path):
 def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
     window._add_player_tab("Video")
+    window.browser.show()
     qtbot.addWidget(window)
     window.show()
     try:

@@ -12,16 +12,19 @@ from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QFocusFrame,
+    QFrame,
+    QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QPushButton,
     QSlider,
     QStyle,
     QStyleOptionSlider,
-    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -33,6 +36,196 @@ from vplayer.sftp import KnownHosts, SshPool
 from vplayer.ui.browser import BrowserDock
 from vplayer.ui.dialogs import ConnectDialog, PreferencesDialog
 from vplayer.ui.tabs import DetachableTabWidget, PlayerTab
+
+SPEED_OPTIONS = (0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0)
+
+MOCKUP_STYLE = """
+QMainWindow, QWidget#central_content {
+    background-color: #141518;
+    color: #e6e6e6;
+    font-family: "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+}
+QMenuBar {
+    background-color: #1d1f23;
+    color: #e6e6e6;
+    max-height: 0px;
+    border: none;
+    padding: 0px;
+    margin: 0px;
+}
+QWidget#top_toolbar {
+    background-color: #1d1f23;
+    border-bottom: 1px solid #2a2d33;
+}
+QPushButton[role="tbtn"] {
+    background: transparent;
+    border: none;
+    color: #e6e6e6;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 15px;
+}
+QPushButton[role="tbtn"]:hover {
+    background-color: #2c2f36;
+}
+QPushButton[role="tbtn"]:pressed {
+    background-color: #363a42;
+}
+QFrame[role="tsep"] {
+    background-color: #2a2d33;
+    min-width: 1px;
+    max-width: 1px;
+    min-height: 24px;
+    max-height: 24px;
+    margin: 0px 2px;
+}
+QLineEdit#location_bar {
+    background-color: #101114;
+    border: 1px solid #2f333a;
+    border-radius: 6px;
+    padding: 5px 9px;
+    color: #e6e6e6;
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 12px;
+    min-width: 300px;
+}
+QLineEdit#location_bar:focus {
+    border-color: #4c8dff;
+}
+QTabWidget::pane {
+    border: none;
+    background-color: #000000;
+}
+QWidget#canvas_placeholder {
+    background-color: #000000;
+}
+QLabel#placeholder_label {
+    color: #8b9099;
+    font-size: 14px;
+    background: transparent;
+}
+QWidget#bottom_panel {
+    background-color: #1d1f23;
+    border-top: 1px solid #2a2d33;
+}
+QLabel[role="time_text"] {
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    color: #c9cdd4;
+    font-size: 12px;
+    min-width: 96px;
+    background: transparent;
+}
+QSlider#seek_bar {
+    min-height: 18px;
+    max-height: 18px;
+    background: transparent;
+}
+QSlider#seek_bar::groove:horizontal {
+    height: 6px;
+    background: #2f333a;
+    border-radius: 3px;
+}
+QSlider#seek_bar::sub-page:horizontal {
+    height: 6px;
+    background: #4c8dff;
+    border-radius: 3px;
+}
+QSlider#seek_bar::add-page:horizontal {
+    height: 6px;
+    background: #2f333a;
+    border-radius: 3px;
+}
+QSlider#seek_bar::handle:horizontal {
+    width: 14px;
+    height: 14px;
+    margin: -4px 0px;
+    background: #ffffff;
+    border-radius: 7px;
+    border: none;
+}
+QPushButton[role="cbtn"] {
+    background: transparent;
+    border: none;
+    color: #e6e6e6;
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 15px;
+}
+QPushButton[role="cbtn"]:hover {
+    background-color: #2c2f36;
+}
+QPushButton[role="cbtn"]:pressed {
+    background-color: #363a42;
+}
+QPushButton#play_btn {
+    background-color: #4c8dff;
+    color: #ffffff;
+    border: none;
+    border-radius: 14px;
+    min-width: 34px;
+    max-width: 34px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0px;
+    margin: 0px 4px;
+    font-size: 15px;
+}
+QPushButton#play_btn:hover {
+    background-color: #6aa1ff;
+}
+QPushButton#play_btn:pressed {
+    background-color: #363a42;
+}
+QComboBox#speed_sel {
+    background-color: #24262b;
+    border: 1px solid #2f333a;
+    border-radius: 6px;
+    color: #e6e6e6;
+    padding: 4px 10px;
+    font-size: 12px;
+    margin-left: 12px;
+}
+QComboBox#speed_sel QAbstractItemView {
+    background-color: #24262b;
+    color: #e6e6e6;
+    selection-background-color: #4c8dff;
+    border: 1px solid #2f333a;
+}
+QLabel#frame_label {
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-weight: bold;
+    color: #ffffff;
+    padding: 0px 6px;
+    font-size: 12px;
+    background: transparent;
+}
+QLabel#meta_label {
+    color: #8b9099;
+    font-size: 12px;
+    background: transparent;
+}
+QStatusBar {
+    background-color: #141518;
+    border-top: 1px solid #2a2d33;
+    color: #8b9099;
+    font-size: 12px;
+}
+QStatusBar::item {
+    border: none;
+}
+QLabel#coords_label {
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    color: #8b9099;
+    font-size: 12px;
+    padding: 0px 8px;
+}
+QLabel#zoom_label {
+    color: #8b9099;
+    font-size: 12px;
+    padding: 0px 8px;
+}
+"""
 
 
 class SeekBar(QSlider):
@@ -106,18 +299,43 @@ class SeekBar(QSlider):
             super().mouseReleaseEvent(event)
 
 
-class ControlBar(QToolBar):
-    def __init__(self, parent):
+class ControlBar(QWidget):
+    def __init__(self, parent, play_button: QPushButton):
         super().__init__(parent)
-        self.setMovable(False)
+        self.hide()
         self.play_action = QAction("Play", self)
         self.play_action.setShortcut("Space")
         self.play_action.setEnabled(False)
         self.play_action.triggered.connect(lambda: parent.player.play_pause())
-        self.addAction(self.play_action)
-        self.play_button = self.widgetForAction(self.play_action)
+        parent.addAction(self.play_action)
+        self.play_button = play_button
         self.play_button.setAccessibleName("Play or pause")
         self.play_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.play_button.setEnabled(False)
+        self.play_button.clicked.connect(self.play_action.trigger)
+        self.play_action.changed.connect(
+            lambda: self.play_button.setEnabled(self.play_action.isEnabled()),
+        )
+
+    def widgetForAction(self, action):
+        return self.play_button if action is self.play_action else None
+
+
+def _make_btn(text: str, tooltip: str, accessible_name: str, role: str, parent: QWidget) -> QPushButton:
+    btn = QPushButton(text, parent)
+    btn.setProperty("role", role)
+    btn.setToolTip(tooltip)
+    btn.setAccessibleName(accessible_name)
+    btn.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    return btn
+
+
+def _make_sep(parent: QWidget) -> QFrame:
+    sep = QFrame(parent)
+    sep.setProperty("role", "tsep")
+    sep.setFrameShape(QFrame.Shape.VLine)
+    return sep
 
 
 class MainWindow(QMainWindow):
@@ -140,6 +358,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(APP_NAME)
         self.resize(960, 600)
+        self.setStyleSheet(MOCKUP_STYLE)
         self.controller = controller
         self.settings = settings or Settings()
         self.settings.load()
@@ -157,8 +376,20 @@ class MainWindow(QMainWindow):
         self.player = None
         self.video = None
         self._active_tab = None
+
+        self.statusBar().setSizeGripEnabled(False)
+        self.coords_label = QLabel("x: 960, y: 540", self)
+        self.coords_label.setObjectName("coords_label")
+        self.coords_label.setAccessibleName("Cursor coordinates")
+        self.statusBar().addWidget(self.coords_label)
+        self.zoom_label = QLabel("100%", self)
+        self.zoom_label.setObjectName("zoom_label")
+        self.zoom_label.setAccessibleName("Zoom level")
+        self.statusBar().addWidget(self.zoom_label)
         self.speed_label = QLabel("1×", self)
         self.speed_label.setAccessibleName("Playback speed")
+        self.speed_label.setStyleSheet("color: transparent; background: transparent; font-size: 1px;")
+        self.speed_label.setFixedWidth(2)
         self.statusBar().addPermanentWidget(self.speed_label)
         self._retry_completed.connect(self._finish_remote_retry)
         self.connection_status = QLabel(self)
@@ -176,8 +407,46 @@ class MainWindow(QMainWindow):
         self._snapshot_folder: Path | None = None
 
         content = QWidget(self)
+        content.setObjectName("central_content")
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        self.top_toolbar = QWidget(content)
+        self.top_toolbar.setObjectName("top_toolbar")
+        self.top_toolbar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        toolbar_layout = QHBoxLayout(self.top_toolbar)
+        toolbar_layout.setContentsMargins(6, 4, 6, 4)
+        toolbar_layout.setSpacing(4)
+        self.open_btn = _make_btn("📂", "Open file (Ctrl+O)", "Open file", "tbtn", self.top_toolbar)
+        self.open_btn.clicked.connect(self.choose_file)
+        toolbar_layout.addWidget(self.open_btn)
+        self.location_bar = QLineEdit(self.top_toolbar)
+        self.location_bar.setObjectName("location_bar")
+        self.location_bar.setPlaceholderText("/path/video.mp4  or  sftp://user@host/path/video.mp4  (Enter to load)")
+        self.location_bar.setAccessibleName("Video path or SFTP URI")
+        self.location_bar.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self.location_bar.returnPressed.connect(self._open_from_location)
+        toolbar_layout.addWidget(self.location_bar, 1)
+        toolbar_layout.addWidget(_make_sep(self.top_toolbar))
+        self.save_frame_btn = _make_btn("💾", "Save frame as PNG (Ctrl+S)", "Save frame as PNG", "tbtn", self.top_toolbar)
+        self.save_frame_btn.clicked.connect(self.snapshot)
+        toolbar_layout.addWidget(self.save_frame_btn)
+        self.copy_frame_btn = _make_btn("📋", "Copy frame to clipboard (Ctrl+Shift+C)", "Copy frame to clipboard", "tbtn", self.top_toolbar)
+        toolbar_layout.addWidget(self.copy_frame_btn)
+        toolbar_layout.addWidget(_make_sep(self.top_toolbar))
+        self.fit_btn = _make_btn("⛶", "Fit to window (Ctrl+0)", "Fit to window", "tbtn", self.top_toolbar)
+        toolbar_layout.addWidget(self.fit_btn)
+        self.actual_size_btn = _make_btn("1:1", "Actual pixels 1:1 (Ctrl+1)", "Actual pixels 1:1", "tbtn", self.top_toolbar)
+        toolbar_layout.addWidget(self.actual_size_btn)
+        self.fullscreen_btn = _make_btn("⛶", "Fullscreen (F11)", "Fullscreen", "tbtn", self.top_toolbar)
+        self.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
+        toolbar_layout.addWidget(self.fullscreen_btn)
+        toolbar_layout.addWidget(_make_sep(self.top_toolbar))
+        self.help_btn = _make_btn("?", "Keyboard shortcuts (F1)", "Keyboard shortcuts", "tbtn", self.top_toolbar)
+        toolbar_layout.addWidget(self.help_btn)
+        layout.addWidget(self.top_toolbar)
+
         self.limit_message = QLabel(content)
         self.limit_message.setAccessibleName("Tab limit")
         self.limit_message.setWordWrap(True)
@@ -209,17 +478,87 @@ class MainWindow(QMainWindow):
         self.video_focus = QFocusFrame(content)
         self.video_focus.hide()
         QApplication.instance().focusChanged.connect(self._focus_changed)
-        self.seek_bar = SeekBar(content)
-        layout.addWidget(self.seek_bar)
+
+        self.bottom_panel = QWidget(content)
+        self.bottom_panel.setObjectName("bottom_panel")
+        self.bottom_panel.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        panel_layout = QVBoxLayout(self.bottom_panel)
+        panel_layout.setContentsMargins(12, 6, 12, 8)
+        panel_layout.setSpacing(4)
+
+        seek_row = QHBoxLayout()
+        seek_row.setContentsMargins(0, 0, 0, 0)
+        seek_row.setSpacing(8)
+        self.pos_time_label = QLabel("00:00:00.000", self.bottom_panel)
+        self.pos_time_label.setProperty("role", "time_text")
+        self.pos_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pos_time_label.setAccessibleName("Current playback time")
+        seek_row.addWidget(self.pos_time_label)
+        self.seek_bar = SeekBar(self.bottom_panel)
+        self.seek_bar.setObjectName("seek_bar")
+        seek_row.addWidget(self.seek_bar, 1)
+        self.dur_time_label = QLabel("00:00:00.000", self.bottom_panel)
+        self.dur_time_label.setProperty("role", "time_text")
+        self.dur_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.dur_time_label.setAccessibleName("Total duration")
+        seek_row.addWidget(self.dur_time_label)
+        panel_layout.addLayout(seek_row)
+
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setContentsMargins(0, 0, 0, 0)
+        ctrl_row.setSpacing(2)
+        self.first_frame_btn = _make_btn("⏮", "First frame (Home)", "First frame", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.first_frame_btn)
+        self.step_back_10_btn = _make_btn("⏪", "−10 frames (Shift+←)", "Skip frames back", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.step_back_10_btn)
+        self.step_back_1_btn = _make_btn("◀", "−1 frame (←)", "Previous frame", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.step_back_1_btn)
+        play_btn = QPushButton("▶", self.bottom_panel)
+        play_btn.setObjectName("play_btn")
+        play_btn.setToolTip("Play / pause (Space)")
+        play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        ctrl_row.addWidget(play_btn)
+        self.step_fwd_1_btn = _make_btn("▶", "+1 frame (→)", "Next frame", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.step_fwd_1_btn)
+        self.step_fwd_10_btn = _make_btn("⏩", "+10 frames (Shift+→)", "Skip frames forward", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.step_fwd_10_btn)
+        self.last_frame_btn = _make_btn("⏭", "Last frame (End)", "Last frame", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.last_frame_btn)
+        ctrl_row.addSpacing(12)
+        self.speed_combo = QComboBox(self.bottom_panel)
+        self.speed_combo.setObjectName("speed_sel")
+        self.speed_combo.setToolTip("Playback speed ( [ / ] )")
+        self.speed_combo.setAccessibleName("Playback speed selector")
+        self.speed_combo.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        for rate in SPEED_OPTIONS:
+            self.speed_combo.addItem(f"{rate:g}×", rate)
+        self.speed_combo.setCurrentIndex(SPEED_OPTIONS.index(1.0))
+        self.speed_combo.activated.connect(self._select_speed_from_combo)
+        ctrl_row.addWidget(self.speed_combo)
+        self.goto_frame_btn = _make_btn("↗", "Go to frame (G)", "Go to frame", "cbtn", self.bottom_panel)
+        ctrl_row.addWidget(self.goto_frame_btn)
+        self.frame_label = QLabel("frame — / —", self.bottom_panel)
+        self.frame_label.setObjectName("frame_label")
+        self.frame_label.setAccessibleName("Frame counter")
+        ctrl_row.addWidget(self.frame_label)
+        ctrl_row.addStretch(1)
+        self.meta_label = QLabel("1920×1080 @ 29.970 fps · h264", self.bottom_panel)
+        self.meta_label.setObjectName("meta_label")
+        self.meta_label.setAccessibleName("Video metadata")
+        ctrl_row.addWidget(self.meta_label)
+        panel_layout.addLayout(ctrl_row)
+        layout.addWidget(self.bottom_panel)
+
         self.time_label = QLabel("00:00:00.000 / 00:00:00.000 · f —", content)
         self.time_label.setAccessibleName("Playback position")
+        self.time_label.setFixedSize(0, 0)
         layout.addWidget(self.time_label)
         self.setCentralWidget(content)
 
-        self.controls = ControlBar(self)
-        self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.controls)
+        self.controls = ControlBar(self, play_btn)
         self.browser = BrowserDock(self)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.browser)
+        self.browser.hide()
         self.browser.file_activated.connect(self.open_file)
         QWidget.setTabOrder(self.browser.all_files, self.browser.tree)
         QWidget.setTabOrder(self.browser.tree, self.tabs)
@@ -378,7 +717,30 @@ class MainWindow(QMainWindow):
             action.setShortcut(shortcut)
             action.triggered.connect(callback)
             self.playback_menu.addAction(action)
+        self.step_fwd_1_btn.clicked.connect(self.frame_next.trigger)
+        self.step_back_1_btn.clicked.connect(self.frame_prev.trigger)
+        self.step_fwd_10_btn.clicked.connect(self.skip_actions[0].trigger)
+        self.step_back_10_btn.clicked.connect(self.skip_actions[1].trigger)
+        for menu in (self.file_menu, self.view_menu, self.playback_menu, self.audio_menu, self.subtitle_menu):
+            for action in menu.actions():
+                self.addAction(action)
         self._tab_changed(-1)
+
+    def _open_from_location(self):
+        target = self.location_bar.text().strip()
+        if target:
+            self.open_file(target)
+
+    def _select_speed_from_combo(self, index: int):
+        if self.player is not None:
+            self.player.set_speed(self.speed_combo.itemData(index))
+
+    def _sync_speed_ui(self, speed: float):
+        text = f"{speed:g}×"
+        self.speed_label.setText(text)
+        index = self.speed_combo.findText(text)
+        if index >= 0:
+            self.speed_combo.setCurrentIndex(index)
 
     def _add_player_tab(self, name: str) -> PlayerTab:
         player = Player(
@@ -396,7 +758,7 @@ class MainWindow(QMainWindow):
                 else hidden(tab.owner, *args) if hidden is not None and shiboken6.isValid(tab) else None,
             )
 
-        active(player.speed_changed, lambda window, speed: window.speed_label.setText(f"{speed:g}×"))
+        active(player.speed_changed, lambda window, speed: window._sync_speed_ui(speed))
         active(player.file_loaded, lambda window: window._refresh_tracks())
         player.file_loaded.connect(lambda: tab.owner._file_opened(tab))
         active(player.file_loaded, lambda window: window.banner.hide(), lambda _window: setattr(tab, "banner_visible", False))
@@ -478,7 +840,11 @@ class MainWindow(QMainWindow):
             self._reconnect_attempt = None
             self._transports = []
             self._cache_paused = False
-            self.speed_label.setText("1×")
+            self._sync_speed_ui(1.0)
+            self.location_bar.clear()
+            self.pos_time_label.setText("00:00:00.000")
+            self.dur_time_label.setText("00:00:00.000")
+            self.frame_label.setText("frame — / —")
             self.time_label.setText("00:00:00.000 / 00:00:00.000 · f —")
             self.seek_bar.set_loop_points(None, None, 0)
         else:
@@ -490,7 +856,11 @@ class MainWindow(QMainWindow):
             self.banner.setVisible(tab.banner_visible)
             self.retry_button.setVisible(tab.retry_visible)
             self._update_connection_status()
-            self.speed_label.setText(f"{self.player.mpv.speed:g}×")
+            self._sync_speed_ui(self.player.mpv.speed)
+            self.location_bar.setText(
+                str(self._current_file) if self._current_file is not None
+                else self._remote_details[0] if self._remote_details is not None else "",
+            )
             self._update_time()
             self._update_loop_markers()
             if previous is not None and self.video.isVisible():
@@ -637,10 +1007,20 @@ class MainWindow(QMainWindow):
 
     def _update_time(self):
         fps = self.player.frame_rate()
-        frame = "f —" if fps is None else f"f{round(self._position * fps)}"
-        if fps is not None and self.player.variable_frame_rate:
-            frame = f"≈ f {round(self._position * fps)}"
-        self.time_label.setText(f"{self._clock(self._position)} / {self._clock(self._duration)} · {frame}")
+        pos_text = self._clock(self._position)
+        dur_text = self._clock(self._duration)
+        self.pos_time_label.setText(pos_text)
+        self.dur_time_label.setText(dur_text)
+        if fps is None:
+            frame = "f —"
+            self.frame_label.setText("frame — / —")
+        else:
+            cur_frame = round(self._position * fps)
+            total_frames = round(self._duration * fps) if self._duration > 0 else "—"
+            frame = f"≈ f {cur_frame}" if self.player.variable_frame_rate else f"f{cur_frame}"
+            prefix = "≈ frame" if self.player.variable_frame_rate else "frame"
+            self.frame_label.setText(f"{prefix} {cur_frame} / {total_frames}")
+        self.time_label.setText(f"{pos_text} / {dur_text} · {frame}")
 
     def _duration_changed(self, duration):
         if self.sender() is not None and self.sender() is not self.player:
@@ -793,6 +1173,7 @@ class MainWindow(QMainWindow):
         start = self.settings.resume_position(self._current_file) if self.settings.resume_enabled else None
         self.player.load(self._current_file, start_position=start)
         self._pending_recent = (self.player._uri, str(self._current_file))
+        self.location_bar.setText(str(self._current_file))
         self._active_tab.title = file.name
         self._update_tab_status(self._active_tab)
         self._store_active_tab_state()
@@ -833,6 +1214,7 @@ class MainWindow(QMainWindow):
             start_position=start_position,
         )
         self._pending_recent = (self.player._uri, uri)
+        self.location_bar.setText(uri)
         self._active_tab.title = Path(remote_path).name
         self._update_tab_status(self._active_tab)
         self._store_active_tab_state()
