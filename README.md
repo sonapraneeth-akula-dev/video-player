@@ -26,6 +26,8 @@ For open checklist items, dependencies, and release blockers, see
 [Remaining work and blockers](docs/REMAINING_WORK.md).
 
 Run `vplayer` or `python -m vplayer`, then use **File > Open** to play a local video.
+Typing a local directory into the path bar lists its video files; choose one
+from the dropdown to play it.
 The window starts with an Open file / Connect to server placeholder. **Ctrl+T**
 opens a file in a new tab, **Ctrl+W** closes the active tab, and **Ctrl+Tab** /
 **Ctrl+Shift+Tab** switch tabs. Closing the last tab restores the placeholder;

@@ -9,11 +9,12 @@ from typing import ClassVar
 import mpv
 import paramiko
 import shiboken6
-from PySide6.QtCore import QEvent, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import QEvent, QStringListModel, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QCompleter,
     QFileDialog,
     QFocusFrame,
     QFrame,
@@ -30,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vplayer import APP_NAME
+from vplayer import APP_NAME, MEDIA_EXTS
 from vplayer.player import Player
 from vplayer.settings import Settings
 from vplayer.sftp import KnownHosts, SshPool
@@ -616,6 +617,13 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.browser)
         self.browser.hide()
         self.browser.file_activated.connect(self.open_file)
+        self._suggestions = QStringListModel(self.location_bar)
+        completer = QCompleter(self._suggestions, self.location_bar)
+        completer.setCompletionMode(QCompleter.CompletionMode.UnfilteredPopupCompletion)
+        completer.popup().setAccessibleName("Video files in directory")
+        self.location_bar.setCompleter(completer)
+        completer.activated[str].connect(self.open_file)
+        self.location_bar.textEdited.connect(self._suggest_videos)
         QWidget.setTabOrder(self.browser.all_files, self.browser.tree)
         QWidget.setTabOrder(self.browser.tree, self.tabs)
         QWidget.setTabOrder(self.tabs, self.seek_bar)
@@ -797,7 +805,28 @@ class MainWindow(QMainWindow):
     def _open_from_location(self):
         target = self.location_bar.text().strip()
         if target:
-            self.open_file(target)
+            if not target.lower().startswith("sftp://") and Path(target).is_dir():
+                self._suggest_videos(target)
+            else:
+                self.open_file(target)
+
+    def _suggest_videos(self, target: str):
+        folder = Path(target.strip())
+        files = []
+        if not target.lower().startswith("sftp://") and folder.is_dir():
+            try:
+                files = sorted(
+                    (str(path) for path in folder.iterdir()
+                     if path.suffix.lower() in MEDIA_EXTS and path.is_file()),
+                    key=str.casefold,
+                )
+            except OSError as error:
+                self.show_error(f"Could not list video files in {folder}: {error}")
+        self._suggestions.setStringList(files)
+        if files:
+            self.location_bar.completer().complete()
+        else:
+            self.location_bar.completer().popup().hide()
 
     def _seek_edge(self, last: bool):
         self.player.mpv.pause = True
