@@ -2,6 +2,8 @@
 
 Desktop video player for Windows 10/11 and Ubuntu 22.04 (in development).
 
+![VPlayer UI](docs/ui-screenshot.png)
+
 ## Development
 
 Use Python 3.12 and FFmpeg for test media. From the repository root:
