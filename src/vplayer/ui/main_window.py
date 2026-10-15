@@ -40,6 +40,7 @@ from vplayer.ui.dialogs import ConnectDialog, PreferencesDialog
 from vplayer.ui.tabs import DetachableTabWidget, PlayerTab
 
 SPEED_OPTIONS = (0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0)
+VIDEO_FILTER = "Video files (" + " ".join(f"*{ext}" for ext in MEDIA_EXTS) + ")"
 
 if sys.platform == "win32":
     UI_FONT = '"Segoe UI", sans-serif'
@@ -1019,7 +1020,7 @@ class MainWindow(QMainWindow):
         super().changeEvent(event)
 
     def new_tab(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", VIDEO_FILTER)
         if path:
             from vplayer.app import open_in_window
 
@@ -1184,7 +1185,7 @@ class MainWindow(QMainWindow):
             self.video_focus.hide()
 
     def choose_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", VIDEO_FILTER)
         if path:
             self.open_file(path)
 

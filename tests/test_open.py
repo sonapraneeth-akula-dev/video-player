@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QFileDialog
 
+from vplayer import MEDIA_EXTS
 from vplayer import __main__ as entry
 from vplayer.settings import Settings
 from vplayer.ui.main_window import MainWindow
@@ -140,5 +141,27 @@ def test_open_file_button_selects_and_plays_video(qtbot, tmp_path, monkeypatch):
         window.open_btn.click()
         qtbot.waitUntil(lambda: window.player is not None and window.player.mpv.duration is not None, timeout=10000)
         assert window.player._uri == str(MEDIA)
+    finally:
+        window.close()
+
+
+def test_file_and_new_tab_picker_only_list_video_types(qtbot, tmp_path, monkeypatch):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    calls = []
+
+    def choose(*args):
+        calls.append(args)
+        return "", ""
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", choose)
+    try:
+        window.open_btn.click()
+        window.file_menu.actions()[0].trigger()
+        window.new_tab()
+        expected = "Video files (" + " ".join(f"*{ext}" for ext in MEDIA_EXTS) + ")"
+        assert len(calls) == 3
+        assert all(args[3] == expected for args in calls)
+        assert "All files" not in expected
     finally:
         window.close()

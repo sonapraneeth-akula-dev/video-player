@@ -27,6 +27,7 @@ For open checklist items, dependencies, and release blockers, see
 
 Run `vplayer` or `python -m vplayer`, then click **Open File** or press
 **Ctrl+O** to select a local video.
+The file picker shows supported video types instead of unrelated files.
 Typing a local directory into the path bar lists its video files; choose one
 from the dropdown to play it.
 The window starts with an Open file / Connect to server placeholder. **Ctrl+T**
