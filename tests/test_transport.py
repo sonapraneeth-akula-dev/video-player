@@ -99,6 +99,40 @@ def test_volume_mute_and_fullscreen_shortcuts(qtbot, tmp_path):
         window.close()
 
 
+def test_fit_actual_pixels_and_fullscreen_controls(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    window._add_player_tab("Video")
+    window.player.mpv.ao = "null"
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        assert window.fit_btn.text() == "▣ Fit"
+        assert window.fit_btn.text() != window.fullscreen_btn.text()
+        assert not window.fit_btn.isEnabled()
+        with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
+            window.open_file(MEDIA)
+        assert window.fit_btn.isEnabled() and window.actual_size_btn.isEnabled()
+        window.actual_size_btn.click()
+        assert window.player.mpv.video_unscaled is True
+        assert window.zoom_label.text() == "100%"
+        window.fit_btn.click()
+        assert window.player.mpv.video_unscaled is False
+        assert window.zoom_label.text() == "Fit"
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
+        window.video.setFocus()
+        QTest.keyClick(window.video, Qt.Key.Key_1, Qt.KeyboardModifier.ControlModifier)
+        assert window.player.mpv.video_unscaled is True
+        QTest.keyClick(window.video, Qt.Key.Key_0, Qt.KeyboardModifier.ControlModifier)
+        assert window.player.mpv.video_unscaled is False
+        QTest.keyClick(window.video, Qt.Key.Key_F11)
+        qtbot.waitUntil(window.isFullScreen)
+        window.fullscreen_btn.click()
+        qtbot.waitUntil(lambda: not window.isFullScreen())
+    finally:
+        window.close()
+
+
 def test_frame_actions_are_available_after_load(qtbot, tmp_path, monkeypatch):
     settings = Settings(tmp_path / "settings.ini")
     settings.store.setValue("playback/skip_frames", 7)

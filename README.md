@@ -46,6 +46,8 @@ Use **Space** or the toolbar to play/pause (the button shows the next action);
 click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Home/End** or the first/last-frame buttons to pause on a video boundary.
+Use **Ctrl+0** to fit video to the window, **Ctrl+1** for actual pixels, and
+**F11** to toggle fullscreen.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).
 You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
