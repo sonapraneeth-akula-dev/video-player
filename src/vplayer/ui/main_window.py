@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QCompleter,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFocusFrame,
     QFrame,
@@ -23,6 +25,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QPlainTextEdit,
     QPushButton,
     QSlider,
     QStyle,
@@ -31,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vplayer import APP_NAME, MEDIA_EXTS
+from vplayer import APP_NAME, MEDIA_EXTS, __version__
 from vplayer.player import Player
 from vplayer.settings import Settings
 from vplayer.sftp import KnownHosts, SshPool
@@ -504,7 +507,12 @@ class MainWindow(QMainWindow):
         self.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
         toolbar_layout.addWidget(self.fullscreen_btn)
         toolbar_layout.addWidget(_make_sep(self.top_toolbar))
-        self.help_btn = _make_btn("?", "Keyboard shortcuts (F1)", "Keyboard shortcuts", "tbtn", self.top_toolbar)
+        self.help_btn = _make_btn("?", "Help and version (F1)", "Help and version", "tbtn", self.top_toolbar)
+        self.help_action = QAction("Help and version", self)
+        self.help_action.setShortcut("F1")
+        self.help_action.triggered.connect(self.show_help)
+        self.addAction(self.help_action)
+        self.help_btn.clicked.connect(self.help_action.trigger)
         toolbar_layout.addWidget(self.help_btn)
         layout.addWidget(self.top_toolbar)
 
@@ -1243,6 +1251,38 @@ class MainWindow(QMainWindow):
         dialog.accepted.connect(lambda: self._save_resume_preference(dialog.resume_enabled.isChecked()))
         dialog.accepted.connect(lambda: self._save_background_preference(dialog.background_tabs.currentData()))
         dialog.accepted.connect(lambda: self._save_hwdec_preference(dialog.hwdec.currentData()))
+        dialog.open()
+
+    def show_help(self):
+        dialog = self.findChild(QDialog, "help_dialog")
+        if dialog is not None and dialog.isVisible():
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+        dialog = QDialog(self)
+        dialog.setObjectName("help_dialog")
+        dialog.setWindowTitle(f"{APP_NAME} Help")
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.resize(430, 480)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(f"{APP_NAME} {__version__} — Keyboard shortcuts", dialog))
+        shortcuts = QPlainTextEdit(dialog)
+        shortcuts.setAccessibleName("Keyboard shortcuts")
+        shortcuts.setReadOnly(True)
+        sections = []
+        for menu in (self.file_menu, self.view_menu, self.playback_menu, self.audio_menu, self.subtitle_menu):
+            entries = [
+                f"{action.shortcut().toString()}: {action.text().replace('&', '')}"
+                for action in menu.actions() if not action.shortcut().isEmpty()
+            ]
+            sections.append(f"{menu.title().replace('&', '')}\n" + "\n".join(entries))
+        sections.append("Help\nF1: Help and version")
+        shortcuts.setPlainText("\n\n".join(sections))
+        layout.addWidget(shortcuts)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, dialog)
+        buttons.button(QDialogButtonBox.StandardButton.Close).setAccessibleName("Close")
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
         dialog.open()
 
     def _save_hwdec_preference(self, mode: str):

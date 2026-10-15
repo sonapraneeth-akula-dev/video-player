@@ -3,8 +3,16 @@ from pathlib import Path
 import paramiko
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QPlainTextEdit,
+    QWidget,
+)
 
+from vplayer import __version__
 from vplayer.settings import Settings
 from vplayer.sftp import KnownHosts
 from vplayer.ui.dialogs import ConnectDialog, HostKeyDialog, PreferencesDialog
@@ -90,6 +98,32 @@ def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
         QTest.keyClick(preferences.background_tabs, Qt.Key.Key_Tab)
         assert QApplication.focusWidget().accessibleName() == "OK"
         preferences.close()
+    finally:
+        window.close()
+
+
+def test_help_button_and_f1_show_closable_shortcuts_and_version(qtbot, tmp_path):
+    window = MainWindow(Settings(tmp_path / "settings.ini"))
+    qtbot.addWidget(window)
+    window.show()
+    try:
+        window.help_btn.click()
+        dialog = window.findChild(QDialog, "help_dialog")
+        assert dialog is not None and dialog.isVisible()
+        assert __version__ in dialog.findChild(QLabel).text()
+        shortcuts = dialog.findChild(QPlainTextEdit)
+        assert shortcuts.isReadOnly() and shortcuts.accessibleName() == "Keyboard shortcuts"
+        assert all(key in shortcuts.toPlainText() for key in ("Ctrl+O", "Space", "Ctrl+0", "F11", "F1"))
+        close = dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Close)
+        with qtbot.waitSignal(dialog.finished):
+            close.click()
+        window.activateWindow()
+        qtbot.waitUntil(window.isActiveWindow)
+        QTest.keyClick(window, Qt.Key.Key_F1)
+        dialog = window.findChild(QDialog, "help_dialog")
+        assert dialog is not None and dialog.isVisible()
+        with qtbot.waitSignal(dialog.finished):
+            QTest.keyClick(dialog, Qt.Key.Key_Escape)
     finally:
         window.close()
 
