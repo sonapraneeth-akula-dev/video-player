@@ -17,20 +17,27 @@ def test_play_pause_and_click_drag_seek(qtbot, tmp_path, monkeypatch):
     try:
         assert not window.controls.play_action.isEnabled()
         assert not window.seek_bar.isEnabled()
+        button = window.controls.play_button
+        assert button.text() == "▶\ufe0e"
         qtbot.waitUntil(lambda: window.video._render is not None, timeout=10000)
         with qtbot.waitSignal(window.player.file_loaded, timeout=10000):
             window.open_file(MEDIA)
         qtbot.waitUntil(window.seek_bar.isEnabled)
         assert window.controls.play_action.shortcut().toString() == "Space"
         qtbot.waitUntil(lambda: window.controls.play_action.text() == "Pause")
+        assert button.text() == "⏸\ufe0e"
+        assert button.accessibleName() == "Pause"
 
         window.controls.widgetForAction(window.controls.play_action).click()
         qtbot.waitUntil(lambda: window.player.state()["pause"] is True)
         qtbot.waitUntil(lambda: window.controls.play_action.text() == "Play")
+        assert button.text() == "▶\ufe0e"
+        assert button.accessibleName() == "Play"
         window.activateWindow()
         qtbot.waitUntil(window.isActiveWindow)
         QTest.keyClick(window, Qt.Key.Key_Space)
         qtbot.waitUntil(lambda: window.player.state()["pause"] is False)
+        qtbot.waitUntil(lambda: button.text() == "⏸\ufe0e")
 
         calls = []
         original_seek = window.player.seek

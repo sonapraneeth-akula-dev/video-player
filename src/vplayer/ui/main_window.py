@@ -356,9 +356,15 @@ class ControlBar(QWidget):
         self.play_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.play_button.setEnabled(False)
         self.play_button.clicked.connect(self.play_action.trigger)
-        self.play_action.changed.connect(
-            lambda: self.play_button.setEnabled(self.play_action.isEnabled()),
-        )
+        self.play_action.changed.connect(self._sync_button)
+        self._sync_button()
+
+    def _sync_button(self):
+        label = self.play_action.text()
+        self.play_button.setEnabled(self.play_action.isEnabled())
+        self.play_button.setText("▶\ufe0e" if label == "Play" else "⏸\ufe0e")
+        self.play_button.setAccessibleName(label)
+        self.play_button.setToolTip(f"{label} (Space)")
 
     def widgetForAction(self, action):
         return self.play_button if action is self.play_action else None
@@ -984,8 +990,7 @@ class MainWindow(QMainWindow):
             self.first_frame_action, self.last_frame_action, *self.skip_actions,
         ):
             action.setEnabled(loaded)
-        if tab is not None:
-            self.controls.play_action.setText("Play" if self.player.mpv.pause else "Pause")
+        self.controls.play_action.setText("Pause" if loaded and not self.player.mpv.pause else "Play")
         self._refresh_tracks()
 
     def _hide_background_tab(self, tab):

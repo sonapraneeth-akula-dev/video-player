@@ -42,7 +42,8 @@ By default, switching tabs or minimizing a window pauses playback; returning
 resumes only videos that were playing before they became hidden. **File >
 Preferences > Background tabs** can instead keep hidden tabs playing muted
 or with audio; the choice applies to all open windows.
-Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
+Use **Space** or the toolbar to play/pause (the button shows the next action);
+click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Home/End** or the first/last-frame buttons to pause on a video boundary.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
