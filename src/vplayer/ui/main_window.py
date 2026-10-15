@@ -1254,8 +1254,11 @@ class MainWindow(QMainWindow):
         dialog.open()
 
     def show_help(self):
-        dialog = self.findChild(QDialog, "help_dialog")
-        if dialog is not None and dialog.isVisible():
+        dialog = next(
+            (child for child in self.findChildren(QDialog, "help_dialog") if child.isVisible()),
+            None,
+        )
+        if dialog is not None:
             dialog.raise_()
             dialog.activateWindow()
             return

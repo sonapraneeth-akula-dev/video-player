@@ -120,8 +120,13 @@ def test_help_button_and_f1_show_closable_shortcuts_and_version(qtbot, tmp_path)
         window.activateWindow()
         qtbot.waitUntil(window.isActiveWindow)
         QTest.keyClick(window, Qt.Key.Key_F1)
-        dialog = window.findChild(QDialog, "help_dialog")
-        assert dialog is not None and dialog.isVisible()
+        dialog = next(
+            (child for child in window.findChildren(QDialog, "help_dialog") if child.isVisible()),
+            None,
+        )
+        assert dialog is not None
+        window.help_action.trigger()
+        assert sum(child.isVisible() for child in window.findChildren(QDialog, "help_dialog")) == 1
         with qtbot.waitSignal(dialog.finished):
             QTest.keyClick(dialog, Qt.Key.Key_Escape)
     finally:
