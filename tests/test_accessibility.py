@@ -102,7 +102,7 @@ def test_keyboard_tab_order_and_focus_feedback(qtbot, tmp_path: Path):
         window.close()
 
 
-def test_help_button_and_f1_show_closable_shortcuts_and_version(qtbot, tmp_path):
+def test_help_button_shows_closable_shortcuts_and_version(qtbot, tmp_path):
     window = MainWindow(Settings(tmp_path / "settings.ini"))
     qtbot.addWidget(window)
     window.show()
@@ -113,16 +113,11 @@ def test_help_button_and_f1_show_closable_shortcuts_and_version(qtbot, tmp_path)
         assert __version__ in dialog.findChild(QLabel).text()
         shortcuts = dialog.findChild(QPlainTextEdit)
         assert shortcuts.isReadOnly() and shortcuts.accessibleName() == "Keyboard shortcuts"
-        assert all(key in shortcuts.toPlainText() for key in ("Ctrl+O", "Space", "Ctrl+0", "F11", "F1"))
+        assert all(key in shortcuts.toPlainText() for key in ("Ctrl+O", "Space", "Ctrl+0", "F11"))
         close = dialog.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Close)
         with qtbot.waitSignal(dialog.finished):
             close.click()
-        window.activateWindow()
-        qtbot.waitUntil(window.isActiveWindow)
-        window.help_btn.setFocus()
-        qtbot.waitUntil(window.help_btn.hasFocus)
-        with qtbot.waitSignal(window.help_action.triggered, timeout=3000):
-            QTest.keyClick(window.help_btn, Qt.Key.Key_F1)
+        window.help_btn.click()
         qtbot.waitUntil(
             lambda: any(child.isVisible() for child in window.findChildren(QDialog, "help_dialog")),
             timeout=3000,
@@ -132,7 +127,7 @@ def test_help_button_and_f1_show_closable_shortcuts_and_version(qtbot, tmp_path)
             None,
         )
         assert dialog is not None
-        window.help_action.trigger()
+        window.show_help()
         assert sum(child.isVisible() for child in window.findChildren(QDialog, "help_dialog")) == 1
         with qtbot.waitSignal(dialog.finished):
             QTest.keyClick(dialog, Qt.Key.Key_Escape)

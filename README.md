@@ -48,7 +48,7 @@ click or drag the seek bar, or use
 Use **Home/End** or the first/last-frame buttons to pause on a video boundary.
 Use **Ctrl+0** to fit video to the window, **Ctrl+1** for actual pixels, and
 **F11** to toggle fullscreen.
-Click **?** or press **F1** to view the version and keyboard shortcuts; close
+Click **?** to view the version and keyboard shortcuts; close
 the help dialog with **Close** or **Esc**.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).

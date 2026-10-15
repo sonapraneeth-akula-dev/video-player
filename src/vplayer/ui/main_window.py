@@ -507,12 +507,8 @@ class MainWindow(QMainWindow):
         self.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
         toolbar_layout.addWidget(self.fullscreen_btn)
         toolbar_layout.addWidget(_make_sep(self.top_toolbar))
-        self.help_btn = _make_btn("?", "Help and version (F1)", "Help and version", "tbtn", self.top_toolbar)
-        self.help_action = QAction("Help and version", self)
-        self.help_action.setShortcut("F1")
-        self.help_action.triggered.connect(self.show_help)
-        self.addAction(self.help_action)
-        self.help_btn.clicked.connect(self.help_action.trigger)
+        self.help_btn = _make_btn("?", "Help and version", "Help and version", "tbtn", self.top_toolbar)
+        self.help_btn.clicked.connect(self.show_help)
         toolbar_layout.addWidget(self.help_btn)
         layout.addWidget(self.top_toolbar)
 
@@ -1279,7 +1275,6 @@ class MainWindow(QMainWindow):
                 for action in menu.actions() if not action.shortcut().isEmpty()
             ]
             sections.append(f"{menu.title().replace('&', '')}\n" + "\n".join(entries))
-        sections.append("Help\nF1: Help and version")
         shortcuts.setPlainText("\n\n".join(sections))
         layout.addWidget(shortcuts)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, dialog)
