@@ -119,7 +119,14 @@ def test_help_button_and_f1_show_closable_shortcuts_and_version(qtbot, tmp_path)
             close.click()
         window.activateWindow()
         qtbot.waitUntil(window.isActiveWindow)
-        QTest.keyClick(window, Qt.Key.Key_F1)
+        window.help_btn.setFocus()
+        qtbot.waitUntil(window.help_btn.hasFocus)
+        with qtbot.waitSignal(window.help_action.triggered, timeout=3000):
+            QTest.keyClick(window.help_btn, Qt.Key.Key_F1)
+        qtbot.waitUntil(
+            lambda: any(child.isVisible() for child in window.findChildren(QDialog, "help_dialog")),
+            timeout=3000,
+        )
         dialog = next(
             (child for child in window.findChildren(QDialog, "help_dialog") if child.isVisible()),
             None,
