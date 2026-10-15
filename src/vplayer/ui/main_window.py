@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QCompleter,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFocusFrame,
     QFrame,
@@ -23,6 +25,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QPlainTextEdit,
     QPushButton,
     QSlider,
     QStyle,
@@ -31,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from vplayer import APP_NAME, MEDIA_EXTS
+from vplayer import APP_NAME, MEDIA_EXTS, __version__
 from vplayer.player import Player
 from vplayer.settings import Settings
 from vplayer.sftp import KnownHosts, SshPool
@@ -40,6 +43,7 @@ from vplayer.ui.dialogs import ConnectDialog, PreferencesDialog
 from vplayer.ui.tabs import DetachableTabWidget, PlayerTab
 
 SPEED_OPTIONS = (0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0)
+VIDEO_FILTER = "Video files (" + " ".join(f"*{ext}" for ext in MEDIA_EXTS) + ")"
 
 if sys.platform == "win32":
     UI_FONT = '"Segoe UI", sans-serif'
@@ -355,9 +359,15 @@ class ControlBar(QWidget):
         self.play_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.play_button.setEnabled(False)
         self.play_button.clicked.connect(self.play_action.trigger)
-        self.play_action.changed.connect(
-            lambda: self.play_button.setEnabled(self.play_action.isEnabled()),
-        )
+        self.play_action.changed.connect(self._sync_button)
+        self._sync_button()
+
+    def _sync_button(self):
+        label = self.play_action.text()
+        self.play_button.setEnabled(self.play_action.isEnabled())
+        self.play_button.setText("▶\ufe0e" if label == "Play" else "⏸\ufe0e")
+        self.play_button.setAccessibleName(label)
+        self.play_button.setToolTip(f"{label} (Space)")
 
     def widgetForAction(self, action):
         return self.play_button if action is self.play_action else None
@@ -436,7 +446,7 @@ class MainWindow(QMainWindow):
         self.coords_label.setObjectName("coords_label")
         self.coords_label.setAccessibleName("Cursor coordinates")
         self.statusBar().addWidget(self.coords_label)
-        self.zoom_label = QLabel("100%", self)
+        self.zoom_label = QLabel("Fit", self)
         self.zoom_label.setObjectName("zoom_label")
         self.zoom_label.setAccessibleName("Zoom level")
         self.statusBar().addWidget(self.zoom_label)
@@ -489,7 +499,7 @@ class MainWindow(QMainWindow):
         self.copy_frame_btn = _make_btn("📋", "Copy frame to clipboard (Ctrl+Shift+C)", "Copy frame to clipboard", "tbtn", self.top_toolbar)
         toolbar_layout.addWidget(self.copy_frame_btn)
         toolbar_layout.addWidget(_make_sep(self.top_toolbar))
-        self.fit_btn = _make_btn("⛶", "Fit to window (Ctrl+0)", "Fit to window", "tbtn", self.top_toolbar)
+        self.fit_btn = _make_btn("▣ Fit", "Fit to window (Ctrl+0)", "Fit to window", "tbtn", self.top_toolbar)
         toolbar_layout.addWidget(self.fit_btn)
         self.actual_size_btn = _make_btn("1:1", "Actual pixels 1:1 (Ctrl+1)", "Actual pixels 1:1", "tbtn", self.top_toolbar)
         toolbar_layout.addWidget(self.actual_size_btn)
@@ -497,7 +507,8 @@ class MainWindow(QMainWindow):
         self.fullscreen_btn.clicked.connect(self.toggle_fullscreen)
         toolbar_layout.addWidget(self.fullscreen_btn)
         toolbar_layout.addWidget(_make_sep(self.top_toolbar))
-        self.help_btn = _make_btn("?", "Keyboard shortcuts (F1)", "Keyboard shortcuts", "tbtn", self.top_toolbar)
+        self.help_btn = _make_btn("?", "Help and version", "Help and version", "tbtn", self.top_toolbar)
+        self.help_btn.clicked.connect(self.show_help)
         toolbar_layout.addWidget(self.help_btn)
         layout.addWidget(self.top_toolbar)
 
@@ -683,6 +694,28 @@ class MainWindow(QMainWindow):
         browser_action = self.browser.toggleViewAction()
         browser_action.setShortcut("Ctrl+B")
         self.view_menu.addAction(browser_action)
+        self.fit_action = QAction("Fit to window", self)
+        self.fit_action.setShortcut("Ctrl+0")
+        self.fit_action.setEnabled(False)
+        self.fit_action.triggered.connect(lambda: self._set_video_scale(False))
+        self.fit_action.changed.connect(lambda: self.fit_btn.setEnabled(self.fit_action.isEnabled()))
+        self.fit_btn.setEnabled(False)
+        self.fit_btn.clicked.connect(self.fit_action.trigger)
+        self.view_menu.addAction(self.fit_action)
+        self.actual_size_action = QAction("Actual pixels 1:1", self)
+        self.actual_size_action.setShortcut("Ctrl+1")
+        self.actual_size_action.setEnabled(False)
+        self.actual_size_action.triggered.connect(lambda: self._set_video_scale(True))
+        self.actual_size_action.changed.connect(
+            lambda: self.actual_size_btn.setEnabled(self.actual_size_action.isEnabled()),
+        )
+        self.actual_size_btn.setEnabled(False)
+        self.actual_size_btn.clicked.connect(self.actual_size_action.trigger)
+        self.view_menu.addAction(self.actual_size_action)
+        fullscreen_action = QAction("Fullscreen", self)
+        fullscreen_action.setShortcut("F11")
+        fullscreen_action.triggered.connect(self.toggle_fullscreen)
+        self.view_menu.addAction(fullscreen_action)
         self.playback_menu = self.menuBar().addMenu("&Playback")
         self.playback_menu.addAction(self.controls.play_action)
         self.audio_menu = self.menuBar().addMenu("&Audio")
@@ -865,6 +898,8 @@ class MainWindow(QMainWindow):
         player.file_loaded.connect(lambda: tab.owner._file_opened(tab))
         active(player.file_loaded, lambda window: window.banner.hide(), lambda _window: setattr(tab, "banner_visible", False))
         active(player.file_loaded, lambda window: window.controls.play_action.setEnabled(True))
+        active(player.file_loaded, lambda window: window.fit_action.setEnabled(True))
+        active(player.file_loaded, lambda window: window.actual_size_action.setEnabled(True))
         active(player.file_loaded, lambda window: window.frame_next.setEnabled(True))
         active(player.file_loaded, lambda window: window.frame_prev.setEnabled(True))
         active(player.file_loaded, lambda window: window.first_frame_action.setEnabled(True))
@@ -971,10 +1006,13 @@ class MainWindow(QMainWindow):
             if previous is not None and self.video.isVisible():
                 self.video.setFocus()
         loaded = tab is not None and self.player.mpv.duration is not None
+        self.zoom_label.setText("100%" if loaded and self.player.mpv.video_unscaled else "Fit")
         self._update_metadata()
         self.move_tab_action.setEnabled(tab is not None)
         self.copy_position_action.setEnabled(tab is not None)
         self.seek_bar.setEnabled(loaded)
+        self.fit_action.setEnabled(loaded)
+        self.actual_size_action.setEnabled(loaded)
         for action in self.playback_menu.actions():
             if action.text() not in ("Fullscreen", "Exit fullscreen"):
                 action.setEnabled(tab is not None)
@@ -983,8 +1021,7 @@ class MainWindow(QMainWindow):
             self.first_frame_action, self.last_frame_action, *self.skip_actions,
         ):
             action.setEnabled(loaded)
-        if tab is not None:
-            self.controls.play_action.setText("Play" if self.player.mpv.pause else "Pause")
+        self.controls.play_action.setText("Pause" if loaded and not self.player.mpv.pause else "Play")
         self._refresh_tracks()
 
     def _hide_background_tab(self, tab):
@@ -1019,7 +1056,7 @@ class MainWindow(QMainWindow):
         super().changeEvent(event)
 
     def new_tab(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", VIDEO_FILTER)
         if path:
             from vplayer.app import open_in_window
 
@@ -1175,6 +1212,13 @@ class MainWindow(QMainWindow):
         if self._duration:
             self.player.seek(value / self.seek_bar.maximum() * self._duration)
 
+    def _set_video_scale(self, unscaled: bool):
+        if self.player is None or self.player.mpv.duration is None:
+            self.show_error("Open a video to change its size")
+            return
+        self.player.mpv.video_unscaled = unscaled
+        self.zoom_label.setText("100%" if unscaled else "Fit")
+
     def _focus_changed(self, _previous, current):
         if self.video is not None and current is self.video:
             self.video_focus.setWidget(self.video)
@@ -1184,7 +1228,7 @@ class MainWindow(QMainWindow):
             self.video_focus.hide()
 
     def choose_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Open Video")
+        path, _ = QFileDialog.getOpenFileName(self, "Open Video", "", VIDEO_FILTER)
         if path:
             self.open_file(path)
 
@@ -1203,6 +1247,40 @@ class MainWindow(QMainWindow):
         dialog.accepted.connect(lambda: self._save_resume_preference(dialog.resume_enabled.isChecked()))
         dialog.accepted.connect(lambda: self._save_background_preference(dialog.background_tabs.currentData()))
         dialog.accepted.connect(lambda: self._save_hwdec_preference(dialog.hwdec.currentData()))
+        dialog.open()
+
+    def show_help(self):
+        dialog = next(
+            (child for child in self.findChildren(QDialog, "help_dialog") if child.isVisible()),
+            None,
+        )
+        if dialog is not None:
+            dialog.raise_()
+            dialog.activateWindow()
+            return
+        dialog = QDialog(self)
+        dialog.setObjectName("help_dialog")
+        dialog.setWindowTitle(f"{APP_NAME} Help")
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.resize(430, 480)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel(f"{APP_NAME} {__version__} — Keyboard shortcuts", dialog))
+        shortcuts = QPlainTextEdit(dialog)
+        shortcuts.setAccessibleName("Keyboard shortcuts")
+        shortcuts.setReadOnly(True)
+        sections = []
+        for menu in (self.file_menu, self.view_menu, self.playback_menu, self.audio_menu, self.subtitle_menu):
+            entries = [
+                f"{action.shortcut().toString()}: {action.text().replace('&', '')}"
+                for action in menu.actions() if not action.shortcut().isEmpty()
+            ]
+            sections.append(f"{menu.title().replace('&', '')}\n" + "\n".join(entries))
+        shortcuts.setPlainText("\n\n".join(sections))
+        layout.addWidget(shortcuts)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, dialog)
+        buttons.button(QDialogButtonBox.StandardButton.Close).setAccessibleName("Close")
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
         dialog.open()
 
     def _save_hwdec_preference(self, mode: str):

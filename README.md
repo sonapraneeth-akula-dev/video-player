@@ -27,6 +27,7 @@ For open checklist items, dependencies, and release blockers, see
 
 Run `vplayer` or `python -m vplayer`, then click **Open File** or press
 **Ctrl+O** to select a local video.
+The file picker shows supported video types instead of unrelated files.
 Typing a local directory into the path bar lists its video files; choose one
 from the dropdown to play it.
 The window starts with an Open file / Connect to server placeholder. **Ctrl+T**
@@ -41,9 +42,14 @@ By default, switching tabs or minimizing a window pauses playback; returning
 resumes only videos that were playing before they became hidden. **File >
 Preferences > Background tabs** can instead keep hidden tabs playing muted
 or with audio; the choice applies to all open windows.
-Use **Space** or the toolbar to play/pause; click or drag the seek bar, or use
+Use **Space** or the toolbar to play/pause (the button shows the next action);
+click or drag the seek bar, or use
 **Left/Right** (5 seconds) and **Shift+Left/Right** (60 seconds) to seek.
 Use **Home/End** or the first/last-frame buttons to pause on a video boundary.
+Use **Ctrl+0** to fit video to the window, **Ctrl+1** for actual pixels, and
+**F11** to toggle fullscreen.
+Click **?** to view the version and keyboard shortcuts; close
+the help dialog with **Close** or **Esc**.
 Use **Up/Down** for volume, **M** for mute, and **F** for fullscreen (**Esc**
 to exit).
 You can also run `vplayer FILE [FILE ...]` to open paths from the command line,
